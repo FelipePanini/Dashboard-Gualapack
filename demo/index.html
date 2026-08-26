@@ -6,58 +6,62 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@600;700;800&family=IBM+Plex+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600;1,700&family=Archivo:wght@500;600;700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <style>
 :root{
   color-scheme: light;
-  --bg: #f2f1ec;
-  --surface-1: #fcfcfa;
+  --bg: #eef2f6;
+  --surface-1: #ffffff;
   --surface-2: #ffffff;
-  --surface-sunken: #e8e6de;
-  --border: #dcd9cd;
-  --border-strong: #c8c4b4;
-  --text-primary: #1c1a15;
-  --text-secondary: #5c584c;
-  --text-muted: #8a8574;
-  --accent: #d95926;
+  --surface-sunken: #e6ecf3;
+  --border: #d7e0e9;
+  --border-strong: #b9c8d8;
+  --text-primary: #0a1524;
+  --text-secondary: #3d5066;
+  --text-muted: #7288a0;
+  --accent: #0f5ea6;
   --accent-ink: #ffffff;
-  --accent-soft: #fbe3d4;
-  --series-1: #2a78d6;
-  --series-2: #eb6834;
-  --series-3: #1baf7a;
-  --series-4: #eda100;
-  --series-5: #4a3aa7;
-  --good: #0ca30c;
-  --good-bg: #e3f5e3;
-  --warning: #b5790a;
-  --warning-bg: #fdedcf;
-  --serious: #ec835a;
-  --serious-bg: #fde6dd;
-  --critical: #d03b3b;
-  --critical-bg: #fbe2e2;
-  --shadow: 0 1px 2px rgba(28,26,21,0.06), 0 8px 24px -12px rgba(28,26,21,0.18);
+  --accent-soft: #dbeaf8;
+  --brand-black: #0d0e10;
+  --brand-navy: #0a2f57;
+  --series-1: #0c3868;
+  --series-2: #1e5590;
+  --series-3: #2f78c4;
+  --series-4: #4f97dd;
+  --series-5: #123a6b;
+  --good: #0d8f4f;
+  --good-bg: #dff3e8;
+  --warning: #a9720a;
+  --warning-bg: #faedd2;
+  --serious: #c1602b;
+  --serious-bg: #fbe4d6;
+  --critical: #c22b3c;
+  --critical-bg: #fbdfe2;
+  --shadow: 0 1px 2px rgba(10,21,36,0.06), 0 10px 28px -14px rgba(10,21,36,0.22);
+  --grid-line: rgba(15,94,166,0.07);
 }
 @media (prefers-color-scheme: dark){
   :root:not([data-theme="light"]){
     color-scheme: dark;
-    --bg: #15140f;
-    --surface-1: #1c1b16;
-    --surface-2: #221f19;
-    --surface-sunken: #131210;
-    --border: #3431276;
-    --border: #34312a;
-    --border-strong: #454034;
-    --text-primary: #f4f2ea;
-    --text-secondary: #c3bfae;
-    --text-muted: #8d8877;
-    --accent: #ef7a3c;
-    --accent-ink: #1c1a15;
-    --accent-soft: #3a2618;
-    --series-1: #3987e5;
-    --series-2: #ef7a3c;
-    --series-3: #199e70;
-    --series-4: #c98500;
-    --series-5: #9085e9;
+    --bg: #07090c;
+    --surface-1: #0e1116;
+    --surface-2: #12161d;
+    --surface-sunken: #0a0d12;
+    --border: #212833;
+    --border-strong: #303b4a;
+    --text-primary: #eef3f9;
+    --text-secondary: #a7b7c9;
+    --text-muted: #6d7d90;
+    --accent: #4f9ce0;
+    --accent-ink: #071019;
+    --accent-soft: #132639;
+    --brand-black: #05070a;
+    --brand-navy: #14416f;
+    --series-1: #175a99;
+    --series-2: #2f7dc4;
+    --series-3: #4f9ce0;
+    --series-4: #8fc0ea;
+    --series-5: #9fc6ea;
     --good: #2fbf2f;
     --good-bg: #16301a;
     --warning: #e0a834;
@@ -67,27 +71,30 @@
     --critical: #e66767;
     --critical-bg: #3a1616;
     --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 32px -16px rgba(0,0,0,0.6);
+    --grid-line: rgba(79,156,224,0.10);
   }
 }
 :root[data-theme="dark"]{
   color-scheme: dark;
-  --bg: #15140f;
-  --surface-1: #1c1b16;
-  --surface-2: #221f19;
-  --surface-sunken: #131210;
-  --border: #34312a;
-  --border-strong: #454034;
-  --text-primary: #f4f2ea;
-  --text-secondary: #c3bfae;
-  --text-muted: #8d8877;
-  --accent: #ef7a3c;
-  --accent-ink: #1c1a15;
-  --accent-soft: #3a2618;
-  --series-1: #3987e5;
-  --series-2: #ef7a3c;
-  --series-3: #199e70;
-  --series-4: #c98500;
-  --series-5: #9085e9;
+  --bg: #07090c;
+  --surface-1: #0e1116;
+  --surface-2: #12161d;
+  --surface-sunken: #0a0d12;
+  --border: #212833;
+  --border-strong: #303b4a;
+  --text-primary: #eef3f9;
+  --text-secondary: #a7b7c9;
+  --text-muted: #6d7d90;
+  --accent: #4f9ce0;
+  --accent-ink: #071019;
+  --accent-soft: #132639;
+  --brand-black: #05070a;
+  --brand-navy: #14416f;
+  --series-1: #175a99;
+  --series-2: #2f7dc4;
+  --series-3: #4f9ce0;
+  --series-4: #8fc0ea;
+  --series-5: #9fc6ea;
   --good: #2fbf2f;
   --good-bg: #16301a;
   --warning: #e0a834;
@@ -97,6 +104,7 @@
   --critical: #e66767;
   --critical-bg: #3a1616;
   --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 32px -16px rgba(0,0,0,0.6);
+  --grid-line: rgba(79,156,224,0.10);
 }
 
 *{ box-sizing: border-box; }
@@ -104,14 +112,23 @@ html,body{ margin:0; padding:0; }
 body{
   background: var(--bg);
   color: var(--text-primary);
-  font-family: "IBM Plex Sans", system-ui, sans-serif;
+  font-family: "Public Sans", system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
+  background-image:
+    linear-gradient(var(--grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
+  background-size: 28px 28px;
+  background-attachment: fixed;
 }
 h1,h2,h3,.display{
-  font-family: "Big Shoulders Display", "IBM Plex Sans", sans-serif;
-  text-transform: uppercase;
-  letter-spacing: 0.01em;
+  font-family: "Archivo", "Public Sans", sans-serif;
+  letter-spacing: -0.01em;
   text-wrap: balance;
+}
+.brandmark{
+  font-family: "Playfair Display", "Georgia", serif;
+  font-style: italic;
+  font-weight: 700;
 }
 .mono{ font-family: "IBM Plex Mono", ui-monospace, monospace; font-variant-numeric: tabular-nums; }
 ::selection{ background: var(--accent-soft); }
@@ -143,7 +160,7 @@ h1,h2,h3,.display{
   background: var(--accent);
   color: var(--accent-ink);
   display:flex; align-items:center; justify-content:center;
-  font-family: "Big Shoulders Display", sans-serif;
+  font-family: "Archivo", sans-serif;
   font-weight: 800;
   font-size: 18px;
 }
@@ -180,8 +197,16 @@ h1,h2,h3,.display{
   background: var(--surface-1);
   position: sticky; top:0; z-index: 20;
 }
-.topbar-left h1{ font-size: 22px; margin:0; line-height:1; }
+.topbar-left{ display:flex; align-items:center; gap:18px; }
+.topbar-left h1{ font-size: 20px; margin:0; line-height:1; font-weight:700; }
 .topbar-sub{ color: var(--text-muted); font-size: 12.5px; margin-top: 4px; letter-spacing: 0.02em; }
+.brand-lockup{ display:flex; flex-direction:column; align-items:flex-start; line-height:1; }
+.brand-word{ font-family:"Playfair Display","Georgia",serif; font-style:italic; font-weight:700; font-size:21px; white-space:nowrap; }
+.brand-word .ink-primary{ color: var(--text-primary); }
+.brand-word .ink-accent{ color: var(--accent); }
+.brand-rule{ width:100%; height:1px; background: var(--border-strong); margin:5px 0 4px; opacity:.9; }
+.brand-region{ font-size:9.5px; letter-spacing:.16em; color: var(--text-muted); text-transform:uppercase; }
+.topbar-divider{ width:1px; align-self:stretch; background:var(--border); }
 .topbar-right{ display:flex; align-items:center; gap: 10px; }
 .pill-select, .icon-btn{
   font-family: inherit;
@@ -227,7 +252,7 @@ h1,h2,h3,.display{
 .kpi:nth-child(4){ animation-delay: .2s; }
 @keyframes rise{ to{ opacity:1; transform:none; } }
 .kpi-label{ font-size:12px; color:var(--text-muted); letter-spacing:.04em; text-transform:uppercase; }
-.kpi-value{ font-family:"Big Shoulders Display",sans-serif; font-size:38px; font-weight:700; margin-top:6px; line-height:1; font-variant-numeric: tabular-nums; }
+.kpi-value{ font-family:"Archivo",sans-serif; font-size:38px; font-weight:700; margin-top:6px; line-height:1; font-variant-numeric: tabular-nums; }
 .kpi-delta{ display:flex; align-items:center; gap:5px; margin-top:9px; font-size:12.5px; }
 .kpi-delta.up{ color: var(--good); }
 .kpi-delta.down{ color: var(--critical); }
@@ -316,7 +341,7 @@ tbody tr:hover{ background: var(--surface-sunken); }
   background: var(--accent); color: var(--accent-ink);
   border:none; cursor:pointer;
   display:flex; align-items:center; justify-content:center;
-  box-shadow: 0 10px 24px -6px rgba(217,89,38,0.55);
+  box-shadow: 0 10px 24px -6px rgba(15,94,166,0.5);
   transition: transform .15s ease;
 }
 .assistant-fab:hover{ transform: scale(1.05); }
@@ -398,7 +423,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 
 <div class="shell">
   <aside class="rail">
-    <div class="rail-mark">G</div>
+    <div class="rail-mark"><span class="brandmark">G</span></div>
     <nav class="rail-nav">
       <button class="rail-btn active" title="Visão geral" aria-label="Visão geral">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
@@ -419,8 +444,16 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
   <div class="main">
     <header class="topbar">
       <div class="topbar-left">
-        <h1>Painel de Produção</h1>
-        <div class="topbar-sub">Unidade Gualapack &middot; Área de Produção &middot; Turnos A/B/C</div>
+        <div class="brand-lockup">
+          <div class="brand-word"><span class="ink-primary">Guala</span><span class="ink-accent">pack</span></div>
+          <div class="brand-rule"></div>
+          <div class="brand-region">Brasil</div>
+        </div>
+        <div class="topbar-divider"></div>
+        <div>
+          <h1>Painel de Produção</h1>
+          <div class="topbar-sub">Área de Produção &middot; Turnos A/B/C</div>
+        </div>
       </div>
       <div class="topbar-right">
         <span class="tag-demo"><span class="dot"></span>Demonstração &middot; dados fictícios</span>
@@ -628,7 +661,7 @@ kpis.forEach(k=>{
 (function(){
   const holder = document.getElementById("avail-chart");
   const legend = document.getElementById("avail-legend");
-  const W = 640, H = 220, padL = 34, padR = 12, padT = 12, padB = 26;
+  const W = 640, H = 220, padL = 34, padR = 66, padT = 12, padB = 26;
   const plotW = W - padL - padR, plotH = H - padT - padB;
   const yMin = 40, yMax = 100;
 
@@ -656,6 +689,7 @@ kpis.forEach(k=>{
       paths += `<path class="series-path" data-id="${s.id}" d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.5s" fill="freeze"/></path>`;
       const li = s.data.length-1;
       dots += `<circle cx="${x(li)}" cy="${y(s.data[li])}" r="3.5" fill="${s.color}" stroke="var(--surface-1)" stroke-width="1.5"/>`;
+      dots += `<text x="${x(li)+8}" y="${y(s.data[li])+3.5}" font-size="10.5" font-weight="600" fill="${s.color}" font-family="Public Sans, sans-serif">${s.name.replace("Linha ","L")}</text>`;
     });
 
     holder.innerHTML = `
@@ -738,7 +772,7 @@ kpis.forEach(k=>{
   data.forEach((d,i)=>{
     const yTop = i*(rowH+gap);
     const barW = (d.scrap/maxVal)*barMaxW;
-    const color = d.scrap > target ? "var(--critical)" : "var(--series-3)";
+    const color = d.scrap > target ? "var(--critical)" : "var(--good)";
     bars += `
       <text x="0" y="${yTop+rowH/2+4}" font-size="12" fill="var(--text-secondary)" font-family="IBM Plex Sans">${d.name}</text>
       <rect x="${labelW}" y="${yTop+5}" width="${barMaxW}" height="${rowH-10}" rx="4" fill="var(--surface-sunken)"/>
