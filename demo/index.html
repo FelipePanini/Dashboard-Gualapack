@@ -584,7 +584,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
         <div class="topbar-divider"></div>
         <div>
           <h1>Painel de Produção</h1>
-          <div class="topbar-sub">Área de Produção &middot; Turnos A/B/C</div>
+          <div class="topbar-sub">Unidade Jaguariúna &middot; Área de Produção &middot; Turnos A/B/C</div>
         </div>
       </div>
       <div class="topbar-right">
@@ -628,8 +628,8 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
       <section class="panel" style="margin-bottom:16px;">
         <div class="panel-head">
           <div>
-            <h2 class="panel-title">Linhas de produção</h2>
-            <div class="panel-sub">Status atual, OEE e tendência de disponibilidade (7 dias)</div>
+            <h2 class="panel-title">Etapas do processo produtivo</h2>
+            <div class="panel-sub">Status atual, OEE e tendência de disponibilidade (7 dias), de Extrusão a Controle de Qualidade</div>
           </div>
         </div>
         <div class="machine-grid" id="machine-grid"></div>
@@ -689,17 +689,17 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 <script>
 /* ============ DEMO DATA (fictício) ============ */
 const LINES = [
-  { id:"L1", name:"Linha 1", product:"Sachê", oee:78, avail:88, perf:91, qual:97, scrap:3.1, status:"good",
+  { id:"L1", name:"Extrusão", short:"Extrusão", product:"Filmes e substratos", oee:78, avail:88, perf:91, qual:97, scrap:3.1, status:"good",
     trend:[86,87,85,89,90,88,91] },
-  { id:"L2", name:"Linha 2", product:"Stand-up Pouch", oee:64, avail:74, perf:88, qual:98, scrap:5.4, status:"warning",
+  { id:"L2", name:"Impressão", short:"Impressão", product:"Rotogravura / Flexografia", oee:64, avail:74, perf:88, qual:98, scrap:5.4, status:"warning",
     trend:[80,78,75,72,74,73,74] },
-  { id:"L3", name:"Linha 3", product:"Laminação", oee:82, avail:93, perf:90, qual:98, scrap:2.2, status:"good",
+  { id:"L3", name:"Laminação", short:"Laminação", product:"Estruturas multicamada", oee:82, avail:93, perf:90, qual:98, scrap:2.2, status:"good",
     trend:[90,91,92,93,92,94,93] },
-  { id:"L4", name:"Linha 4", product:"Extrusão", oee:55, avail:61, perf:83, qual:96, scrap:7.8, status:"critical",
+  { id:"L4", name:"Refile e Corte", short:"Refile", product:"Bobinas sob medida", oee:55, avail:61, perf:83, qual:96, scrap:7.8, status:"critical",
     trend:[70,66,63,60,58,62,61] },
-  { id:"L5", name:"Linha 5", product:"Corte e Solda", oee:74, avail:85, perf:89, qual:98, scrap:3.6, status:"good",
+  { id:"L5", name:"Formação e Selagem", short:"Formação", product:"Pouches e sachês", oee:74, avail:85, perf:89, qual:98, scrap:3.6, status:"good",
     trend:[81,83,82,84,85,84,85] },
-  { id:"L6", name:"Linha 6", product:"Sachê", oee:69, avail:80, perf:87, qual:97, scrap:4.4, status:"warning",
+  { id:"L6", name:"Controle de Qualidade", short:"CQ", product:"Inspeção e liberação", oee:69, avail:80, perf:87, qual:97, scrap:4.4, status:"warning",
     trend:[76,77,79,78,81,79,80] },
 ];
 
@@ -719,17 +719,17 @@ function genTrend(base, vol){
   return out;
 }
 const availSeries = LINES.slice(0,4).map((l,i)=>({
-  id: l.id, name: l.name, color: `var(--series-${i+1})`,
+  id: l.id, name: l.name, short: l.short, color: `var(--series-${i+1})`,
   data: genTrend(l.avail, 4)
 }));
 
 const FACAS = [
-  { id:"FC-102", linha:"Linha 1", tipo:"Corte rotativo", ciclos: 812000, vida: 1000000, afiacao: "12/08/2026" },
-  { id:"FC-118", linha:"Linha 2", tipo:"Vinco", ciclos: 960000, vida: 1000000, afiacao: "03/07/2026" },
-  { id:"FC-131", linha:"Linha 3", tipo:"Corte reto", ciclos: 410000, vida: 900000, afiacao: "20/08/2026" },
-  { id:"FC-140", linha:"Linha 4", tipo:"Corte rotativo", ciclos: 1040000, vida: 1000000, afiacao: "02/06/2026" },
-  { id:"FC-155", linha:"Linha 5", tipo:"Solda lateral", ciclos: 233000, vida: 850000, afiacao: "15/08/2026" },
-  { id:"FC-162", linha:"Linha 6", tipo:"Vinco", ciclos: 705000, vida: 950000, afiacao: "29/07/2026" },
+  { id:"FC-102", linha:"Refile e Corte", tipo:"Corte rotativo", ciclos: 812000, vida: 1000000, afiacao: "12/08/2026" },
+  { id:"FC-118", linha:"Formação e Selagem", tipo:"Vinco", ciclos: 960000, vida: 1000000, afiacao: "03/07/2026" },
+  { id:"FC-131", linha:"Laminação", tipo:"Corte reto (refile)", ciclos: 410000, vida: 900000, afiacao: "20/08/2026" },
+  { id:"FC-140", linha:"Refile e Corte", tipo:"Corte rotativo", ciclos: 1040000, vida: 1000000, afiacao: "02/06/2026" },
+  { id:"FC-155", linha:"Formação e Selagem", tipo:"Solda lateral", ciclos: 233000, vida: 850000, afiacao: "15/08/2026" },
+  { id:"FC-162", linha:"Formação e Selagem", tipo:"Vinco", ciclos: 705000, vida: 950000, afiacao: "29/07/2026" },
 ];
 
 /* ============ helpers ============ */
@@ -815,7 +815,7 @@ kpis.forEach((k,ki)=>{
 (function(){
   const holder = document.getElementById("avail-chart");
   const legend = document.getElementById("avail-legend");
-  const W = 640, H = 220, padL = 34, padR = 66, padT = 12, padB = 26;
+  const W = 640, H = 220, padL = 34, padR = 82, padT = 12, padB = 26;
   const plotW = W - padL - padR, plotH = H - padT - padB;
   const yMin = 40, yMax = 100;
 
@@ -843,7 +843,7 @@ kpis.forEach((k,ki)=>{
       paths += `<path class="series-path" data-id="${s.id}" d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.5s" fill="freeze"/></path>`;
       const li = s.data.length-1;
       dots += `<circle cx="${x(li)}" cy="${y(s.data[li])}" r="3.5" fill="${s.color}" stroke="var(--surface-1)" stroke-width="1.5"/>`;
-      dots += `<text x="${x(li)+8}" y="${y(s.data[li])+3.5}" font-size="10.5" font-weight="600" fill="${s.color}" font-family="Public Sans, sans-serif">${s.name.replace("Linha ","L")}</text>`;
+      dots += `<text x="${x(li)+8}" y="${y(s.data[li])+3.5}" font-size="10.5" font-weight="600" fill="${s.color}" font-family="Public Sans, sans-serif">${s.short}</text>`;
     });
 
     holder.innerHTML = `
@@ -917,7 +917,7 @@ kpis.forEach((k,ki)=>{
   const W = 420, rowH = 34, gap = 10;
   const H = data.length*(rowH+gap);
   const maxVal = Math.max(...data.map(d=>d.scrap), 8);
-  const labelW = 78, barMaxW = W-labelW-56;
+  const labelW = 118, barMaxW = W-labelW-56;
 
   const target = 3.5;
   const targetX = labelW + (target/maxVal)*barMaxW;
@@ -930,7 +930,7 @@ kpis.forEach((k,ki)=>{
     bars += `
       <g class="bar-row">
         <rect class="bar-hover-bg" x="-8" y="${yTop-2}" width="${W+8}" height="${rowH+4}" rx="6" fill="transparent"/>
-        <text x="0" y="${yTop+rowH/2+4}" font-size="12" fill="var(--text-secondary)" font-family="Public Sans">${d.name}</text>
+        <text x="0" y="${yTop+rowH/2+4}" font-size="11" fill="var(--text-secondary)" font-family="Public Sans">${d.name}</text>
         <rect x="${labelW}" y="${yTop+5}" width="${barMaxW}" height="${rowH-10}" rx="4" fill="var(--surface-sunken)"/>
         <rect class="bar-fill" x="${labelW}" y="${yTop+5}" width="0" height="${rowH-10}" rx="4" fill="${color}">
           <animate attributeName="width" from="0" to="${barW}" dur="0.7s" fill="freeze" begin="${i*0.06}s" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
