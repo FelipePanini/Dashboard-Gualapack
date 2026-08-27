@@ -33,7 +33,17 @@ const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
   auth: { autoRefreshToken: false, persistSession: false },
 });
 
-const JSON_HEADERS = { "Content-Type": "application/json" };
+// CORS: sem isso, o navegador bloqueia a resposta antes do front-end
+// conseguir lê-la (aparece como "erro de conexão", mesmo a função tendo
+// rodado com sucesso do lado do servidor). Restrinja ALLOWED_ORIGIN ao(s)
+// domínio(s) reais onde o painel roda em produção quando sair da fase de demo.
+const ALLOWED_ORIGIN = "*";
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": ALLOWED_ORIGIN,
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
+};
+const JSON_HEADERS = { "Content-Type": "application/json", ...CORS_HEADERS };
 
 // Rate limiting simples em memória (por instância) — mitiga tentativas de
 // força bruta contra a chave de convite. Para múltiplas instâncias/escala
@@ -58,6 +68,9 @@ function isValidEmail(email: string): boolean {
 }
 
 Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") {
+    return new Response(null, { status: 204, headers: CORS_HEADERS });
+  }
   if (req.method !== "POST") {
     return new Response(JSON.stringify({ error: "method_not_allowed" }), {
       status: 405,
