@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>Entrar — Painel de Produção Gualapack</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600;1,700&family=Archivo:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="./supabase-config.js"></script>
+<style>
+:root{
+  color-scheme: light;
+  --bg: #eef2f6;
+  --surface-1: #ffffff;
+  --border: #d7e0e9;
+  --border-strong: #b9c8d8;
+  --text-primary: #0a1524;
+  --text-secondary: #3d5066;
+  --text-muted: #7288a0;
+  --accent: #0f5ea6;
+  --accent-ink: #ffffff;
+  --accent-soft: #dbeaf8;
+  --series-1: #0c3868;
+  --series-3: #2f78c4;
+  --critical: #c22b3c;
+  --critical-bg: #fbdfe2;
+  --good: #0d8f4f;
+  --good-bg: #dff3e8;
+  --glass-bg: rgba(255,255,255,0.6);
+  --glass-bg-strong: rgba(255,255,255,0.78);
+  --glass-border: rgba(255,255,255,0.65);
+  --glass-highlight: rgba(255,255,255,0.9);
+  --glass-shadow: 0 1px 1px rgba(10,47,87,0.05), 0 30px 60px -24px rgba(10,47,87,0.35);
+  --blob-1: #2f78c4; --blob-2: #0c3868; --blob-3: #7fbde8;
+  --ease: cubic-bezier(.22,1,.36,1);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg: #07090c;
+    --surface-1: #0e1116;
+    --border: #212833;
+    --border-strong: #303b4a;
+    --text-primary: #eef3f9;
+    --text-secondary: #a7b7c9;
+    --text-muted: #6d7d90;
+    --accent: #4f9ce0;
+    --accent-ink: #071019;
+    --accent-soft: #132639;
+    --series-1: #175a99;
+    --series-3: #4f9ce0;
+    --critical: #e66767;
+    --critical-bg: #3a1616;
+    --good: #2fbf2f;
+    --good-bg: #16301a;
+    --glass-bg: rgba(20,26,36,0.55);
+    --glass-bg-strong: rgba(24,30,41,0.75);
+    --glass-border: rgba(146,180,214,0.16);
+    --glass-highlight: rgba(255,255,255,0.06);
+    --glass-shadow: 0 1px 1px rgba(0,0,0,0.3), 0 30px 60px -24px rgba(0,0,0,0.7);
+    --blob-1: #2f7dc4; --blob-2: #103257; --blob-3: #6fa9dd;
+  }
+}
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; height:100%; }
+body{
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: "Public Sans", system-ui, sans-serif;
+  min-height:100vh;
+  display:flex; align-items:center; justify-content:center;
+  padding: 24px;
+  overflow-x:hidden;
+  position:relative;
+}
+.liquid-field{ position:fixed; inset:0; z-index:0; overflow:hidden; pointer-events:none; }
+.liquid-field .blob{ position:absolute; border-radius:50%; filter:blur(70px); opacity:.4; }
+.blob-a{ width:560px; height:560px; left:-160px; top:-160px; background: radial-gradient(circle at 35% 35%, var(--blob-3), var(--blob-1) 60%, transparent 75%); animation: drift-a 26s var(--ease) infinite; }
+.blob-b{ width:480px; height:480px; right:-140px; bottom:-160px; background: radial-gradient(circle at 60% 40%, var(--blob-1), var(--blob-2) 65%, transparent 78%); animation: drift-b 32s var(--ease) infinite; }
+@keyframes drift-a{ 0%,100%{ transform:translate(0,0) scale(1);} 50%{ transform:translate(60px,50px) scale(1.08);} }
+@keyframes drift-b{ 0%,100%{ transform:translate(0,0) scale(1);} 50%{ transform:translate(-50px,-40px) scale(1.05);} }
+@media (prefers-reduced-motion: reduce){ .blob{ animation:none !important; } }
+
+.card{
+  position:relative; z-index:1;
+  width:100%; max-width:400px;
+  background: var(--glass-bg-strong);
+  backdrop-filter: blur(26px) saturate(180%);
+  -webkit-backdrop-filter: blur(26px) saturate(180%);
+  border:1px solid var(--glass-border);
+  border-radius:20px;
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+  padding: 30px 30px 26px;
+  opacity:0; transform: translateY(14px);
+  animation: rise .6s var(--ease) forwards;
+}
+@keyframes rise{ to{ opacity:1; transform:none; } }
+.brand-word{ font-family:"Playfair Display","Georgia",serif; font-style:italic; font-weight:700; font-size:26px; }
+.brand-word .ink-accent{ color:var(--accent); }
+.brand-region{ font-size:10px; letter-spacing:.16em; color:var(--text-muted); text-transform:uppercase; margin-top:2px; }
+h1{ font-family:"Archivo",sans-serif; font-size:19px; margin:20px 0 4px; letter-spacing:-0.01em; }
+.sub{ color:var(--text-muted); font-size:13px; margin-bottom:22px; line-height:1.5; }
+
+.tabs{ display:flex; gap:4px; background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:11px; padding:4px; margin-bottom:20px; }
+.tab{ flex:1; border:none; background:transparent; padding:8px 0; border-radius:8px; font-size:13px; font-weight:600; color:var(--text-muted); cursor:pointer; transition: all .25s var(--ease); font-family:inherit; }
+.tab.active{ background:var(--accent); color:var(--accent-ink); }
+
+form{ display:flex; flex-direction:column; gap:12px; }
+form.hidden{ display:none; }
+label{ font-size:12px; font-weight:600; color:var(--text-secondary); }
+.field{ display:flex; flex-direction:column; gap:5px; }
+input{
+  border:1px solid var(--glass-border); border-radius:10px; padding:11px 12px; font-size:13.5px;
+  background: var(--glass-bg); color:var(--text-primary); font-family:inherit;
+  transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+input:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.hint{ font-size:11px; color:var(--text-muted); }
+button.submit{
+  margin-top:6px;
+  background: linear-gradient(155deg, var(--series-3), var(--accent) 65%, var(--series-1));
+  color: var(--accent-ink); border:none; border-radius:10px; padding:12px; font-size:14px; font-weight:700;
+  cursor:pointer; font-family:inherit; box-shadow:0 10px 24px -8px rgba(15,94,166,0.5);
+  transition: transform .2s var(--ease), box-shadow .2s var(--ease);
+  display:flex; align-items:center; justify-content:center; gap:8px;
+}
+button.submit:hover{ transform: translateY(-1px); box-shadow:0 14px 30px -8px rgba(15,94,166,0.6); }
+button.submit:active{ transform: translateY(0) scale(.98); }
+button.submit:disabled{ opacity:.6; cursor:not-allowed; transform:none; }
+.spinner{ width:14px; height:14px; border-radius:50%; border:2px solid rgba(255,255,255,.4); border-top-color:#fff; animation: spin .7s linear infinite; display:none; }
+button.submit.loading .spinner{ display:inline-block; }
+@keyframes spin{ to{ transform: rotate(360deg); } }
+
+.msg{ font-size:12.5px; padding:9px 11px; border-radius:9px; display:none; line-height:1.5; }
+.msg.show{ display:block; }
+.msg.error{ background:var(--critical-bg); color:var(--critical); }
+.msg.success{ background:var(--good-bg); color:var(--good); }
+
+.footnote{ margin-top:20px; font-size:11px; color:var(--text-muted); text-align:center; line-height:1.6; }
+</style>
+</head>
+<body>
+
+<div class="liquid-field" aria-hidden="true">
+  <div class="blob blob-a"></div>
+  <div class="blob blob-b"></div>
+</div>
+
+<div class="card">
+  <div class="brand-word">Guala<span class="ink-accent">pack</span></div>
+  <div class="brand-region">Brasil &middot; Unidade Jaguariúna</div>
+  <h1>Painel de Produção</h1>
+  <div class="sub">Acesso restrito à equipe de Produção. O cadastro exige uma chave de convite válida.</div>
+
+  <div class="tabs">
+    <button class="tab active" id="tab-login" type="button">Entrar</button>
+    <button class="tab" id="tab-register" type="button">Cadastrar</button>
+  </div>
+
+  <div class="msg" id="msg"></div>
+
+  <form id="form-login">
+    <div class="field">
+      <label for="login-email">E-mail corporativo</label>
+      <input id="login-email" type="email" autocomplete="username" required />
+    </div>
+    <div class="field">
+      <label for="login-password">Senha</label>
+      <input id="login-password" type="password" autocomplete="current-password" required />
+    </div>
+    <button class="submit" type="submit">
+      <span class="spinner"></span><span class="label">Entrar</span>
+    </button>
+  </form>
+
+  <form id="form-register" class="hidden">
+    <div class="field">
+      <label for="reg-name">Nome completo</label>
+      <input id="reg-name" type="text" autocomplete="name" required minlength="2" />
+    </div>
+    <div class="field">
+      <label for="reg-email">E-mail corporativo</label>
+      <input id="reg-email" type="email" autocomplete="username" required />
+    </div>
+    <div class="field">
+      <label for="reg-password">Senha</label>
+      <input id="reg-password" type="password" autocomplete="new-password" required minlength="12" />
+      <span class="hint">Mínimo de 12 caracteres.</span>
+    </div>
+    <div class="field">
+      <label for="reg-invite">Chave de convite</label>
+      <input id="reg-invite" type="text" autocomplete="off" required />
+      <span class="hint">Fornecida pelo seu gestor de Produção. Sem ela não é possível se cadastrar.</span>
+    </div>
+    <button class="submit" type="submit">
+      <span class="spinner"></span><span class="label">Criar conta</span>
+    </button>
+  </form>
+
+  <div class="footnote">Acesso monitorado. O uso indevido de chaves de convite revoga o acesso da conta.</div>
+</div>
+
+<script>
+const cfg = window.SUPABASE_CONFIG;
+const configured = cfg && !cfg.url.includes("SEU-PROJETO");
+const client = configured ? window.supabase.createClient(cfg.url, cfg.anonKey) : null;
+
+const tabLogin = document.getElementById("tab-login");
+const tabRegister = document.getElementById("tab-register");
+const formLogin = document.getElementById("form-login");
+const formRegister = document.getElementById("form-register");
+const msg = document.getElementById("msg");
+
+function showMsg(text, type){
+  msg.textContent = text;
+  msg.className = `msg show ${type}`;
+}
+function clearMsg(){ msg.className = "msg"; }
+
+function switchTab(which){
+  clearMsg();
+  const isLogin = which === "login";
+  tabLogin.classList.toggle("active", isLogin);
+  tabRegister.classList.toggle("active", !isLogin);
+  formLogin.classList.toggle("hidden", !isLogin);
+  formRegister.classList.toggle("hidden", isLogin);
+}
+tabLogin.addEventListener("click", ()=> switchTab("login"));
+tabRegister.addEventListener("click", ()=> switchTab("register"));
+
+function setLoading(btn, on){
+  btn.disabled = on;
+  btn.classList.toggle("loading", on);
+}
+
+if(!configured){
+  showMsg("Backend ainda não configurado (preencha demo/supabase-config.js com a URL e a anon key do seu projeto Supabase). Esta tela funciona só como pré-visualização visual.", "error");
+}
+
+formLogin.addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  clearMsg();
+  if(!configured) return showMsg("Backend não configurado ainda.", "error");
+  const btn = formLogin.querySelector("button.submit");
+  setLoading(btn, true);
+  const email = document.getElementById("login-email").value.trim();
+  const password = document.getElementById("login-password").value;
+  const { error } = await client.auth.signInWithPassword({ email, password });
+  setLoading(btn, false);
+  if(error){
+    showMsg("E-mail ou senha incorretos.", "error");
+    return;
+  }
+  window.location.href = "./index.html";
+});
+
+formRegister.addEventListener("submit", async (e)=>{
+  e.preventDefault();
+  clearMsg();
+  if(!configured) return showMsg("Backend não configurado ainda.", "error");
+  const btn = formRegister.querySelector("button.submit");
+  setLoading(btn, true);
+  const fullName = document.getElementById("reg-name").value.trim();
+  const email = document.getElementById("reg-email").value.trim();
+  const password = document.getElementById("reg-password").value;
+  const inviteKey = document.getElementById("reg-invite").value.trim();
+
+  try{
+    const res = await fetch(cfg.registerFunctionUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fullName, email, password, inviteKey }),
+    });
+    const data = await res.json();
+    if(!res.ok){
+      showMsg(data.message || "Não foi possível concluir o cadastro.", "error");
+      setLoading(btn, false);
+      return;
+    }
+    showMsg("Conta criada! Entrando...", "success");
+    const { error } = await client.auth.signInWithPassword({ email, password });
+    setLoading(btn, false);
+    if(error){ switchTab("login"); return; }
+    window.location.href = "./index.html";
+  }catch(err){
+    showMsg("Erro de conexão com o servidor. Tente novamente.", "error");
+    setLoading(btn, false);
+  }
+});
+
+// Se já existe sessão válida, pula direto pro painel.
+(async ()=>{
+  if(!configured) return;
+  const { data } = await client.auth.getSession();
+  if(data.session) window.location.href = "./index.html";
+})();
+</script>
+</body>
+</html>

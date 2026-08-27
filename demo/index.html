@@ -7,7 +7,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600;1,700&family=Archivo:wght@500;600;700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="./supabase-config.js"></script>
 <style>
+/* Some vazio até a sessão ser confirmada — evita mostrar dados antes do login. */
+body.auth-pending{ visibility:hidden; }
 :root{
   color-scheme: light;
   --bg: #eef2f6;
@@ -307,6 +311,7 @@ h1,h2,h3,.display{
   transition: border-color .2s var(--ease), color .2s var(--ease), transform .2s var(--ease);
 }
 .icon-btn{ display:flex; align-items:center; gap:6px; }
+.icon-btn[hidden]{ display:none; }
 .icon-btn:hover, .pill-select:hover{ border-color: var(--accent); color: var(--text-primary); transform: translateY(-1px); }
 .live-dot{
   width:7px; height:7px; border-radius:50%; background: var(--good);
@@ -545,7 +550,35 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 }
 </style>
 </head>
-<body>
+<body class="auth-pending">
+
+<script>
+// ---------------------------------------------------------------------------
+// Guarda de autenticação. Roda antes de qualquer dado ser desenhado: sem
+// sessão Supabase válida, redireciona pro login e nunca mostra o painel.
+// Isso é só a camada de UX — a segurança de verdade está no RLS do banco
+// (backend/schema.sql), que rejeita as queries mesmo se alguém pular essa
+// tela chamando a API diretamente sem sessão.
+// ---------------------------------------------------------------------------
+(function(){
+  const cfg = window.SUPABASE_CONFIG;
+  const configured = cfg && !cfg.url.includes("SEU-PROJETO");
+  if(!configured){
+    // Backend ainda não configurado: deixa a demo visível (modo pré-visualização).
+    document.addEventListener("DOMContentLoaded", ()=> document.body.classList.remove("auth-pending"));
+    return;
+  }
+  window.gualapackAuth = window.supabase.createClient(cfg.url, cfg.anonKey);
+  window.gualapackAuth.auth.getSession().then(({ data })=>{
+    if(!data.session){
+      window.location.replace("./login.html");
+      return;
+    }
+    window.gualapackSession = data.session;
+    document.body.classList.remove("auth-pending");
+  });
+})();
+</script>
 
 <div class="liquid-field" aria-hidden="true">
   <div class="blob blob-a"></div>
@@ -570,7 +603,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l5 5v13H6z"/><path d="M9 12h6M9 16h6M9 8h3"/></svg>
       </button>
     </nav>
-    <div class="rail-foot" title="F. Panini">FP</div>
+    <div class="rail-foot" id="rail-foot" title="">&#8226;&#8226;</div>
   </aside>
 
   <div class="main">
@@ -595,6 +628,10 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
           <option>Este mês</option>
         </select>
         <button class="icon-btn"><span class="live-dot"></span>Ao vivo</button>
+        <button class="icon-btn" id="logout-btn" title="Sair" aria-label="Sair" hidden>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+          Sair
+        </button>
       </div>
     </header>
 
@@ -1093,6 +1130,26 @@ kpis.forEach((k,ki)=>{
   sendBtn.addEventListener("click", ()=>{ if(input.value.trim()) ask(input.value.trim()); });
   input.addEventListener("keydown", (e)=>{
     if(e.key === "Enter" && input.value.trim()) ask(input.value.trim());
+  });
+})();
+
+/* ============ sessão / logout ============ */
+(function(){
+  const railFoot = document.getElementById("rail-foot");
+  const logoutBtn = document.getElementById("logout-btn");
+  const session = window.gualapackSession;
+
+  if(session && session.user){
+    const name = session.user.user_metadata?.full_name || session.user.email || "Usuário";
+    const initials = name.trim().split(/\s+/).slice(0,2).map(p=>p[0]).join("").toUpperCase();
+    railFoot.textContent = initials || "U";
+    railFoot.title = name;
+    logoutBtn.hidden = false;
+  }
+
+  logoutBtn.addEventListener("click", async ()=>{
+    if(window.gualapackAuth) await window.gualapackAuth.auth.signOut();
+    window.location.replace("./login.html");
   });
 })();
 </script>
