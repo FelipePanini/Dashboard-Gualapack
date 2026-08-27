@@ -141,6 +141,7 @@ body.auth-pending{ visibility:hidden; }
 
 *{ box-sizing: border-box; }
 html,body{ margin:0; padding:0; }
+:root{ --mx: 0; --my: 0; }
 body{
   background: var(--bg);
   color: var(--text-primary);
@@ -150,8 +151,13 @@ body{
     linear-gradient(var(--grid-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 28px 28px;
-  background-attachment: fixed;
+  background-position: 0 0, 0 0;
+  animation: grid-drift 90s linear infinite;
   overflow-x: hidden;
+}
+@keyframes grid-drift{
+  0%{ background-position: 0 0, 0 0; }
+  100%{ background-position: 336px 224px, 336px 224px; }
 }
 
 /* ---------- ambient liquid field ---------- */
@@ -161,6 +167,29 @@ body{
   z-index: 0;
   overflow: hidden;
   pointer-events: none;
+}
+/* washes de luz/sombra bem grandes e suaves, para o fundo respirar como um todo */
+.liquid-field .wash{
+  position: absolute;
+  inset: -25%;
+  mix-blend-mode: soft-light;
+  will-change: transform;
+}
+.liquid-field .wash-light{
+  background: radial-gradient(38% 38% at 28% 32%, rgba(255,255,255,0.55), transparent 70%);
+  animation: wash-light 52s ease-in-out infinite;
+}
+.liquid-field .wash-dark{
+  background: radial-gradient(36% 36% at 74% 70%, rgba(4,10,20,0.55), transparent 70%);
+  animation: wash-dark 60s ease-in-out infinite;
+}
+@keyframes wash-light{
+  0%,100%{ transform: translate(0,0) scale(1); }
+  50%{ transform: translate(14%,9%) scale(1.15); }
+}
+@keyframes wash-dark{
+  0%,100%{ transform: translate(0,0) scale(1); }
+  50%{ transform: translate(-11%,-13%) scale(1.12); }
 }
 .liquid-field .blob{
   position: absolute;
@@ -199,10 +228,41 @@ body{
   50%{ transform: translate(50px,-60px) scale(1.1); }
 }
 @media (prefers-reduced-motion: reduce){
-  .liquid-field .blob{ animation: none !important; }
+  .liquid-field .blob, .liquid-field .wash, body{ animation: none !important; }
 }
 @media (max-width: 1080px){
   .liquid-field{ display:none; }
+}
+
+/* ---------- brilho de vidro que acompanha o mouse (cards) ---------- */
+.glass-live{ position: relative; overflow: hidden; }
+.glass-live::before, .glass-live::after{
+  content:""; position:absolute; inset:0; pointer-events:none; z-index:0;
+}
+.glass-live::before{
+  background: radial-gradient(380px circle at calc(50% + var(--mx) * 70px) calc(45% + var(--my) * 70px), rgba(255,255,255,0.16), transparent 62%);
+  opacity: .55;
+  transition: opacity .4s ease;
+}
+:root[data-theme="dark"] .glass-live::before{ opacity: .3; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .glass-live::before{ opacity: .3; } }
+.glass-live:hover::before{ opacity: .9; }
+.glass-live::after{
+  background: linear-gradient(115deg, transparent 32%, rgba(255,255,255,0.09) 46%, transparent 60%);
+  background-size: 240% 240%;
+  animation: sheen-sweep 11s ease-in-out infinite;
+  mix-blend-mode: overlay;
+}
+.glass-live:nth-of-type(3n)::after{ animation-delay: -3.6s; }
+.glass-live:nth-of-type(3n+1)::after{ animation-delay: -7.2s; }
+@keyframes sheen-sweep{
+  0%{ background-position: 130% 130%; }
+  50%{ background-position: -30% -30%; }
+  100%{ background-position: 130% 130%; }
+}
+.glass-live > *{ position: relative; z-index: 1; }
+@media (prefers-reduced-motion: reduce){
+  .glass-live::after{ animation: none !important; }
 }
 h1,h2,h3,.display{
   font-family: "Archivo", "Public Sans", sans-serif;
@@ -682,6 +742,8 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 </script>
 
 <div class="liquid-field" aria-hidden="true">
+  <div class="wash wash-light"></div>
+  <div class="wash wash-dark"></div>
   <div class="blob blob-a"></div>
   <div class="blob blob-b"></div>
   <div class="blob blob-c"></div>
@@ -746,7 +808,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
         <section class="kpi-row" id="kpi-row"></section>
 
         <section class="grid-2">
-          <div class="panel">
+          <div class="panel glass-live">
             <div class="panel-head">
               <div>
                 <h2 class="panel-title">Disponibilidade de máquina</h2>
@@ -757,7 +819,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
             <div id="avail-chart"></div>
           </div>
 
-          <div class="panel">
+          <div class="panel glass-live">
             <div class="panel-head">
               <div>
                 <h2 class="panel-title">Aparas por linha</h2>
@@ -768,7 +830,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
           </div>
         </section>
 
-        <section class="panel">
+        <section class="panel glass-live">
           <div class="panel-head">
             <div>
               <h2 class="panel-title">Etapas do processo produtivo</h2>
@@ -781,7 +843,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 
       <!-- ============ LINHAS (detalhe) ============ -->
       <div class="view" id="view-lines" hidden>
-        <section class="panel">
+        <section class="panel glass-live">
           <div class="panel-head">
             <div>
               <h2 class="panel-title">Linhas &amp; etapas de processo</h2>
@@ -794,7 +856,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 
       <!-- ============ FACAS ============ -->
       <div class="view" id="view-facas" hidden>
-        <section class="panel">
+        <section class="panel glass-live">
           <div class="panel-head">
             <div>
               <h2 class="panel-title">Controle de facas</h2>
@@ -823,7 +885,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 
       <!-- ============ RELATÓRIOS ============ -->
       <div class="view" id="view-reports" hidden>
-        <section class="panel">
+        <section class="panel glass-live">
           <div class="panel-head">
             <div>
               <h2 class="panel-title">Gerar relatório</h2>
@@ -849,7 +911,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
           </form>
         </section>
 
-        <section class="panel" id="report-result" hidden>
+        <section class="panel glass-live" id="report-result" hidden>
           <div class="panel-head">
             <div>
               <h2 class="panel-title" id="report-title">Resumo</h2>
@@ -1028,7 +1090,7 @@ kpis.forEach((k,ki)=>{
   const color = k.dir==="up" ? "var(--good)" : k.dir==="down" ? "var(--critical)" : "var(--text-muted)";
   const arrow = k.dir==="up" ? "&#8599;" : k.dir==="down" ? "&#8600;" : "&#8594;";
   const div = document.createElement("div");
-  div.className = "kpi";
+  div.className = "kpi glass-live";
   const m = k.value.match(/^(-?\d+(\.\d+)?)(.*)$/);
   const targetNum = m ? parseFloat(m[1]) : 0;
   const decimals = m && m[2] ? m[2].length-1 : 0;
@@ -1245,7 +1307,7 @@ kpis.forEach((k,ki)=>{
     const area = path + ` L${w-2},${h-2} L2,${h-2} Z`;
     const strokeColor = l.status==="good" ? "var(--good)" : l.status==="warning" ? "var(--warning)" : "var(--critical)";
     return `
-    <div class="machine-card st-${l.status}" data-line="${l.id}" tabindex="0" role="button">
+    <div class="machine-card glass-live st-${l.status}" data-line="${l.id}" tabindex="0" role="button">
       <div class="machine-top">
         <div>
           <div class="machine-name">${l.name}</div>
@@ -1672,10 +1734,13 @@ kpis.forEach((k,ki)=>{
     targetX = (e.clientX / window.innerWidth - 0.5) * 2;
     targetY = (e.clientY / window.innerHeight - 0.5) * 2;
   });
+  const root = document.documentElement;
   function loop(){
     curX += (targetX - curX) * 0.04;
     curY += (targetY - curY) * 0.04;
     field.style.transform = `translate(${curX*14}px, ${curY*10}px)`;
+    root.style.setProperty("--mx", curX.toFixed(3));
+    root.style.setProperty("--my", curY.toFixed(3));
     requestAnimationFrame(loop);
   }
   loop();
