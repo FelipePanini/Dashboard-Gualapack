@@ -120,6 +120,12 @@ Deno.serve(async (req) => {
     .single();
 
   if (inviteError || !inviteResult?.valid) {
+    if (inviteError) {
+      // Erro de infraestrutura (ex: permissão faltando na função SQL) é
+      // diferente de "chave errada" — loga aqui pra aparecer nos Logs do
+      // Supabase, mas a resposta ao cliente continua genérica de propósito.
+      console.error("validate_and_consume_invite failed:", inviteError.message);
+    }
     return new Response(
       JSON.stringify({ error: "invalid_invite_key", message: "Chave de convite inválida, expirada ou já utilizada." }),
       { status: 403, headers: JSON_HEADERS },

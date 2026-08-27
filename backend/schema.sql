@@ -122,8 +122,13 @@ end;
 $$;
 
 -- Revoga acesso público direto à função — só o service role (Edge Function)
--- deve conseguir chamá-la.
+-- deve conseguir chamá-la. REVOKE FROM PUBLIC remove o EXECUTE implícito
+-- que toda função ganha ao ser criada — isso também tira o acesso do
+-- service_role (ele não é superuser), então precisa ser devolvido
+-- explicitamente na linha seguinte, senão a Edge Function fica sem
+-- conseguir chamar a própria função de validação.
 revoke execute on function public.validate_and_consume_invite(text) from public, anon, authenticated;
+grant execute on function public.validate_and_consume_invite(text) to service_role;
 
 -- ----------------------------------------------------------------------------
 -- 4. Helper para você gerar chaves de convite pelo SQL Editor
