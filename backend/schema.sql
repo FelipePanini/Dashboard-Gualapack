@@ -180,7 +180,7 @@ set search_path = public
 as $$
 begin
   if not exists (
-    select 1 from public.profiles where id = auth.uid() and profiles.role = 'admin'
+    select 1 from public.profiles where profiles.id = auth.uid() and profiles.role = 'admin'
   ) then
     raise exception 'not authorized';
   end if;
@@ -211,7 +211,7 @@ declare
   new_id uuid;
 begin
   if not exists (
-    select 1 from public.profiles where id = auth.uid() and profiles.role = 'admin'
+    select 1 from public.profiles where profiles.id = auth.uid() and profiles.role = 'admin'
   ) then
     raise exception 'not authorized';
   end if;
@@ -254,7 +254,7 @@ set search_path = public
 as $$
 begin
   if not exists (
-    select 1 from public.profiles where id = auth.uid() and profiles.role = 'admin'
+    select 1 from public.profiles where profiles.id = auth.uid() and profiles.role = 'admin'
   ) then
     raise exception 'not authorized';
   end if;
