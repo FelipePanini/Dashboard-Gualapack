@@ -476,13 +476,18 @@ body.no-scroll{ overflow:hidden; }
 .machine-card.st-good{ border-left-color: var(--good); }
 .machine-card.st-warning{ border-left-color: var(--warning); }
 .machine-card.st-critical{ border-left-color: var(--critical); }
-.machine-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
-.machine-name{ font-weight:600; font-size:14px; }
-.machine-line{ color:var(--text-muted); font-size:12px; margin-top:1px; }
-.machine-metrics{ display:flex; gap: 16px; margin-top: 12px; }
-.mm{ flex:1; }
-.mm-label{ font-size:10.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; }
-.mm-value{ font-family:"IBM Plex Mono",monospace; font-size:15px; font-weight:600; margin-top:2px; }
+.machine-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.machine-name{ font-weight:600; font-size:14.5px; }
+.machine-hero{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:16px; }
+.machine-oee{ display:flex; flex-direction:column; }
+.machine-oee .v{ font-size:26px; font-weight:700; line-height:1; }
+.machine-oee .l{ font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-top:5px; }
+.machine-foot{
+  display:flex; align-items:center; gap:4px; margin-top:14px;
+  font-size:11.5px; color:var(--text-muted);
+  transition: color .25s var(--ease), gap .25s var(--ease);
+}
+.machine-card:hover .machine-foot{ color:var(--accent); gap:7px; }
 
 /* table */
 .table-wrap{ overflow-x:auto; }
@@ -1302,32 +1307,28 @@ kpis.forEach((k,ki)=>{
 (function(){
   const grid = document.getElementById("machine-grid");
   grid.innerHTML = LINES.map(l=>{
-    const w=100,h=26;
+    const w=128,h=40;
     const path = sparkPath(l.trend, w, h);
     const area = path + ` L${w-2},${h-2} L2,${h-2} Z`;
     const strokeColor = l.status==="good" ? "var(--good)" : l.status==="warning" ? "var(--warning)" : "var(--critical)";
     return `
     <div class="machine-card glass-live st-${l.status}" data-line="${l.id}" tabindex="0" role="button">
       <div class="machine-top">
-        <div>
-          <div class="machine-name">${l.name}</div>
-          <div class="machine-line">${l.product}</div>
-        </div>
+        <div class="machine-name">${l.name}</div>
         <span class="status-pill status-${l.status}"><span class="dot" style="background:currentColor"></span>${statusLabel[l.status]}</span>
       </div>
-      <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-        <defs><linearGradient id="mgrad-${l.id}" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.35"/>
-          <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0"/>
-        </linearGradient></defs>
-        <path d="${area}" fill="url(#mgrad-${l.id})"/>
-        <path d="${path}" fill="none" stroke="${strokeColor}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <div class="machine-metrics">
-        <div class="mm"><div class="mm-label">OEE</div><div class="mm-value">${l.oee}%</div></div>
-        <div class="mm"><div class="mm-label">Disponib.</div><div class="mm-value">${l.avail}%</div></div>
-        <div class="mm"><div class="mm-label">Aparas</div><div class="mm-value">${l.scrap}%</div></div>
+      <div class="machine-hero">
+        <div class="machine-oee"><span class="v mono">${l.oee}%</span><span class="l">OEE</span></div>
+        <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+          <defs><linearGradient id="mgrad-${l.id}" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.35"/>
+            <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0"/>
+          </linearGradient></defs>
+          <path d="${area}" fill="url(#mgrad-${l.id})"/>
+          <path d="${path}" fill="none" stroke="${strokeColor}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
       </div>
+      <div class="machine-foot">Ver detalhe <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></div>
     </div>`;
   }).join("");
 
