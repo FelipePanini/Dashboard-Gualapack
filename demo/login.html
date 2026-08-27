@@ -270,7 +270,13 @@ formRegister.addEventListener("submit", async (e)=>{
   try{
     const res = await fetch(cfg.registerFunctionUrl, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: {
+        "Content-Type": "application/json",
+        // A API Gateway do Supabase exige esse header em toda chamada,
+        // inclusive Edge Functions com "Enforce JWT Verification" desligado.
+        "apikey": cfg.anonKey,
+        "Authorization": `Bearer ${cfg.anonKey}`,
+      },
       body: JSON.stringify({ fullName, email, password, inviteKey }),
     });
     const data = await res.json();

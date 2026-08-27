@@ -10,5 +10,8 @@
 window.SUPABASE_CONFIG = {
   url: "https://iwocigbdywkypvagrrjk.supabase.co",
   anonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml3b2NpZ2JkeXdreXB2YWdycmprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODc4MjQ1NzAsImV4cCI6MjEwMzQwMDU3MH0.J3s2IdmRR2LHA1YCxTOJRLX30Q-D8SvbHJMFGFyNazw",
-  registerFunctionUrl: "https://iwocigbdywkypvagrrjk.supabase.co/functions/v1/register",
+  // A função foi criada no Supabase com o slug "super-action" (nome padrão
+  // sugerido pelo Dashboard) em vez de "register" — a URL abaixo aponta pro
+  // slug real. Se um dia recriar a função como "register", troque aqui.
+  registerFunctionUrl: "https://iwocigbdywkypvagrrjk.supabase.co/functions/v1/super-action",
 };
