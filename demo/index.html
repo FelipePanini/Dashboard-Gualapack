@@ -260,11 +260,13 @@ h1,h2,h3,.display{
   background: transparent;
   border: none;
   cursor: pointer;
+  text-decoration: none;
   transition: background .25s var(--ease), color .25s var(--ease), transform .25s var(--ease);
 }
 .rail-btn:hover{ background: var(--glass-bg-strong); color: var(--text-primary); transform: translateY(-1px); }
 .rail-btn.active{ background: var(--accent-soft); color: var(--accent); }
 .rail-btn svg{ width:19px; height:19px; }
+.rail-btn[hidden]{ display:none; }
 .rail-foot{
   width: 34px; height: 34px; border-radius: 50%;
   background: var(--series-1);
@@ -602,6 +604,9 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
       <button class="rail-btn" title="Relatórios" aria-label="Relatórios">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l5 5v13H6z"/><path d="M9 12h6M9 16h6M9 8h3"/></svg>
       </button>
+      <a class="rail-btn" id="admin-link" title="Administração de acessos" aria-label="Administração de acessos" href="./admin.html" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4Z"/><path d="M9 12l2 2 4-4"/></svg>
+      </a>
     </nav>
     <div class="rail-foot" id="rail-foot" title="">&#8226;&#8226;</div>
   </aside>
@@ -1145,6 +1150,17 @@ kpis.forEach((k,ki)=>{
     railFoot.textContent = initials || "U";
     railFoot.title = name;
     logoutBtn.hidden = false;
+
+    window.gualapackAuth
+      .from("profiles")
+      .select("role")
+      .eq("id", session.user.id)
+      .single()
+      .then(({ data: profile })=>{
+        if(profile?.role === "admin"){
+          document.getElementById("admin-link").hidden = false;
+        }
+      });
   }
 
   logoutBtn.addEventListener("click", async ()=>{

@@ -159,3 +159,109 @@ grant execute on function public.validate_and_consume_invite(text) to service_ro
 create index if not exists idx_invite_keys_active
   on public.invite_keys (revoked, expires_at)
   where revoked = false;
+
+-- ----------------------------------------------------------------------------
+-- 6. Administração de convites (tela demo/admin.html)
+-- ----------------------------------------------------------------------------
+-- As três funções abaixo são chamadas direto do navegador via
+-- supabase-js .rpc(), autenticado com a sessão do próprio usuário — sem
+-- precisar de Edge Function. RLS não filtra dentro de SECURITY DEFINER,
+-- então cada função checa auth.uid()/profiles.role manualmente antes de
+-- fazer qualquer coisa. Só "authenticated" pode chamar (nunca anon).
+
+create or replace function public.admin_list_invite_keys()
+returns table (
+  id uuid, label text, role text, max_uses int, used_count int,
+  revoked boolean, expires_at timestamptz, created_at timestamptz
+)
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from public.profiles where id = auth.uid() and profiles.role = 'admin'
+  ) then
+    raise exception 'not authorized';
+  end if;
+
+  return query
+    select ik.id, ik.label, ik.role, ik.max_uses, ik.used_count, ik.revoked, ik.expires_at, ik.created_at
+    from public.invite_keys ik
+    order by ik.created_at desc;
+end;
+$$;
+
+revoke execute on function public.admin_list_invite_keys() from public, anon;
+grant execute on function public.admin_list_invite_keys() to authenticated;
+
+create or replace function public.admin_create_invite_key(
+  p_label text,
+  p_role text,
+  p_max_uses int default 1,
+  p_expires_in_days int default 30
+)
+returns table (id uuid, plain_key text)
+language plpgsql
+security definer
+set search_path = public, extensions
+as $$
+declare
+  new_key text;
+  new_id uuid;
+begin
+  if not exists (
+    select 1 from public.profiles where id = auth.uid() and profiles.role = 'admin'
+  ) then
+    raise exception 'not authorized';
+  end if;
+  if p_role not in ('viewer','supervisor','manager','admin') then
+    raise exception 'invalid role';
+  end if;
+  if p_max_uses < 1 then
+    raise exception 'max_uses must be >= 1';
+  end if;
+
+  -- 18 bytes aleatórios em base64 (~24 chars), sem caracteres que atrapalham
+  -- copiar/colar ou URLs.
+  new_key := replace(replace(replace(encode(gen_random_bytes(18), 'base64'), '/', '-'), '+', '_'), '=', '');
+
+  insert into public.invite_keys (key_hash, label, role, max_uses, expires_at, created_by)
+  values (
+    crypt(new_key, gen_salt('bf')),
+    p_label,
+    p_role,
+    p_max_uses,
+    case when p_expires_in_days is null then null else now() + (p_expires_in_days || ' days')::interval end,
+    auth.uid()
+  )
+  returning invite_keys.id into new_id;
+
+  -- A chave em texto puro só existe neste retorno — o front-end precisa
+  -- mostrá-la uma vez e avisar que não dá pra recuperar depois.
+  return query select new_id, new_key;
+end;
+$$;
+
+revoke execute on function public.admin_create_invite_key(text, text, int, int) from public, anon;
+grant execute on function public.admin_create_invite_key(text, text, int, int) to authenticated;
+
+create or replace function public.admin_revoke_invite_key(p_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if not exists (
+    select 1 from public.profiles where id = auth.uid() and profiles.role = 'admin'
+  ) then
+    raise exception 'not authorized';
+  end if;
+
+  update public.invite_keys set revoked = true where id = p_id;
+end;
+$$;
+
+revoke execute on function public.admin_revoke_invite_key(uuid) from public, anon;
+grant execute on function public.admin_revoke_invite_key(uuid) to authenticated;
