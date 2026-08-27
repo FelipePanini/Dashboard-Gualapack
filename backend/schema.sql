@@ -4,6 +4,11 @@
 -- seu projeto Supabase (Project > SQL Editor > New query) uma única vez.
 -- ============================================================================
 
+-- No Supabase, pgcrypto normalmente é instalado no schema "extensions",
+-- não em "public" — por isso toda função abaixo que usa crypt()/gen_salt()
+-- precisa incluir "extensions" no seu search_path explicitamente, senão
+-- funciona no SQL Editor (que enxerga tudo) mas falha quando chamada via
+-- API/RPC com search_path restrito.
 create extension if not exists pgcrypto;
 
 -- ----------------------------------------------------------------------------
@@ -85,7 +90,7 @@ create or replace function public.validate_and_consume_invite(plain_key text)
 returns table (valid boolean, invite_id uuid, granted_role text)
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, extensions
 as $$
 declare
   match_row record;
