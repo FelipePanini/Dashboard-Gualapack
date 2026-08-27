@@ -357,6 +357,21 @@ h1,h2,h3,.display{
 }
 .icon-btn{ display:flex; align-items:center; gap:6px; }
 .icon-btn[hidden]{ display:none; }
+.theme-toggle{ padding: 8px 10px; }
+.theme-toggle svg{ transition: transform .4s var(--ease), opacity .3s var(--ease); }
+.theme-toggle:active svg{ transform: rotate(-25deg) scale(.85); }
+
+/* ---------- transição de tema em círculo ("fecha um ciclo, abre outro") ---------- */
+::view-transition-old(root),
+::view-transition-new(root){
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root){ z-index: 1; }
+::view-transition-new(root){ z-index: 2; }
+@media (prefers-reduced-motion: reduce){
+  ::view-transition-group(root){ animation: none !important; }
+}
 .icon-btn:hover, .pill-select:hover{ border-color: var(--accent); color: var(--text-primary); transform: translateY(-1px); }
 .live-dot{
   width:7px; height:7px; border-radius:50%; background: var(--good);
@@ -786,6 +801,10 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
           <option value="30">Este mês</option>
         </select>
         <button class="icon-btn" id="live-toggle" aria-pressed="true"><span class="live-dot" id="live-dot"></span><span id="live-label">Ao vivo</span></button>
+        <button class="icon-btn theme-toggle" id="theme-toggle" type="button" title="Trocar tema" aria-label="Trocar tema">
+          <svg id="theme-icon-sun" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8L6 18M18 6l1.8-1.8"/></svg>
+          <svg id="theme-icon-moon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" hidden><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>
+        </button>
         <button class="icon-btn" id="logout-btn" title="Sair" aria-label="Sair" hidden>
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
           Sair
@@ -1653,6 +1672,69 @@ kpis.forEach((k,ki)=>{
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+  });
+})();
+
+/* ============ troca de tema claro/escuro, com transição em círculo ============ */
+(function(){
+  const btn = document.getElementById("theme-toggle");
+  const sunIcon = document.getElementById("theme-icon-sun");
+  const moonIcon = document.getElementById("theme-icon-moon");
+  const root = document.documentElement;
+  const STORAGE_KEY = "gualapack-theme";
+
+  function systemPrefersDark(){
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  function effectiveTheme(){
+    const explicit = root.getAttribute("data-theme");
+    if(explicit === "light" || explicit === "dark") return explicit;
+    return systemPrefersDark() ? "dark" : "light";
+  }
+  function updateIcon(theme){
+    // Ícone mostra a AÇÃO (pra onde vai ao clicar), não o estado atual.
+    const showSun = theme === "dark";
+    sunIcon.hidden = !showSun;
+    moonIcon.hidden = showSun;
+    btn.title = showSun ? "Mudar para tema claro" : "Mudar para tema escuro";
+  }
+
+  function applyTheme(theme){
+    root.setAttribute("data-theme", theme);
+    try{ localStorage.setItem(STORAGE_KEY, theme); }catch(e){}
+    updateIcon(theme);
+  }
+
+  // Estampa o tema explícito assim que a página carrega (a partir do que já
+  // está salvo, ou do sistema) — sem isso, o primeiro clique não teria um
+  // estado "atual" confiável pra alternar.
+  let saved = null;
+  try{ saved = localStorage.getItem(STORAGE_KEY); }catch(e){}
+  applyTheme(saved === "light" || saved === "dark" ? saved : effectiveTheme());
+
+  btn.addEventListener("click", (e)=>{
+    const next = effectiveTheme() === "dark" ? "light" : "dark";
+
+    if(window.matchMedia("(prefers-reduced-motion: reduce)").matches || !document.startViewTransition){
+      applyTheme(next);
+      return;
+    }
+
+    const rect = btn.getBoundingClientRect();
+    const x = rect.left + rect.width/2;
+    const y = rect.top + rect.height/2;
+    const endRadius = Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y)
+    );
+
+    const transition = document.startViewTransition(()=> applyTheme(next));
+    transition.ready.then(()=>{
+      root.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`] },
+        { duration: 680, easing: "cubic-bezier(.65,0,.35,1)", pseudoElement: "::view-transition-new(root)" }
+      );
+    });
   });
 })();
 
