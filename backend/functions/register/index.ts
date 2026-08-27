@@ -2,8 +2,9 @@
 //
 // Único ponto de entrada para criar uma conta nova no Painel de Produção.
 // Roda no servidor (Deno), nunca no navegador — por isso pode usar a
-// SERVICE_ROLE_KEY com segurança (ela fica em uma variável de ambiente
-// da própria função, configurada via `supabase secrets set`).
+// SERVICE_ROLE_KEY com segurança. SUPABASE_URL e SUPABASE_SERVICE_ROLE_KEY
+// são injetadas automaticamente pelo runtime do Supabase em toda Edge
+// Function — não é preciso configurar nenhum secret manualmente.
 //
 // Fluxo:
 //   1. Recebe { email, password, fullName, inviteKey }
@@ -17,9 +18,11 @@
 //   5. Se a chave for inválida/expirada/esgotada, rejeita ANTES de criar
 //      qualquer usuário.
 //
-// Deploy: supabase functions deploy register --no-verify-jwt
-// (--no-verify-jwt porque quem chama ainda não tem sessão — é o próprio
-// cadastro. A proteção real está na chave de convite, não em um JWT.)
+// Deploy: pelo Dashboard (Edge Functions > Deploy a new function, cole este
+// arquivo) ou via CLI: supabase functions deploy register --no-verify-jwt
+// Em ambos os casos, desligue "Enforce JWT Verification" para esta função —
+// quem chama ainda não tem sessão, é o próprio cadastro. A proteção real
+// está na chave de convite, não em um JWT.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 

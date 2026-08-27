@@ -31,25 +31,38 @@ servidor (Edge Function) que guarda a chave de acesso ao banco
      Security (RLS) e cria a função `validate_and_consume_invite`.
 
 3. **Publicar a Edge Function `register`**
+
+   Duas formas — escolha uma:
+
+   **Pelo painel web (sem instalar nada):**
+   - No projeto: `Edge Functions` (menu lateral) → `Deploy a new function`.
+   - Nome da função: `register` (tem que ser exatamente esse, é o nome usado
+     na URL que o front-end chama).
+   - Cole o conteúdo de [`functions/register/index.ts`](./functions/register/index.ts)
+     no editor e clique em `Deploy`.
+   - Depois de criada, entre nas configurações da função e **desligue "Enforce
+     JWT Verification"** — quem chama essa função ainda não tem login, é o
+     próprio cadastro; a proteção real é a chave de convite, validada dentro
+     do código.
+   - Não é preciso configurar nenhum secret: `SUPABASE_URL` e
+     `SUPABASE_SERVICE_ROLE_KEY` já ficam disponíveis automaticamente dentro
+     de toda Edge Function do projeto.
+
+   **Pela CLI (se você tiver terminal e conseguir alcançar `api.supabase.com`):**
    - Instale a [Supabase CLI](https://supabase.com/docs/guides/cli).
    - `supabase login`
    - `supabase link --project-ref SEU_PROJECT_REF` (o ref aparece na URL do
      projeto: `supabase.com/dashboard/project/SEU_PROJECT_REF`)
-   - `supabase functions deploy register --no-verify-jwt`
-     (roda a partir da pasta `backend/`, que já tem `functions/register/index.ts`)
-   - Configure o segredo que a função usa para falar com o banco:
-     ```
-     supabase secrets set SUPABASE_SERVICE_ROLE_KEY=<service_role key do projeto>
-     ```
-     A `service_role key` fica em `Project Settings > API`. **Nunca** cole
-     esse valor em nenhum arquivo do front-end (`demo/*.html`, `*.js`).
+   - Rodando a partir da pasta `backend/`: `supabase functions deploy register --no-verify-jwt`
 
 4. **Preencher a configuração pública do front-end**
    - Abra [`demo/supabase-config.js`](../demo/supabase-config.js) e preencha:
      - `url`: `Project Settings > API > Project URL`
      - `anonKey`: `Project Settings > API > anon public key` (essa é
        segura para expor no navegador — o RLS que protege os dados)
-     - `registerFunctionUrl`: `https://SEU_PROJECT_REF.functions.supabase.co/register`
+     - `registerFunctionUrl`: `https://SEU_PROJECT_REF.supabase.co/functions/v1/register`
+       (repare: é um caminho dentro do domínio do projeto, `/functions/v1/<nome>`
+       — não um subdomínio `functions.supabase.co` separado)
 
 5. **Gerar a primeira chave de convite**
    - No `SQL Editor`, rode (trocando a chave e o rótulo):
