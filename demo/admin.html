@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>Administração de Acessos — Gualapack</title>
+<link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600;1,700&family=Archivo:wght@500;600;700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="./supabase-config.js"></script>
+<style>
+:root{
+  color-scheme: light;
+  --bg: #eef2f6;
+  --surface-1: #ffffff;
+  --surface-2: #ffffff;
+  --surface-sunken: #e6ecf3;
+  --border: #d7e0e9;
+  --border-strong: #b9c8d8;
+  --text-primary: #0a1524;
+  --text-secondary: #3d5066;
+  --text-muted: #7288a0;
+  --accent: #0f5ea6;
+  --accent-ink: #ffffff;
+  --accent-soft: #dbeaf8;
+  --series-1: #0c3868;
+  --series-3: #2f78c4;
+  --good: #0d8f4f;
+  --good-bg: #dff3e8;
+  --warning: #a9720a;
+  --warning-bg: #faedd2;
+  --critical: #c22b3c;
+  --critical-bg: #fbdfe2;
+  --glass-bg: rgba(255,255,255,0.6);
+  --glass-bg-strong: rgba(255,255,255,0.78);
+  --glass-border: rgba(255,255,255,0.65);
+  --glass-highlight: rgba(255,255,255,0.9);
+  --glass-shadow: 0 1px 1px rgba(10,47,87,0.05), 0 20px 40px -20px rgba(10,47,87,0.28);
+  --ease: cubic-bezier(.22,1,.36,1);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg: #07090c;
+    --surface-1: #0e1116;
+    --surface-2: #12161d;
+    --surface-sunken: #0a0d12;
+    --border: #212833;
+    --border-strong: #303b4a;
+    --text-primary: #eef3f9;
+    --text-secondary: #a7b7c9;
+    --text-muted: #6d7d90;
+    --accent: #4f9ce0;
+    --accent-ink: #071019;
+    --accent-soft: #132639;
+    --series-1: #175a99;
+    --series-3: #4f9ce0;
+    --good: #2fbf2f;
+    --good-bg: #16301a;
+    --warning: #e0a834;
+    --warning-bg: #382d10;
+    --critical: #e66767;
+    --critical-bg: #3a1616;
+    --glass-bg: rgba(20,26,36,0.5);
+    --glass-bg-strong: rgba(24,30,41,0.68);
+    --glass-border: rgba(146,180,214,0.16);
+    --glass-highlight: rgba(255,255,255,0.06);
+    --glass-shadow: 0 1px 1px rgba(0,0,0,0.3), 0 24px 48px -20px rgba(0,0,0,0.65);
+  }
+}
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+body{
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: "Public Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height:100vh;
+}
+body.auth-pending{ visibility:hidden; }
+h1,h2{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; margin:0; }
+.mono{ font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric: tabular-nums; }
+
+.topbar{
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:18px 28px; border-bottom:1px solid var(--glass-border);
+  background: var(--glass-bg); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%);
+  position: sticky; top:0; z-index:10;
+}
+.brand-word{ font-family:"Playfair Display","Georgia",serif; font-style:italic; font-weight:700; font-size:19px; }
+.brand-word .ink-accent{ color:var(--accent); }
+.back-link{
+  display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-secondary);
+  text-decoration:none; background:var(--glass-bg-strong); border:1px solid var(--glass-border);
+  padding:8px 14px; border-radius:999px; transition: color .2s var(--ease), border-color .2s var(--ease);
+}
+.back-link:hover{ color:var(--text-primary); border-color:var(--accent); }
+
+.content{ padding:28px; max-width:1040px; margin:0 auto; }
+.page-title{ font-size:24px; margin-bottom:4px; }
+.page-sub{ color:var(--text-muted); font-size:13.5px; margin-bottom:26px; }
+
+.panel{
+  background: var(--glass-bg);
+  backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border:1px solid var(--glass-border); border-radius:14px;
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+  padding:22px 24px; margin-bottom:20px;
+}
+.panel h2{ font-size:16px; margin-bottom:4px; }
+.panel .sub{ color:var(--text-muted); font-size:12.5px; margin-bottom:18px; }
+
+form.create-form{ display:grid; grid-template-columns: 1.4fr 1fr 0.8fr 0.8fr auto; gap:12px; align-items:end; }
+.field{ display:flex; flex-direction:column; gap:5px; }
+.field label{ font-size:11.5px; font-weight:600; color:var(--text-secondary); }
+input, select{
+  border:1px solid var(--glass-border); border-radius:9px; padding:10px 11px; font-size:13px;
+  background: var(--glass-bg-strong); color:var(--text-primary); font-family:inherit;
+  transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+input:focus, select:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+button.primary{
+  background: linear-gradient(155deg, var(--series-3), var(--accent) 65%, var(--series-1));
+  color:var(--accent-ink); border:none; border-radius:9px; padding:10px 18px; font-size:13.5px; font-weight:700;
+  cursor:pointer; font-family:inherit; transition: transform .2s var(--ease), box-shadow .2s var(--ease);
+  box-shadow: 0 8px 20px -8px rgba(15,94,166,0.5);
+}
+button.primary:hover{ transform: translateY(-1px); }
+button.primary:disabled{ opacity:.6; cursor:not-allowed; transform:none; }
+
+.new-key-box{
+  margin-top:16px; padding:14px 16px; border-radius:10px;
+  background: var(--good-bg); border:1px solid var(--good);
+  display:none; flex-direction:column; gap:8px;
+}
+.new-key-box.show{ display:flex; }
+.new-key-box .label{ font-size:12px; color:var(--good); font-weight:600; }
+.new-key-row{ display:flex; align-items:center; gap:10px; }
+.new-key-row code{
+  flex:1; background:var(--surface-1); border:1px solid var(--border); border-radius:8px;
+  padding:9px 11px; font-family:"IBM Plex Mono",monospace; font-size:13px; word-break:break-all;
+}
+.copy-btn{
+  background:var(--surface-1); border:1px solid var(--border-strong); border-radius:8px; padding:9px 12px;
+  cursor:pointer; font-size:12.5px; color:var(--text-secondary); font-family:inherit; flex:none;
+}
+.copy-btn:hover{ color:var(--text-primary); }
+.warn-note{ font-size:11.5px; color:var(--text-secondary); }
+
+.table-wrap{ overflow-x:auto; }
+table{ width:100%; border-collapse:collapse; font-size:13px; }
+thead th{
+  text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted);
+  font-weight:600; padding:0 10px 10px; border-bottom:1px solid var(--glass-border); white-space:nowrap;
+}
+tbody td{ padding:11px 10px; border-bottom:1px solid var(--glass-border); white-space:nowrap; }
+tbody tr:last-child td{ border-bottom:none; }
+tbody tr:hover{ background: var(--glass-bg-strong); }
+
+.status-pill{
+  display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600;
+  padding:3px 9px 3px 7px; border-radius:99px;
+}
+.status-pill .dot{ width:6px; height:6px; border-radius:50%; background:currentColor; }
+.status-good{ background:var(--good-bg); color:var(--good); }
+.status-warning{ background:var(--warning-bg); color:var(--warning); }
+.status-critical{ background:var(--critical-bg); color:var(--critical); }
+
+.revoke-btn{
+  background:transparent; border:1px solid var(--glass-border); color:var(--critical);
+  border-radius:7px; padding:6px 11px; font-size:12px; cursor:pointer; font-family:inherit;
+  transition: background .2s var(--ease);
+}
+.revoke-btn:hover{ background: var(--critical-bg); }
+.revoke-btn:disabled{ opacity:.4; cursor:not-allowed; }
+
+.empty-state, .denied, .loading-state{ color:var(--text-muted); font-size:13.5px; padding:20px 0; text-align:center; }
+.denied{ color:var(--critical); }
+.msg{ font-size:12.5px; padding:9px 11px; border-radius:9px; margin-bottom:14px; display:none; }
+.msg.show{ display:block; }
+.msg.error{ background:var(--critical-bg); color:var(--critical); }
+
+@media (max-width: 760px){
+  form.create-form{ grid-template-columns: 1fr; }
+}
+</style>
+</head>
+<body class="auth-pending">
+
+<script>
+(function(){
+  const cfg = window.SUPABASE_CONFIG;
+  const configured = cfg && !cfg.url.includes("SEU-PROJETO");
+  if(!configured){
+    document.addEventListener("DOMContentLoaded", ()=> document.body.classList.remove("auth-pending"));
+    return;
+  }
+  window.gualapackAuth = window.supabase.createClient(cfg.url, cfg.anonKey);
+  window.gualapackAuth.auth.getSession().then(({ data })=>{
+    if(!data.session){
+      window.location.replace("./login.html");
+      return;
+    }
+    window.gualapackSession = data.session;
+    document.body.classList.remove("auth-pending");
+    document.dispatchEvent(new CustomEvent("gualapack-session-ready"));
+  });
+})();
+</script>
+
+<header class="topbar">
+  <div class="brand-word">Guala<span class="ink-accent">pack</span></div>
+  <a class="back-link" href="./index.html">&larr; Voltar ao painel</a>
+</header>
+
+<main class="content">
+  <h1 class="page-title">Administração de acessos</h1>
+  <div class="page-sub">Gerar e revogar chaves de convite &mdash; restrito a usuários com perfil de administrador.</div>
+
+  <div id="root">
+    <div class="loading-state">Verificando permissão...</div>
+  </div>
+</main>
+
+<script>
+(function(){
+  const cfg = window.SUPABASE_CONFIG;
+  const configured = cfg && !cfg.url.includes("SEU-PROJETO");
+  const root = document.getElementById("root");
+
+  if(!configured){
+    root.innerHTML = `<div class="denied">Backend não configurado ainda (demo/supabase-config.js). Esta tela só funciona com o Supabase conectado.</div>`;
+    return;
+  }
+
+  const client = window.gualapackAuth;
+  const ROLE_LABELS = { viewer:"Visualizador", supervisor:"Supervisor", manager:"Gestor", admin:"Administrador" };
+
+  function statusFor(row){
+    if(row.revoked) return { cls:"status-critical", label:"Revogada" };
+    if(row.expires_at && new Date(row.expires_at) < new Date()) return { cls:"status-warning", label:"Expirada" };
+    if(row.used_count >= row.max_uses) return { cls:"status-warning", label:"Esgotada" };
+    return { cls:"status-good", label:"Ativa" };
+  }
+
+  function fmtDate(iso){
+    if(!iso) return "—";
+    return new Date(iso).toLocaleDateString("pt-BR", { day:"2-digit", month:"2-digit", year:"numeric" });
+  }
+
+  async function init(){
+    const session = window.gualapackSession;
+    if(!session){ root.innerHTML = `<div class="denied">Sessão não encontrada.</div>`; return; }
+
+    const { data: profile, error: profileError } = await client
+      .from("profiles")
+      .select("role, full_name")
+      .eq("id", session.user.id)
+      .single();
+
+    if(profileError || !profile || profile.role !== "admin"){
+      root.innerHTML = `<div class="denied">Acesso restrito a administradores. Sua conta (${profile?.full_name ?? session.user.email}) não tem essa permissão.</div>`;
+      return;
+    }
+
+    renderShell();
+    await refreshList();
+  }
+
+  function renderShell(){
+    root.innerHTML = `
+      <div class="panel">
+        <h2>Gerar nova chave</h2>
+        <div class="sub">A chave só aparece uma vez, logo após ser criada. Anote em local seguro.</div>
+        <div class="msg error" id="create-msg"></div>
+        <form class="create-form" id="create-form">
+          <div class="field">
+            <label for="f-label">Rótulo</label>
+            <input id="f-label" type="text" placeholder="Ex: Supervisores Turno A" required minlength="3" />
+          </div>
+          <div class="field">
+            <label for="f-role">Perfil concedido</label>
+            <select id="f-role">
+              <option value="viewer">Visualizador</option>
+              <option value="supervisor" selected>Supervisor</option>
+              <option value="manager">Gestor</option>
+              <option value="admin">Administrador</option>
+            </select>
+          </div>
+          <div class="field">
+            <label for="f-uses">Usos</label>
+            <input id="f-uses" type="number" min="1" max="100" value="1" />
+          </div>
+          <div class="field">
+            <label for="f-days">Validade (dias)</label>
+            <input id="f-days" type="number" min="1" max="365" value="30" />
+          </div>
+          <button class="primary" type="submit">Gerar chave</button>
+        </form>
+        <div class="new-key-box" id="new-key-box">
+          <div class="label">Chave gerada &mdash; copie agora, ela não será mostrada de novo:</div>
+          <div class="new-key-row">
+            <code id="new-key-value"></code>
+            <button class="copy-btn" id="copy-btn" type="button">Copiar</button>
+          </div>
+          <div class="warn-note">Envie por um canal seguro (nunca por e-mail em texto aberto ou chat público).</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <h2>Chaves existentes</h2>
+        <div class="sub">Convites gerados até agora, mais recentes primeiro.</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>Rótulo</th><th>Perfil</th><th>Usos</th><th>Status</th><th>Expira em</th><th>Criada em</th><th></th></tr>
+            </thead>
+            <tbody id="keys-tbody"></tbody>
+          </table>
+        </div>
+        <div class="empty-state" id="empty-state" style="display:none;">Nenhuma chave gerada ainda.</div>
+      </div>
+    `;
+
+    document.getElementById("create-form").addEventListener("submit", onCreate);
+    document.getElementById("copy-btn").addEventListener("click", onCopy);
+  }
+
+  async function refreshList(){
+    const { data, error } = await client.rpc("admin_list_invite_keys");
+    const tbody = document.getElementById("keys-tbody");
+    const empty = document.getElementById("empty-state");
+    if(error){
+      tbody.innerHTML = "";
+      empty.style.display = "block";
+      empty.textContent = "Não foi possível carregar as chaves: " + error.message;
+      return;
+    }
+    if(!data || data.length === 0){
+      tbody.innerHTML = "";
+      empty.style.display = "block";
+      return;
+    }
+    empty.style.display = "none";
+    tbody.innerHTML = data.map(row=>{
+      const st = statusFor(row);
+      const canRevoke = !row.revoked;
+      return `
+        <tr data-id="${row.id}">
+          <td>${row.label}</td>
+          <td>${ROLE_LABELS[row.role] ?? row.role}</td>
+          <td class="mono">${row.used_count}/${row.max_uses}</td>
+          <td><span class="status-pill ${st.cls}"><span class="dot"></span>${st.label}</span></td>
+          <td class="mono">${fmtDate(row.expires_at)}</td>
+          <td class="mono">${fmtDate(row.created_at)}</td>
+          <td>${canRevoke ? `<button class="revoke-btn" data-id="${row.id}">Revogar</button>` : ""}</td>
+        </tr>`;
+    }).join("");
+
+    tbody.querySelectorAll(".revoke-btn").forEach(btn=>{
+      btn.addEventListener("click", ()=> onRevoke(btn.dataset.id, btn));
+    });
+  }
+
+  async function onCreate(e){
+    e.preventDefault();
+    const msg = document.getElementById("create-msg");
+    msg.className = "msg error";
+    const btn = e.target.querySelector("button.primary");
+    btn.disabled = true;
+
+    const label = document.getElementById("f-label").value.trim();
+    const role = document.getElementById("f-role").value;
+    const maxUses = parseInt(document.getElementById("f-uses").value, 10) || 1;
+    const days = parseInt(document.getElementById("f-days").value, 10) || 30;
+
+    const { data, error } = await client.rpc("admin_create_invite_key", {
+      p_label: label, p_role: role, p_max_uses: maxUses, p_expires_in_days: days,
+    }).single();
+
+    btn.disabled = false;
+
+    if(error || !data?.plain_key){
+      msg.textContent = "Não foi possível gerar a chave: " + (error?.message ?? "erro desconhecido");
+      msg.classList.add("show");
+      return;
+    }
+
+    msg.classList.remove("show");
+    document.getElementById("f-label").value = "";
+    const box = document.getElementById("new-key-box");
+    document.getElementById("new-key-value").textContent = data.plain_key;
+    box.classList.add("show");
+    await refreshList();
+  }
+
+  function onCopy(){
+    const value = document.getElementById("new-key-value").textContent;
+    navigator.clipboard?.writeText(value);
+    const btn = document.getElementById("copy-btn");
+    const original = btn.textContent;
+    btn.textContent = "Copiado!";
+    setTimeout(()=> btn.textContent = original, 1500);
+  }
+
+  async function onRevoke(id, btn){
+    if(!confirm("Revogar esta chave? Ninguém vai conseguir se cadastrar com ela depois disso.")) return;
+    btn.disabled = true;
+    const { error } = await client.rpc("admin_revoke_invite_key", { p_id: id });
+    if(error){
+      alert("Não foi possível revogar: " + error.message);
+      btn.disabled = false;
+      return;
+    }
+    await refreshList();
+  }
+
+  if(window.gualapackSession){
+    init();
+  }else{
+    document.addEventListener("gualapack-session-ready", init);
+  }
+})();
+</script>
+</body>
+</html>

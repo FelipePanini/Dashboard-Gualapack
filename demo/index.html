@@ -3,11 +3,16 @@
 <head>
 <meta charset="UTF-8" />
 <title>Painel de Produção — Gualapack</title>
+<link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600;1,700&family=Archivo:wght@500;600;700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="./supabase-config.js"></script>
 <style>
+/* Some vazio até a sessão ser confirmada — evita mostrar dados antes do login. */
+body.auth-pending{ visibility:hidden; }
 :root{
   color-scheme: light;
   --bg: #eef2f6;
@@ -256,11 +261,13 @@ h1,h2,h3,.display{
   background: transparent;
   border: none;
   cursor: pointer;
+  text-decoration: none;
   transition: background .25s var(--ease), color .25s var(--ease), transform .25s var(--ease);
 }
 .rail-btn:hover{ background: var(--glass-bg-strong); color: var(--text-primary); transform: translateY(-1px); }
 .rail-btn.active{ background: var(--accent-soft); color: var(--accent); }
 .rail-btn svg{ width:19px; height:19px; }
+.rail-btn[hidden]{ display:none; }
 .rail-foot{
   width: 34px; height: 34px; border-radius: 50%;
   background: var(--series-1);
@@ -307,6 +314,7 @@ h1,h2,h3,.display{
   transition: border-color .2s var(--ease), color .2s var(--ease), transform .2s var(--ease);
 }
 .icon-btn{ display:flex; align-items:center; gap:6px; }
+.icon-btn[hidden]{ display:none; }
 .icon-btn:hover, .pill-select:hover{ border-color: var(--accent); color: var(--text-primary); transform: translateY(-1px); }
 .live-dot{
   width:7px; height:7px; border-radius:50%; background: var(--good);
@@ -368,6 +376,8 @@ h1,h2,h3,.display{
   animation-delay: .1s;
   transition: box-shadow .3s var(--ease);
 }
+.panel[hidden]{ display:none; }
+body.no-scroll{ overflow:hidden; }
 .panel-head{ display:flex; align-items:flex-start; justify-content:space-between; margin-bottom: 14px; gap:12px; }
 .panel-title{ font-size:16px; font-weight:600; margin:0; text-transform:none; font-family:"IBM Plex Sans",sans-serif; letter-spacing:0; }
 .panel-sub{ color:var(--text-muted); font-size:12.5px; margin-top:3px; }
@@ -399,8 +409,10 @@ h1,h2,h3,.display{
   padding: 15px 16px;
   box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
   transition: transform .3s var(--ease), box-shadow .3s var(--ease), border-color .3s var(--ease);
+  cursor: pointer;
 }
 .machine-card:hover{ transform: translateY(-4px) scale(1.012); box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight), 0 16px 32px -16px rgba(15,94,166,0.4); }
+.machine-card:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
 .machine-card.st-good{ border-left-color: var(--good); }
 .machine-card.st-warning{ border-left-color: var(--warning); }
 .machine-card.st-critical{ border-left-color: var(--critical); }
@@ -538,6 +550,100 @@ tbody tr:hover{ background: var(--surface-sunken); }
 
 footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 
+/* ---------- views ---------- */
+.view{ display:none; }
+.view.active{ display:block; animation: view-in .45s var(--ease); }
+@keyframes view-in{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:none; } }
+.view > section.panel, .view > section.grid-2, .view > section.kpi-row{ margin-bottom:16px; }
+.view > section:last-child{ margin-bottom:0; }
+
+/* ---------- lines detail view ---------- */
+.lines-detail{ display:flex; flex-direction:column; gap:10px; }
+.line-row{
+  display:grid; grid-template-columns: 1.4fr repeat(4, 0.85fr) 110px auto; gap:14px; align-items:center;
+  padding:14px 16px; border-radius:12px; border:1px solid var(--glass-border); background:var(--glass-bg);
+  cursor:pointer; transition: transform .25s var(--ease), box-shadow .25s var(--ease), border-color .25s var(--ease);
+}
+.line-row:hover{ transform: translateX(3px); box-shadow: 0 10px 24px -16px rgba(15,94,166,0.4); border-color: var(--accent); }
+.line-row-name{ font-weight:600; font-size:13.5px; }
+.line-row-sub{ font-size:11.5px; color:var(--text-muted); margin-top:1px; }
+.line-metric{ text-align:center; }
+.line-metric .v{ font-family:"IBM Plex Mono",monospace; font-size:14px; font-weight:600; }
+.line-metric .l{ font-size:9.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin-top:1px; }
+.line-row-chevron{ color:var(--text-muted); transition: transform .25s var(--ease); }
+.line-row:hover .line-row-chevron{ transform: translateX(3px); color:var(--accent); }
+@media (max-width: 900px){
+  .line-row{ grid-template-columns: 1fr auto; }
+  .line-row .line-metric{ display:none; }
+}
+
+/* ---------- filter chips ---------- */
+.filter-chips{ display:flex; gap:6px; flex-wrap:wrap; }
+.filter-chip{
+  font-family: inherit; font-size:12px; font-weight:600; color:var(--text-secondary);
+  background:var(--glass-bg-strong); border:1px solid var(--glass-border); border-radius:999px;
+  padding:6px 13px; cursor:pointer; transition: all .2s var(--ease);
+}
+.filter-chip:hover{ border-color:var(--accent); color:var(--text-primary); }
+.filter-chip.active{ background: linear-gradient(155deg, var(--series-3), var(--accent)); color:var(--accent-ink); border-color:transparent; }
+.empty-state{ color:var(--text-muted); font-size:13px; text-align:center; padding:26px 0; }
+
+/* ---------- report form ---------- */
+.report-form{ display:flex; align-items:end; gap:14px; flex-wrap:wrap; }
+.report-form .field{ display:flex; flex-direction:column; gap:5px; }
+.report-form label{ font-size:11.5px; font-weight:600; color:var(--text-secondary); }
+.report-form select{
+  border:1px solid var(--glass-border); border-radius:9px; padding:10px 12px; font-size:13px;
+  background: var(--glass-bg-strong); color:var(--text-primary); font-family:inherit; min-width:200px;
+  transition: border-color .2s var(--ease), box-shadow .2s var(--ease);
+}
+.report-form select:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.primary-btn{
+  background: linear-gradient(155deg, var(--series-3), var(--accent) 65%, var(--series-1));
+  color:var(--accent-ink); border:none; border-radius:9px; padding:10px 20px; font-size:13.5px; font-weight:700;
+  cursor:pointer; font-family:inherit; box-shadow: 0 8px 20px -8px rgba(15,94,166,0.5);
+  transition: transform .2s var(--ease);
+}
+.primary-btn:hover{ transform: translateY(-1px); }
+.report-stats{ display:grid; grid-template-columns: repeat(4,1fr); gap:12px; margin-bottom:18px; }
+.report-stat{ background:var(--glass-bg-strong); border:1px solid var(--glass-border); border-radius:10px; padding:12px 14px; }
+.report-stat .l{ font-size:10.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; }
+.report-stat .v{ font-family:"IBM Plex Mono",monospace; font-size:20px; font-weight:700; margin-top:4px; }
+@media (max-width: 760px){ .report-stats{ grid-template-columns: repeat(2,1fr); } }
+
+/* ---------- detail drawer ---------- */
+.drawer-backdrop{
+  position:fixed; inset:0; z-index:45; background: rgba(7,10,14,0.32);
+  backdrop-filter: blur(2px); opacity:0; transition: opacity .3s var(--ease); pointer-events:none;
+}
+.drawer-backdrop.open{ opacity:1; pointer-events:auto; }
+.drawer{
+  position:fixed; top:0; right:0; height:100vh; width:min(440px, 92vw); z-index:46;
+  background: var(--glass-bg-strong); backdrop-filter: blur(30px) saturate(180%); -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border-left:1px solid var(--glass-border); box-shadow: -24px 0 60px -20px rgba(10,21,36,0.35);
+  display:flex; flex-direction:column;
+  transform: translateX(100%); transition: transform .38s var(--ease);
+  pointer-events:none;
+}
+.drawer.open{ transform: translateX(0); pointer-events:auto; }
+.drawer-head{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; padding:22px 22px 16px; border-bottom:1px solid var(--glass-border); }
+.drawer-eyebrow{ font-size:11.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; }
+.drawer-title{ font-size:20px; margin-top:3px; }
+.drawer-body{ flex:1; overflow-y:auto; padding:20px 22px 30px; }
+.drawer-metrics{ display:grid; grid-template-columns:repeat(3,1fr); gap:10px; margin-bottom:20px; }
+.drawer-metric{ background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:10px; padding:12px; text-align:center; }
+.drawer-metric .v{ font-family:"IBM Plex Mono",monospace; font-size:19px; font-weight:700; }
+.drawer-metric .l{ font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; margin-top:2px; }
+.drawer-section-title{ font-size:12.5px; font-weight:600; color:var(--text-secondary); margin:20px 0 10px; text-transform:uppercase; letter-spacing:.04em; }
+.drawer-bars{ display:flex; flex-direction:column; gap:10px; }
+.drawer-bar-row{ display:flex; align-items:center; gap:10px; font-size:12.5px; }
+.drawer-bar-label{ width:88px; flex:none; color:var(--text-secondary); }
+.drawer-bar-track{ flex:1; height:8px; border-radius:99px; background:var(--surface-sunken); overflow:hidden; }
+.drawer-bar-fill{ height:100%; border-radius:99px; }
+.drawer-bar-value{ width:38px; text-align:right; font-family:"IBM Plex Mono",monospace; font-weight:600; }
+.drawer-facas-item{ display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--glass-border); font-size:12.5px; }
+.drawer-facas-item:last-child{ border-bottom:none; }
+
 @media (max-width: 1080px){
   .grid-2{ grid-template-columns: 1fr; }
   .machine-grid{ grid-template-columns: repeat(2,1fr); }
@@ -545,7 +651,35 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 }
 </style>
 </head>
-<body>
+<body class="auth-pending">
+
+<script>
+// ---------------------------------------------------------------------------
+// Guarda de autenticação. Roda antes de qualquer dado ser desenhado: sem
+// sessão Supabase válida, redireciona pro login e nunca mostra o painel.
+// Isso é só a camada de UX — a segurança de verdade está no RLS do banco
+// (backend/schema.sql), que rejeita as queries mesmo se alguém pular essa
+// tela chamando a API diretamente sem sessão.
+// ---------------------------------------------------------------------------
+(function(){
+  const cfg = window.SUPABASE_CONFIG;
+  const configured = cfg && !cfg.url.includes("SEU-PROJETO");
+  if(!configured){
+    // Backend ainda não configurado: deixa a demo visível (modo pré-visualização).
+    document.addEventListener("DOMContentLoaded", ()=> document.body.classList.remove("auth-pending"));
+    return;
+  }
+  window.gualapackAuth = window.supabase.createClient(cfg.url, cfg.anonKey);
+  window.gualapackAuth.auth.getSession().then(({ data })=>{
+    if(!data.session){
+      window.location.replace("./login.html");
+      return;
+    }
+    window.gualapackSession = data.session;
+    document.body.classList.remove("auth-pending");
+  });
+})();
+</script>
 
 <div class="liquid-field" aria-hidden="true">
   <div class="blob blob-a"></div>
@@ -557,20 +691,23 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
   <aside class="rail">
     <div class="rail-mark"><span class="brandmark">G</span></div>
     <nav class="rail-nav">
-      <button class="rail-btn active" title="Visão geral" aria-label="Visão geral">
+      <button class="rail-btn active" data-view="overview" title="Visão geral" aria-label="Visão geral">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
       </button>
-      <button class="rail-btn" title="Linhas" aria-label="Linhas">
+      <button class="rail-btn" data-view="lines" title="Linhas" aria-label="Linhas">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l5-6 4 3 5-7 4 5"/></svg>
       </button>
-      <button class="rail-btn" title="Facas" aria-label="Facas">
+      <button class="rail-btn" data-view="facas" title="Facas" aria-label="Facas">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20L20 4M14 4h6v6M9 15l-4 4"/></svg>
       </button>
-      <button class="rail-btn" title="Relatórios" aria-label="Relatórios">
+      <button class="rail-btn" data-view="reports" title="Relatórios" aria-label="Relatórios">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l5 5v13H6z"/><path d="M9 12h6M9 16h6M9 8h3"/></svg>
       </button>
+      <a class="rail-btn" id="admin-link" title="Administração de acessos" aria-label="Administração de acessos" href="./admin.html" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4Z"/><path d="M9 12l2 2 4-4"/></svg>
+      </a>
     </nav>
-    <div class="rail-foot" title="F. Panini">FP</div>
+    <div class="rail-foot" id="rail-foot" title="">&#8226;&#8226;</div>
   </aside>
 
   <div class="main">
@@ -584,80 +721,175 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
         <div class="topbar-divider"></div>
         <div>
           <h1>Painel de Produção</h1>
-          <div class="topbar-sub">Área de Produção &middot; Turnos A/B/C</div>
+          <div class="topbar-sub">Unidade Jaguariúna &middot; Área de Produção &middot; Turnos A/B/C</div>
         </div>
       </div>
       <div class="topbar-right">
         <span class="tag-demo"><span class="dot"></span>Demonstração &middot; dados fictícios</span>
-        <select class="pill-select" aria-label="Período">
-          <option>Últimos 14 dias</option>
-          <option>Últimos 7 dias</option>
-          <option>Este mês</option>
+        <select class="pill-select" id="period-select" aria-label="Período">
+          <option value="14" selected>Últimos 14 dias</option>
+          <option value="7">Últimos 7 dias</option>
+          <option value="30">Este mês</option>
         </select>
-        <button class="icon-btn"><span class="live-dot"></span>Ao vivo</button>
+        <button class="icon-btn" id="live-toggle" aria-pressed="true"><span class="live-dot" id="live-dot"></span><span id="live-label">Ao vivo</span></button>
+        <button class="icon-btn" id="logout-btn" title="Sair" aria-label="Sair" hidden>
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
+          Sair
+        </button>
       </div>
     </header>
 
     <main class="content">
 
-      <section class="kpi-row" id="kpi-row"></section>
+      <!-- ============ VISÃO GERAL ============ -->
+      <div class="view active" id="view-overview">
+        <section class="kpi-row" id="kpi-row"></section>
 
-      <section class="grid-2">
-        <div class="panel">
+        <section class="grid-2">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">Disponibilidade de máquina</h2>
+                <div class="panel-sub" id="avail-panel-sub">% do tempo programado, por linha &middot; últimos 14 dias</div>
+              </div>
+              <div class="legend" id="avail-legend"></div>
+            </div>
+            <div id="avail-chart"></div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">Aparas por linha</h2>
+                <div class="panel-sub">% de refugo sobre produção, semana atual</div>
+              </div>
+            </div>
+            <div id="scrap-chart"></div>
+          </div>
+        </section>
+
+        <section class="panel">
           <div class="panel-head">
             <div>
-              <h2 class="panel-title">Disponibilidade de máquina</h2>
-              <div class="panel-sub">% do tempo programado, por linha &middot; últimos 14 dias</div>
+              <h2 class="panel-title">Etapas do processo produtivo</h2>
+              <div class="panel-sub">Status atual e OEE, de Extrusão a Controle de Qualidade &middot; clique num card para ver o detalhe</div>
             </div>
-            <div class="legend" id="avail-legend"></div>
           </div>
-          <div id="avail-chart"></div>
-        </div>
+          <div class="machine-grid" id="machine-grid"></div>
+        </section>
+      </div>
 
-        <div class="panel">
+      <!-- ============ LINHAS (detalhe) ============ -->
+      <div class="view" id="view-lines" hidden>
+        <section class="panel">
           <div class="panel-head">
             <div>
-              <h2 class="panel-title">Aparas por linha</h2>
-              <div class="panel-sub">% de refugo sobre produção, semana atual</div>
+              <h2 class="panel-title">Linhas &amp; etapas de processo</h2>
+              <div class="panel-sub">OEE decomposto (disponibilidade &times; performance &times; qualidade) e tendência de 7 dias &middot; clique para expandir</div>
             </div>
           </div>
-          <div id="scrap-chart"></div>
-        </div>
-      </section>
+          <div class="lines-detail" id="lines-detail"></div>
+        </section>
+      </div>
 
-      <section class="panel" style="margin-bottom:16px;">
-        <div class="panel-head">
-          <div>
-            <h2 class="panel-title">Linhas de produção</h2>
-            <div class="panel-sub">Status atual, OEE e tendência de disponibilidade (7 dias)</div>
+      <!-- ============ FACAS ============ -->
+      <div class="view" id="view-facas" hidden>
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Controle de facas</h2>
+              <div class="panel-sub">Ferramental por linha &middot; vida útil estimada em ciclos</div>
+            </div>
+            <div class="filter-chips" id="facas-filters">
+              <button class="filter-chip active" data-status="all">Todas</button>
+              <button class="filter-chip" data-status="good">Em uso</button>
+              <button class="filter-chip" data-status="warning">Agendar troca</button>
+              <button class="filter-chip" data-status="critical">Trocar</button>
+            </div>
           </div>
-        </div>
-        <div class="machine-grid" id="machine-grid"></div>
-      </section>
+          <div class="table-wrap">
+            <table id="facas-table">
+              <thead>
+                <tr>
+                  <th>ID</th><th>Linha</th><th>Tipo</th><th>Ciclos</th><th>Vida útil</th><th>Status</th><th>Última afiação</th>
+                </tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <div class="empty-state" id="facas-empty" hidden>Nenhuma faca nesse status.</div>
+        </section>
+      </div>
 
-      <section class="panel">
-        <div class="panel-head">
-          <div>
-            <h2 class="panel-title">Controle de facas</h2>
-            <div class="panel-sub">Ferramental por linha &middot; vida útil estimada em ciclos</div>
+      <!-- ============ RELATÓRIOS ============ -->
+      <div class="view" id="view-reports" hidden>
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Gerar relatório</h2>
+              <div class="panel-sub">Resumo do período selecionado, pronto para exportar</div>
+            </div>
           </div>
-        </div>
-        <div class="table-wrap">
-          <table id="facas-table">
-            <thead>
-              <tr>
-                <th>ID</th><th>Linha</th><th>Tipo</th><th>Ciclos</th><th>Vida útil</th><th>Status</th><th>Última afiação</th>
-              </tr>
-            </thead>
-            <tbody></tbody>
-          </table>
-        </div>
-      </section>
+          <form class="report-form" id="report-form">
+            <div class="field">
+              <label for="rep-line">Linha / etapa</label>
+              <select id="rep-line">
+                <option value="all">Todas as etapas</option>
+              </select>
+            </div>
+            <div class="field">
+              <label for="rep-period">Período</label>
+              <select id="rep-period">
+                <option value="7">Últimos 7 dias</option>
+                <option value="14" selected>Últimos 14 dias</option>
+                <option value="30">Este mês</option>
+              </select>
+            </div>
+            <button class="primary-btn" type="submit">Gerar relatório</button>
+          </form>
+        </section>
+
+        <section class="panel" id="report-result" hidden>
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title" id="report-title">Resumo</h2>
+              <div class="panel-sub" id="report-sub"></div>
+            </div>
+            <button class="icon-btn" id="report-export">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+              Exportar CSV
+            </button>
+          </div>
+          <div class="report-stats" id="report-stats"></div>
+          <div class="table-wrap">
+            <table id="report-table">
+              <thead>
+                <tr><th>Etapa</th><th>OEE</th><th>Disponib.</th><th>Aparas</th><th>Status</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+      </div>
 
       <footer>Protótipo interno &middot; valores simulados para validação de layout &middot; gerado para apresentação à gerência de Produção</footer>
     </main>
   </div>
 </div>
+
+<div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
+<aside class="drawer" id="line-drawer" hidden aria-label="Detalhe da etapa">
+  <div class="drawer-head">
+    <div>
+      <div class="drawer-eyebrow" id="drawer-product">&nbsp;</div>
+      <h2 class="drawer-title" id="drawer-title">&nbsp;</h2>
+    </div>
+    <button class="assistant-close" id="drawer-close" aria-label="Fechar detalhe">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
+  <div class="drawer-body" id="drawer-body"></div>
+</aside>
 
 <div class="assistant">
   <div class="assistant-panel" id="assistant-panel" hidden>
@@ -689,29 +921,33 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 <script>
 /* ============ DEMO DATA (fictício) ============ */
 const LINES = [
-  { id:"L1", name:"Linha 1", product:"Sachê", oee:78, avail:88, perf:91, qual:97, scrap:3.1, status:"good",
+  { id:"L1", name:"Extrusão", short:"Extrusão", product:"Filmes e substratos", oee:78, avail:88, perf:91, qual:97, scrap:3.1, status:"good",
     trend:[86,87,85,89,90,88,91] },
-  { id:"L2", name:"Linha 2", product:"Stand-up Pouch", oee:64, avail:74, perf:88, qual:98, scrap:5.4, status:"warning",
+  { id:"L2", name:"Impressão", short:"Impressão", product:"Rotogravura / Flexografia", oee:64, avail:74, perf:88, qual:98, scrap:5.4, status:"warning",
     trend:[80,78,75,72,74,73,74] },
-  { id:"L3", name:"Linha 3", product:"Laminação", oee:82, avail:93, perf:90, qual:98, scrap:2.2, status:"good",
+  { id:"L3", name:"Laminação", short:"Laminação", product:"Estruturas multicamada", oee:82, avail:93, perf:90, qual:98, scrap:2.2, status:"good",
     trend:[90,91,92,93,92,94,93] },
-  { id:"L4", name:"Linha 4", product:"Extrusão", oee:55, avail:61, perf:83, qual:96, scrap:7.8, status:"critical",
+  { id:"L4", name:"Refile e Corte", short:"Refile", product:"Bobinas sob medida", oee:55, avail:61, perf:83, qual:96, scrap:7.8, status:"critical",
     trend:[70,66,63,60,58,62,61] },
-  { id:"L5", name:"Linha 5", product:"Corte e Solda", oee:74, avail:85, perf:89, qual:98, scrap:3.6, status:"good",
+  { id:"L5", name:"Formação e Selagem", short:"Formação", product:"Pouches e sachês", oee:74, avail:85, perf:89, qual:98, scrap:3.6, status:"good",
     trend:[81,83,82,84,85,84,85] },
-  { id:"L6", name:"Linha 6", product:"Sachê", oee:69, avail:80, perf:87, qual:97, scrap:4.4, status:"warning",
+  { id:"L6", name:"Controle de Qualidade", short:"CQ", product:"Inspeção e liberação", oee:69, avail:80, perf:87, qual:97, scrap:4.4, status:"warning",
     trend:[76,77,79,78,81,79,80] },
 ];
 
-const DAYS = 14;
-const dayLabels = Array.from({length: DAYS}, (_,i)=>{
-  const d = new Date(2026,7,26 - (DAYS-1-i));
-  return d.toLocaleDateString("pt-BR",{day:"2-digit", month:"2-digit"});
-});
-// aggregate availability trend per line over 14 days, seeded around current avail
-function genTrend(base, vol){
+let DAYS = 14;
+function buildDayLabels(days){
+  return Array.from({length: days}, (_,i)=>{
+    const d = new Date(2026,7,26 - (days-1-i));
+    return d.toLocaleDateString("pt-BR",{day:"2-digit", month:"2-digit"});
+  });
+}
+let dayLabels = buildDayLabels(DAYS);
+// aggregate availability trend per line over N days, seeded around current avail
+function genTrend(base, vol, days){
+  days = days || DAYS;
   let v = base, out=[];
-  for(let i=0;i<DAYS;i++){
+  for(let i=0;i<days;i++){
     v += (Math.sin(i*0.9+base)*vol*0.4) + (Math.random()-0.5)*vol;
     v = Math.max(35, Math.min(99, v));
     out.push(Math.round(v));
@@ -719,17 +955,17 @@ function genTrend(base, vol){
   return out;
 }
 const availSeries = LINES.slice(0,4).map((l,i)=>({
-  id: l.id, name: l.name, color: `var(--series-${i+1})`,
+  id: l.id, name: l.name, short: l.short, color: `var(--series-${i+1})`,
   data: genTrend(l.avail, 4)
 }));
 
 const FACAS = [
-  { id:"FC-102", linha:"Linha 1", tipo:"Corte rotativo", ciclos: 812000, vida: 1000000, afiacao: "12/08/2026" },
-  { id:"FC-118", linha:"Linha 2", tipo:"Vinco", ciclos: 960000, vida: 1000000, afiacao: "03/07/2026" },
-  { id:"FC-131", linha:"Linha 3", tipo:"Corte reto", ciclos: 410000, vida: 900000, afiacao: "20/08/2026" },
-  { id:"FC-140", linha:"Linha 4", tipo:"Corte rotativo", ciclos: 1040000, vida: 1000000, afiacao: "02/06/2026" },
-  { id:"FC-155", linha:"Linha 5", tipo:"Solda lateral", ciclos: 233000, vida: 850000, afiacao: "15/08/2026" },
-  { id:"FC-162", linha:"Linha 6", tipo:"Vinco", ciclos: 705000, vida: 950000, afiacao: "29/07/2026" },
+  { id:"FC-102", linha:"Refile e Corte", tipo:"Corte rotativo", ciclos: 812000, vida: 1000000, afiacao: "12/08/2026" },
+  { id:"FC-118", linha:"Formação e Selagem", tipo:"Vinco", ciclos: 960000, vida: 1000000, afiacao: "03/07/2026" },
+  { id:"FC-131", linha:"Laminação", tipo:"Corte reto (refile)", ciclos: 410000, vida: 900000, afiacao: "20/08/2026" },
+  { id:"FC-140", linha:"Refile e Corte", tipo:"Corte rotativo", ciclos: 1040000, vida: 1000000, afiacao: "02/06/2026" },
+  { id:"FC-155", linha:"Formação e Selagem", tipo:"Solda lateral", ciclos: 233000, vida: 850000, afiacao: "15/08/2026" },
+  { id:"FC-162", linha:"Formação e Selagem", tipo:"Vinco", ciclos: 705000, vida: 950000, afiacao: "29/07/2026" },
 ];
 
 /* ============ helpers ============ */
@@ -815,7 +1051,8 @@ kpis.forEach((k,ki)=>{
 (function(){
   const holder = document.getElementById("avail-chart");
   const legend = document.getElementById("avail-legend");
-  const W = 640, H = 220, padL = 34, padR = 66, padT = 12, padB = 26;
+  const sub = document.getElementById("avail-panel-sub");
+  const W = 640, H = 220, padL = 34, padR = 82, padT = 12, padB = 26;
   const plotW = W - padL - padR, plotH = H - padT - padB;
   const yMin = 40, yMax = 100;
 
@@ -823,8 +1060,23 @@ kpis.forEach((k,ki)=>{
 
   function x(i){ return padL + (i/(DAYS-1))*plotW; }
   function y(v){ return padT + (1 - (v-yMin)/(yMax-yMin)) * plotH; }
+  function tickIndices(){
+    const n = Math.min(5, DAYS);
+    const out = [];
+    for(let k=0;k<n;k++) out.push(Math.round(k*(DAYS-1)/(n-1)));
+    return [...new Set(out)];
+  }
 
   function render(){
+    let defs = `<defs><filter id="line-glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+    availSeries.forEach(s=>{
+      defs += `<linearGradient id="grad-${s.id}" x1="0" y1="0" x2="0" y2="1">
+        <stop offset="0%" stop-color="${s.color}" stop-opacity="0.32"/>
+        <stop offset="100%" stop-color="${s.color}" stop-opacity="0"/>
+      </linearGradient>`;
+    });
+    defs += `</defs>`;
+
     let gridLines = "";
     [40,60,80,100].forEach(v=>{
       const yy = y(v);
@@ -832,23 +1084,26 @@ kpis.forEach((k,ki)=>{
       gridLines += `<text x="${padL-8}" y="${yy+3}" text-anchor="end" font-size="10" fill="var(--text-muted)" font-family="IBM Plex Mono, monospace">${v}</text>`;
     });
     let xLabels = "";
-    [0,3,6,9,13].forEach(i=>{
+    tickIndices().forEach(i=>{
       xLabels += `<text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="10" fill="var(--text-muted)" font-family="IBM Plex Mono, monospace">${dayLabels[i]}</text>`;
     });
 
-    let paths = "", dots = "";
+    let areas = "", glow = "", paths = "", dots = "";
     availSeries.forEach(s=>{
       if(!visible.has(s.id)) return;
-      const d = s.data.map((v,i)=> `${i===0?"M":"L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-      paths += `<path class="series-path" data-id="${s.id}" d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.5s" fill="freeze"/></path>`;
+      const line = s.data.map((v,i)=> `${i===0?"M":"L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+      const area = `${line} L${x(s.data.length-1).toFixed(1)},${y(yMin).toFixed(1)} L${x(0).toFixed(1)},${y(yMin).toFixed(1)} Z`;
+      areas += `<path d="${area}" fill="url(#grad-${s.id})" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.6s" fill="freeze"/></path>`;
+      glow += `<path d="${line}" fill="none" stroke="${s.color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0" filter="url(#line-glow)"><animate attributeName="opacity" from="0" to="0.55" dur="0.5s" fill="freeze"/></path>`;
+      paths += `<path class="series-path" data-id="${s.id}" d="${line}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.5s" fill="freeze"/></path>`;
       const li = s.data.length-1;
       dots += `<circle cx="${x(li)}" cy="${y(s.data[li])}" r="3.5" fill="${s.color}" stroke="var(--surface-1)" stroke-width="1.5"/>`;
-      dots += `<text x="${x(li)+8}" y="${y(s.data[li])+3.5}" font-size="10.5" font-weight="600" fill="${s.color}" font-family="Public Sans, sans-serif">${s.name.replace("Linha ","L")}</text>`;
+      dots += `<text x="${x(li)+8}" y="${y(s.data[li])+3.5}" font-size="10.5" font-weight="600" fill="${s.color}" font-family="Public Sans, sans-serif">${s.short}</text>`;
     });
 
     holder.innerHTML = `
-      <svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Disponibilidade de máquina por linha ao longo de 14 dias">
-        ${gridLines}${xLabels}${paths}${dots}
+      <svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Disponibilidade de máquina por linha ao longo do período selecionado">
+        ${defs}${gridLines}${xLabels}${areas}${glow}${paths}${dots}
         <g id="hover-layer"></g>
       </svg>`;
 
@@ -908,6 +1163,18 @@ kpis.forEach((k,ki)=>{
   });
 
   render();
+
+  // Exposto pro seletor de período (topbar) conseguir trocar a janela de dias.
+  window.setAvailPeriod = function(days){
+    DAYS = days;
+    dayLabels = buildDayLabels(days);
+    LINES.slice(0,4).forEach((l,i)=>{ availSeries[i].data = genTrend(l.avail, 4, days); });
+    if(sub){
+      const label = days===7 ? "últimos 7 dias" : days===30 ? "este mês" : "últimos 14 dias";
+      sub.textContent = `% do tempo programado, por linha · ${label}`;
+    }
+    render();
+  };
 })();
 
 /* ============ scrap bar chart ============ */
@@ -917,28 +1184,34 @@ kpis.forEach((k,ki)=>{
   const W = 420, rowH = 34, gap = 10;
   const H = data.length*(rowH+gap);
   const maxVal = Math.max(...data.map(d=>d.scrap), 8);
-  const labelW = 78, barMaxW = W-labelW-56;
+  const labelW = 118, barMaxW = W-labelW-56;
 
   const target = 3.5;
   const targetX = labelW + (target/maxVal)*barMaxW;
 
-  let bars = "";
+  let bars = "", defs = "<defs>";
   data.forEach((d,i)=>{
     const yTop = i*(rowH+gap);
     const barW = (d.scrap/maxVal)*barMaxW;
-    const color = d.scrap > target ? "var(--critical)" : "var(--good)";
+    const over = d.scrap > target;
+    const c1 = over ? "var(--serious)" : "var(--series-3)";
+    const c2 = over ? "var(--critical)" : "var(--good)";
+    defs += `<linearGradient id="bargrad-${i}" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/>
+    </linearGradient>`;
     bars += `
-      <g class="bar-row">
+      <g class="bar-row" data-line="${d.id}">
         <rect class="bar-hover-bg" x="-8" y="${yTop-2}" width="${W+8}" height="${rowH+4}" rx="6" fill="transparent"/>
-        <text x="0" y="${yTop+rowH/2+4}" font-size="12" fill="var(--text-secondary)" font-family="Public Sans">${d.name}</text>
+        <text x="0" y="${yTop+rowH/2+4}" font-size="11" fill="var(--text-secondary)" font-family="Public Sans">${d.name}</text>
         <rect x="${labelW}" y="${yTop+5}" width="${barMaxW}" height="${rowH-10}" rx="4" fill="var(--surface-sunken)"/>
-        <rect class="bar-fill" x="${labelW}" y="${yTop+5}" width="0" height="${rowH-10}" rx="4" fill="${color}">
+        <rect class="bar-fill" x="${labelW}" y="${yTop+5}" width="0" height="${rowH-10}" rx="4" fill="url(#bargrad-${i})">
           <animate attributeName="width" from="0" to="${barW}" dur="0.7s" fill="freeze" begin="${i*0.06}s" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
         </rect>
         <text x="${labelW+barW+8}" y="${yTop+rowH/2+4}" font-size="12" font-family="IBM Plex Mono, monospace" fill="var(--text-primary)" font-weight="600">${d.scrap}%</text>
       </g>
     `;
   });
+  defs += "</defs>";
 
   holder.innerHTML = `
     <svg width="100%" viewBox="0 0 ${W} ${H+10}" role="img" aria-label="Percentual de aparas por linha, comparado à meta de 3,5%">
@@ -949,10 +1222,18 @@ kpis.forEach((k,ki)=>{
         .bar-fill{ transition: filter .2s ease; }
         .bar-row:hover .bar-fill{ filter: brightness(1.12); }
       </style>
+      ${defs}
       ${bars}
       <line x1="${targetX}" y1="0" x2="${targetX}" y2="${H}" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="4,3"/>
       <text x="${targetX}" y="${H+8}" font-size="10" text-anchor="middle" fill="var(--text-muted)" font-family="IBM Plex Mono, monospace">meta ${target}%</text>
     </svg>`;
+
+  holder.querySelectorAll(".bar-row").forEach(row=>{
+    row.addEventListener("click", ()=>{
+      const line = LINES.find(l=>l.id === row.dataset.line);
+      if(line && window.openLineDrawer) window.openLineDrawer(line);
+    });
+  });
 })();
 
 /* ============ machine grid ============ */
@@ -961,9 +1242,10 @@ kpis.forEach((k,ki)=>{
   grid.innerHTML = LINES.map(l=>{
     const w=100,h=26;
     const path = sparkPath(l.trend, w, h);
+    const area = path + ` L${w-2},${h-2} L2,${h-2} Z`;
     const strokeColor = l.status==="good" ? "var(--good)" : l.status==="warning" ? "var(--warning)" : "var(--critical)";
     return `
-    <div class="machine-card st-${l.status}">
+    <div class="machine-card st-${l.status}" data-line="${l.id}" tabindex="0" role="button">
       <div class="machine-top">
         <div>
           <div class="machine-name">${l.name}</div>
@@ -972,6 +1254,11 @@ kpis.forEach((k,ki)=>{
         <span class="status-pill status-${l.status}"><span class="dot" style="background:currentColor"></span>${statusLabel[l.status]}</span>
       </div>
       <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+        <defs><linearGradient id="mgrad-${l.id}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.35"/>
+          <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0"/>
+        </linearGradient></defs>
+        <path d="${area}" fill="url(#mgrad-${l.id})"/>
         <path d="${path}" fill="none" stroke="${strokeColor}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
       <div class="machine-metrics">
@@ -981,16 +1268,28 @@ kpis.forEach((k,ki)=>{
       </div>
     </div>`;
   }).join("");
+
+  grid.querySelectorAll(".machine-card").forEach(card=>{
+    function open(){
+      const line = LINES.find(l=>l.id === card.dataset.line);
+      if(line && window.openLineDrawer) window.openLineDrawer(line);
+    }
+    card.addEventListener("click", open);
+    card.addEventListener("keydown", (e)=>{ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); open(); } });
+  });
 })();
 
 /* ============ facas table ============ */
 (function(){
   const tbody = document.querySelector("#facas-table tbody");
+  const empty = document.getElementById("facas-empty");
+  const table = document.getElementById("facas-table");
+
   tbody.innerHTML = FACAS.map(f=>{
     const w = wearInfo(f.ciclos, f.vida);
     const barColor = w.status==="critical" ? "var(--critical)" : w.status==="warning" ? "var(--warning)" : "var(--good)";
     return `
-    <tr>
+    <tr data-status="${w.status}">
       <td class="mono">${f.id}</td>
       <td>${f.linha}</td>
       <td>${f.tipo}</td>
@@ -1003,6 +1302,24 @@ kpis.forEach((k,ki)=>{
       <td class="mono">${f.afiacao}</td>
     </tr>`;
   }).join("");
+
+  const chips = document.querySelectorAll("#facas-filters .filter-chip");
+  chips.forEach(chip=>{
+    chip.addEventListener("click", ()=>{
+      chips.forEach(c=>c.classList.remove("active"));
+      chip.classList.add("active");
+      const status = chip.dataset.status;
+      const rows = [...tbody.querySelectorAll("tr")];
+      let visibleCount = 0;
+      rows.forEach(r=>{
+        const show = status === "all" || r.dataset.status === status;
+        r.style.display = show ? "" : "none";
+        if(show) visibleCount++;
+      });
+      empty.hidden = visibleCount > 0;
+      table.style.display = visibleCount > 0 ? "" : "none";
+    });
+  });
 })();
 
 /* ============ assistant (RAG simulado sobre os dados fictícios) ============ */
@@ -1093,6 +1410,305 @@ kpis.forEach((k,ki)=>{
   sendBtn.addEventListener("click", ()=>{ if(input.value.trim()) ask(input.value.trim()); });
   input.addEventListener("keydown", (e)=>{
     if(e.key === "Enter" && input.value.trim()) ask(input.value.trim());
+  });
+})();
+
+/* ============ troca de views (menu lateral) ============ */
+(function(){
+  const buttons = document.querySelectorAll(".rail-btn[data-view]");
+  const views = document.querySelectorAll(".view");
+  buttons.forEach(btn=>{
+    btn.addEventListener("click", ()=>{
+      const target = btn.dataset.view;
+      buttons.forEach(b=>b.classList.toggle("active", b===btn));
+      views.forEach(v=> v.classList.toggle("active", v.id === `view-${target}`));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+  });
+})();
+
+/* ============ view: linhas (detalhe) ============ */
+(function(){
+  const wrap = document.getElementById("lines-detail");
+  wrap.innerHTML = LINES.map(l=>`
+    <div class="line-row" data-line="${l.id}" tabindex="0" role="button">
+      <div>
+        <div class="line-row-name">${l.name}</div>
+        <div class="line-row-sub">${l.product}</div>
+      </div>
+      <div class="line-metric"><div class="v mono">${l.oee}%</div><div class="l">OEE</div></div>
+      <div class="line-metric"><div class="v mono">${l.avail}%</div><div class="l">Disponib.</div></div>
+      <div class="line-metric"><div class="v mono">${l.perf}%</div><div class="l">Perform.</div></div>
+      <div class="line-metric"><div class="v mono">${l.qual}%</div><div class="l">Qualidade</div></div>
+      <span class="status-pill status-${l.status}"><span class="dot" style="background:currentColor"></span>${statusLabel[l.status]}</span>
+      <svg class="line-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
+    </div>`).join("");
+
+  wrap.querySelectorAll(".line-row").forEach(row=>{
+    function open(){
+      const line = LINES.find(l=>l.id === row.dataset.line);
+      if(line && window.openLineDrawer) window.openLineDrawer(line);
+    }
+    row.addEventListener("click", open);
+    row.addEventListener("keydown", (e)=>{ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); open(); } });
+  });
+})();
+
+/* ============ drawer de detalhe da etapa ============ */
+(function(){
+  const backdrop = document.getElementById("drawer-backdrop");
+  const drawer = document.getElementById("line-drawer");
+  const closeBtn = document.getElementById("drawer-close");
+  const titleEl = document.getElementById("drawer-title");
+  const productEl = document.getElementById("drawer-product");
+  const bodyEl = document.getElementById("drawer-body");
+
+  function openDrawer(line){
+    titleEl.textContent = line.name;
+    productEl.textContent = line.product;
+
+    const relatedFacas = FACAS.filter(f=>f.linha === line.name);
+    const w = 300, h = 90;
+    const trendPath = sparkPath(line.trend, w, h);
+    const trendArea = trendPath + ` L${w-2},${h-2} L2,${h-2} Z`;
+    const strokeColor = line.status==="good" ? "var(--good)" : line.status==="warning" ? "var(--warning)" : "var(--critical)";
+
+    bodyEl.innerHTML = `
+      <div class="drawer-metrics">
+        <div class="drawer-metric"><div class="v mono">${line.oee}%</div><div class="l">OEE</div></div>
+        <div class="drawer-metric"><div class="v mono">${line.avail}%</div><div class="l">Disponib.</div></div>
+        <div class="drawer-metric"><div class="v mono">${line.scrap}%</div><div class="l">Aparas</div></div>
+      </div>
+
+      <div class="drawer-section-title">Tendência de disponibilidade (7 dias)</div>
+      <svg width="100%" viewBox="0 0 ${w} ${h}" style="display:block;">
+        <defs><linearGradient id="drawer-grad" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.3"/>
+          <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0"/>
+        </linearGradient></defs>
+        <path d="${trendArea}" fill="url(#drawer-grad)"/>
+        <path d="${trendPath}" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+
+      <div class="drawer-section-title">OEE decomposto</div>
+      <div class="drawer-bars">
+        ${[["Disponib.",line.avail,"var(--series-3)"],["Performance",line.perf,"var(--series-2)"],["Qualidade",line.qual,"var(--good)"]].map(([label,val,color])=>`
+          <div class="drawer-bar-row">
+            <div class="drawer-bar-label">${label}</div>
+            <div class="drawer-bar-track"><div class="drawer-bar-fill" style="width:${val}%;background:${color};"></div></div>
+            <div class="drawer-bar-value mono">${val}%</div>
+          </div>`).join("")}
+      </div>
+
+      <div class="drawer-section-title">Facas associadas (${relatedFacas.length})</div>
+      ${relatedFacas.length ? relatedFacas.map(f=>{
+        const wr = wearInfo(f.ciclos, f.vida);
+        return `<div class="drawer-facas-item">
+          <span>${f.id} &middot; ${f.tipo}</span>
+          <span class="status-pill status-${wr.status}"><span class="dot" style="background:currentColor"></span>${wr.label}</span>
+        </div>`;
+      }).join("") : `<div class="empty-state" style="padding:10px 0;">Nenhuma faca cadastrada para esta etapa.</div>`}
+    `;
+
+    document.body.classList.add("no-scroll");
+    backdrop.hidden = false;
+    requestAnimationFrame(()=> requestAnimationFrame(()=>{
+      backdrop.classList.add("open");
+      drawer.classList.add("open");
+    }));
+  }
+
+  function closeDrawer(){
+    backdrop.classList.remove("open");
+    drawer.classList.remove("open");
+    document.body.classList.remove("no-scroll");
+    setTimeout(()=>{ backdrop.hidden = true; }, 380);
+  }
+
+  closeBtn.addEventListener("click", closeDrawer);
+  backdrop.addEventListener("click", closeDrawer);
+  document.addEventListener("keydown", (e)=>{ if(e.key === "Escape") closeDrawer(); });
+
+  window.openLineDrawer = openDrawer;
+})();
+
+/* ============ view: relatórios ============ */
+(function(){
+  const lineSelect = document.getElementById("rep-line");
+  const periodSelect = document.getElementById("rep-period");
+  const form = document.getElementById("report-form");
+  const resultPanel = document.getElementById("report-result");
+  const statsEl = document.getElementById("report-stats");
+  const tbody = document.querySelector("#report-table tbody");
+  const titleEl = document.getElementById("report-title");
+  const subEl = document.getElementById("report-sub");
+  const exportBtn = document.getElementById("report-export");
+
+  LINES.forEach(l=>{
+    const opt = document.createElement("option");
+    opt.value = l.id; opt.textContent = l.name;
+    lineSelect.appendChild(opt);
+  });
+
+  let lastReport = null;
+
+  form.addEventListener("submit", (e)=>{
+    e.preventDefault();
+    const lineId = lineSelect.value;
+    const days = parseInt(periodSelect.value, 10);
+    const rows = lineId === "all" ? LINES : LINES.filter(l=>l.id === lineId);
+
+    const avgOeeR = Math.round(rows.reduce((a,l)=>a+l.oee,0)/rows.length);
+    const avgAvailR = Math.round(rows.reduce((a,l)=>a+l.avail,0)/rows.length);
+    const avgScrapR = (rows.reduce((a,l)=>a+l.scrap,0)/rows.length).toFixed(1);
+    const totalFacas = FACAS.filter(f=> rows.some(r=>r.name === f.linha)).length;
+
+    const periodLabel = days===7 ? "Últimos 7 dias" : days===30 ? "Este mês" : "Últimos 14 dias";
+    titleEl.textContent = lineId==="all" ? "Resumo geral" : rows[0].name;
+    subEl.textContent = `${periodLabel} · gerado em ${new Date().toLocaleString("pt-BR")}`;
+
+    statsEl.innerHTML = `
+      <div class="report-stat"><div class="l">OEE médio</div><div class="v">${avgOeeR}%</div></div>
+      <div class="report-stat"><div class="l">Disponibilidade média</div><div class="v">${avgAvailR}%</div></div>
+      <div class="report-stat"><div class="l">Aparas médias</div><div class="v">${avgScrapR}%</div></div>
+      <div class="report-stat"><div class="l">Facas monitoradas</div><div class="v">${totalFacas}</div></div>
+    `;
+
+    tbody.innerHTML = rows.map(l=>`
+      <tr>
+        <td>${l.name}</td>
+        <td class="mono">${l.oee}%</td>
+        <td class="mono">${l.avail}%</td>
+        <td class="mono">${l.scrap}%</td>
+        <td><span class="status-pill status-${l.status}"><span class="dot" style="background:currentColor"></span>${statusLabel[l.status]}</span></td>
+      </tr>`).join("");
+
+    lastReport = { periodLabel, rows };
+    resultPanel.hidden = false;
+    resultPanel.scrollIntoView({ behavior:"smooth", block:"nearest" });
+  });
+
+  exportBtn.addEventListener("click", ()=>{
+    if(!lastReport) return;
+    const header = "Etapa,OEE,Disponibilidade,Aparas,Status\n";
+    const csv = header + lastReport.rows.map(l=>
+      `${l.name},${l.oee}%,${l.avail}%,${l.scrap}%,${statusLabel[l.status]}`
+    ).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `relatorio-producao-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  });
+})();
+
+/* ============ toggle "Ao vivo" — simula atualização em tempo real ============ */
+(function(){
+  const btn = document.getElementById("live-toggle");
+  const dot = document.getElementById("live-dot");
+  const label = document.getElementById("live-label");
+  let timer = null;
+  let live = true;
+
+  function jitterKpis(){
+    document.querySelectorAll(".kpi").forEach(card=>{
+      card.style.transition = "box-shadow .4s ease";
+      card.style.boxShadow = "var(--glass-shadow), inset 0 1px 0 var(--glass-highlight), 0 0 0 2px var(--accent-soft)";
+      setTimeout(()=>{ card.style.boxShadow = ""; }, 500);
+    });
+    const valEls = document.querySelectorAll(".kpi-value");
+    valEls.forEach(el=>{
+      const m = el.textContent.match(/^(-?\d+(\.\d+)?)(.*)$/);
+      if(!m) return;
+      const num = parseFloat(m[1]);
+      const decimals = m[2] ? m[2].length-1 : 0;
+      const drift = (Math.random()-0.5) * (decimals ? 0.3 : 1);
+      const next = Math.max(0, num + drift);
+      el.textContent = next.toFixed(decimals) + m[3];
+    });
+  }
+
+  function start(){
+    live = true;
+    btn.setAttribute("aria-pressed","true");
+    dot.style.background = "var(--good)";
+    dot.style.animationPlayState = "running";
+    label.textContent = "Ao vivo";
+    timer = setInterval(jitterKpis, 4000);
+  }
+  function stop(){
+    live = false;
+    btn.setAttribute("aria-pressed","false");
+    dot.style.background = "var(--text-muted)";
+    dot.style.animationPlayState = "paused";
+    label.textContent = "Pausado";
+    clearInterval(timer);
+  }
+
+  btn.addEventListener("click", ()=> live ? stop() : start());
+  start();
+})();
+
+/* ============ seletor de período ============ */
+(function(){
+  const select = document.getElementById("period-select");
+  select.addEventListener("change", ()=>{
+    const days = parseInt(select.value, 10);
+    if(window.setAvailPeriod) window.setAvailPeriod(days);
+  });
+})();
+
+/* ============ paralaxe sutil no fundo líquido ============ */
+(function(){
+  if(window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const field = document.querySelector(".liquid-field");
+  if(!field) return;
+  let targetX = 0, targetY = 0, curX = 0, curY = 0;
+  window.addEventListener("mousemove", (e)=>{
+    targetX = (e.clientX / window.innerWidth - 0.5) * 2;
+    targetY = (e.clientY / window.innerHeight - 0.5) * 2;
+  });
+  function loop(){
+    curX += (targetX - curX) * 0.04;
+    curY += (targetY - curY) * 0.04;
+    field.style.transform = `translate(${curX*14}px, ${curY*10}px)`;
+    requestAnimationFrame(loop);
+  }
+  loop();
+})();
+
+/* ============ sessão / logout ============ */
+(function(){
+  const railFoot = document.getElementById("rail-foot");
+  const logoutBtn = document.getElementById("logout-btn");
+  const session = window.gualapackSession;
+
+  if(session && session.user){
+    const name = session.user.user_metadata?.full_name || session.user.email || "Usuário";
+    const initials = name.trim().split(/\s+/).slice(0,2).map(p=>p[0]).join("").toUpperCase();
+    railFoot.textContent = initials || "U";
+    railFoot.title = name;
+    logoutBtn.hidden = false;
+
+    window.gualapackAuth
+      .from("profiles")
+      .select("role")
+      .eq("id", session.user.id)
+      .single()
+      .then(({ data: profile })=>{
+        if(profile?.role === "admin"){
+          document.getElementById("admin-link").hidden = false;
+        }
+      });
+  }
+
+  logoutBtn.addEventListener("click", async ()=>{
+    if(window.gualapackAuth) await window.gualapackAuth.auth.signOut();
+    window.location.replace("./login.html");
   });
 })();
 </script>
