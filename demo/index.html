@@ -1747,7 +1747,17 @@ kpis.forEach((k,ki)=>{
   let live = true;
 
   function jitterKpis(){
-    document.querySelectorAll(".kpi").forEach(card=>{
+    // Só 1 (às vezes 2) indicador chega "atualizado" a cada tick — como
+    // dados reais, que não mudam todos juntos no mesmo instante. O pulso
+    // vira aviso de verdade: só pisca quem de fato mudou.
+    const cards = [...document.querySelectorAll(".kpi")];
+    const updateCount = Math.random() < 0.7 ? 1 : 2;
+    const chosen = new Set();
+    while(chosen.size < Math.min(updateCount, cards.length)){
+      chosen.add(Math.floor(Math.random() * cards.length));
+    }
+    cards.forEach((card, i)=>{
+      if(!chosen.has(i)) return;
       const el = card.querySelector(".kpi-value");
       if(!el) return;
       const m = el.textContent.match(/^(-?\d+(\.\d+)?)(.*)$/);
@@ -1757,7 +1767,6 @@ kpis.forEach((k,ki)=>{
       const drift = (Math.random()-0.5) * (decimals ? 0.3 : 1);
       const next = Math.max(0, num + drift);
       el.textContent = next.toFixed(decimals) + m[3];
-      // Pulsa só este card, só neste instante em que o número mudou.
       card.classList.add("pulse");
       setTimeout(()=> card.classList.remove("pulse"), 550);
     });
