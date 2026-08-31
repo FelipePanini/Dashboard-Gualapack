@@ -1,0 +1,14 @@
+{
+  "name": "gualapack-sync-sharepoint",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Carga diária automática via Microsoft Graph API — fica inativa até a TI liberar o app no Entra ID (ver backend/README-dados.md).",
+  "scripts": {
+    "sync": "node sync.js"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.0",
+    "xlsx": "^0.18.5"
+  }
+}
