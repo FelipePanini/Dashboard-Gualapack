@@ -151,43 +151,44 @@ h1,h2{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; m
 .panel h2{ font-size:16px; margin-bottom:4px; }
 .panel .sub{ color:var(--text-muted); font-size:12.5px; margin-bottom:18px; }
 
-.upload-grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:14px; }
+.dropzone{
+  border:2px dashed var(--glass-border); border-radius:14px; padding:36px 20px;
+  background: var(--glass-bg-strong); display:flex; flex-direction:column; align-items:center; gap:10px;
+  text-align:center; transition: border-color .2s var(--ease), background .2s var(--ease);
+  cursor:pointer;
+}
+.dropzone.drag-over{ border-color:var(--accent); background: var(--accent-soft); }
+.dropzone svg{ color:var(--text-muted); }
+.dropzone .dz-title{ font-size:14.5px; font-weight:700; }
+.dropzone .dz-sub{ font-size:12px; color:var(--text-muted); }
+.dropzone input[type=file]{ display:none; }
 
-.drop-card{
-  border:1.5px dashed var(--glass-border); border-radius:12px; padding:18px 16px;
-  background: var(--glass-bg-strong); display:flex; flex-direction:column; gap:10px;
-  transition: border-color .2s var(--ease), background .2s var(--ease);
-  position:relative;
+.file-rows{ display:flex; flex-direction:column; gap:10px; margin-top:18px; }
+.file-row{
+  border:1px solid var(--glass-border); border-radius:12px; padding:14px 16px;
+  background: var(--glass-bg-strong); display:flex; align-items:center; gap:14px; flex-wrap:wrap;
 }
-.drop-card.drag-over{ border-color:var(--accent); background: var(--accent-soft); }
-.drop-card .table-name{ font-size:13.5px; font-weight:700; }
-.drop-card .table-hint{ font-size:11.5px; color:var(--text-muted); line-height:1.4; }
-.drop-card input[type=file]{ display:none; }
-.drop-card .pick-btn{
-  align-self:flex-start; background: var(--surface-1); border:1px solid var(--border-strong);
-  color:var(--text-secondary); border-radius:8px; padding:7px 13px; font-size:12px; cursor:pointer;
-  font-family:inherit; transition: color .2s var(--ease), border-color .2s var(--ease);
-}
-.drop-card .pick-btn:hover{ color:var(--text-primary); border-color:var(--accent); }
-.drop-card .sheet-row{ display:none; flex-direction:column; gap:5px; }
-.drop-card .sheet-row.show{ display:flex; }
-.drop-card .sheet-row label{ font-size:11px; color:var(--text-muted); }
-.drop-card select{
+.file-row .fr-name{ font-size:13px; font-weight:600; flex:1 1 220px; min-width:0; overflow-wrap:break-word; }
+.file-row .fr-controls{ display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.file-row select{
   border:1px solid var(--glass-border); border-radius:8px; padding:7px 9px; font-size:12.5px;
-  background: var(--surface-1); color:var(--text-primary); font-family:inherit;
+  background: var(--surface-1); color:var(--text-primary); font-family:inherit; max-width:220px;
 }
-.drop-card .send-btn{
+.file-row .send-btn{
   background: linear-gradient(155deg, var(--series-3), var(--accent) 65%, var(--series-1));
-  color:var(--accent-ink); border:none; border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:700;
-  cursor:pointer; font-family:inherit; display:none;
+  color:var(--accent-ink); border:none; border-radius:8px; padding:7px 14px; font-size:12.5px; font-weight:700;
+  cursor:pointer; font-family:inherit;
 }
-.drop-card .send-btn.show{ display:inline-flex; align-self:flex-start; }
-.drop-card .send-btn:disabled{ opacity:.6; cursor:not-allowed; }
-.drop-card .file-status{ font-size:12px; min-height:16px; }
-.drop-card .file-status.ok{ color:var(--good); }
-.drop-card .file-status.error{ color:var(--critical); }
-.drop-card .file-status.pending{ color:var(--text-secondary); }
-.drop-card .spinner{
+.file-row .send-btn:disabled{ opacity:.6; cursor:not-allowed; }
+.file-row .fr-status{ font-size:12px; flex-basis:100%; }
+.file-row .fr-status.ok{ color:var(--good); }
+.file-row .fr-status.error{ color:var(--critical); }
+.file-row .fr-status.pending{ color:var(--text-secondary); }
+.file-row .fr-badge{
+  font-size:10.5px; font-weight:700; text-transform:uppercase; letter-spacing:.04em;
+  padding:3px 8px; border-radius:99px; background:var(--accent-soft); color:var(--accent);
+}
+.spinner{
   width:12px; height:12px; border-radius:50%; border:2px solid var(--glass-border);
   border-top-color: var(--accent); display:inline-block; margin-right:6px; vertical-align:-2px;
   animation: spin .7s linear infinite;
@@ -292,7 +293,7 @@ h1,h2{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; m
 
 <main class="content">
   <h1 class="page-title">Atualizar dados</h1>
-  <div class="page-sub">Envie a planilha de cada indicador &mdash; o painel atualiza assim que o arquivo é processado. Restrito a administradores.</div>
+  <div class="page-sub">Arraste todas as planilhas do dia de uma vez &mdash; o sistema identifica sozinho qual indicador é cada uma. Restrito a administradores.</div>
 
   <div id="root">
     <div class="loading-state">Verificando permissão...</div>
@@ -312,15 +313,60 @@ h1,h2{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; m
 
   const client = window.gualapackAuth;
 
+  // Cada tabela: rótulo, e palavras-chave (já normalizadas) que identificam o
+  // arquivo pelo nome, e palavras-chave que identificam a aba certa dentro
+  // dele quando há mais de uma. Ordem importa: a primeira regra que bater
+  // no nome do arquivo vence (por isso "sequenciamento" vem antes de
+  // "aparas" sozinho, senão pegaria os arquivos errados).
   const TABLES = [
-    { table: "apontamentos", label: "Apontamentos", hint: "De \"Indicadores Diário\" ou \"Base Aparas\" — aba com os eventos de máquina (a maior planilha; use tools/planilha-uma-aba.js pra cortar antes)" },
-    { table: "fardos_aparas", label: "Fardos de aparas", hint: "De \"SEQUENCIAMENTO DOS FARDOS DE APARAS\" (mensal) ou \"Sequenciamento Acumulado\" — aba \"COMPLETOS\"" },
-    { table: "aderencia_maquinas_diaria", label: "Aderência — máquinas (diário)", hint: "De \"Aderência Máquinas - Diária\" — aba \"Apontamentos_produção\"" },
-    { table: "aderencia_programacao", label: "Aderência — programação", hint: "De \"Histórico Aderência Programação\" — aba \"Programação Passado\" (use o script de corte, é grande)" },
-    { table: "refugo_aparas_historico", label: "Refugo/aparas — histórico", hint: "De \"Refugo Aparas\" — aba \"Histórico Refugo\"" },
-    { table: "tendencia_mensal", label: "Tendência mensal", hint: "De \"Graficos Tendência\" — aba \"Dados Prod\"" },
-    { table: "maquinas", label: "Catálogo de máquinas", hint: "De \"Machine Card Oficial\" — aba \"DIM_EQTOS & GRUPO EQTO\"" },
+    { table: "fardos_aparas", label: "Fardos de aparas", fileKeywords: ["sequenciamento"], sheetKeywords: ["completos", "base_aparas_total"] },
+    { table: "aderencia_maquinas_diaria", label: "Aderência — máquinas (diário)", fileKeywords: ["aderencia_maquinas", "aderenciamaquinas"], sheetKeywords: ["apontamentos_producao"] },
+    { table: "aderencia_programacao", label: "Aderência — programação", fileKeywords: ["historico_aderencia", "aderencia_programacao"], sheetKeywords: ["programacao_passado"] },
+    { table: "refugo_aparas_historico", label: "Refugo/aparas — histórico", fileKeywords: ["refugo_aparas"], sheetKeywords: ["historico_refugo"] },
+    { table: "tendencia_mensal", label: "Tendência mensal", fileKeywords: ["tendencia", "grafico"], sheetKeywords: ["dados_prod"] },
+    { table: "maquinas", label: "Catálogo de máquinas", fileKeywords: ["machine_card"], sheetKeywords: ["dim_eqtos"] },
+    { table: "apontamentos", label: "Apontamentos", fileKeywords: ["indicadores", "base_aparas"], sheetKeywords: ["base_maquina", "base_detalhe"] },
   ];
+  const TABLE_BY_KEY = Object.fromEntries(TABLES.map(t=> [t.table, t]));
+
+  function normalize(s){
+    return String(s || "")
+      .normalize("NFD").replace(/[̀-ͯ]/g, "")
+      .toLowerCase()
+      .replace(/\.(xlsx|xls|csv)$/i, "")
+      .replace(/[^a-z0-9]+/g, "_")
+      .replace(/^_+|_+$/g, "");
+  }
+
+  function detectTable(fileName){
+    const norm = normalize(fileName);
+    for(const t of TABLES){
+      if(t.fileKeywords.some(k=> norm.includes(k))) return t.table;
+    }
+    return null;
+  }
+
+  function detectSheet(tableKey, sheetNames){
+    const cfg = TABLE_BY_KEY[tableKey];
+    if(!cfg) return sheetNames[0];
+    const byKeyword = sheetNames.find(n=> cfg.sheetKeywords.some(k=> normalize(n).includes(k)));
+    return byKeyword || sheetNames[0];
+  }
+
+  const REMEMBER_KEY = "gualapack-upload-sheet-choice";
+  function rememberedSheet(tableKey, sheetNames){
+    try{
+      const saved = JSON.parse(localStorage.getItem(REMEMBER_KEY) || "{}");
+      return saved[tableKey] && sheetNames.includes(saved[tableKey]) ? saved[tableKey] : null;
+    }catch(e){ return null; }
+  }
+  function rememberSheet(tableKey, sheetName){
+    try{
+      const saved = JSON.parse(localStorage.getItem(REMEMBER_KEY) || "{}");
+      saved[tableKey] = sheetName;
+      localStorage.setItem(REMEMBER_KEY, JSON.stringify(saved));
+    }catch(e){}
+  }
 
   function fmtTime(d){
     return d.toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit", second:"2-digit" });
@@ -358,126 +404,129 @@ h1,h2{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; m
     `).join("");
   }
 
-  async function sendFile(cardEl, tableCfg, file, sheetName){
-    const statusEl = cardEl.querySelector(".file-status");
-    const sendBtn = cardEl.querySelector(".send-btn");
+  async function sendFile(rowEl, tableKey, file, sheetName){
+    const statusEl = rowEl.querySelector(".fr-status");
+    const sendBtn = rowEl.querySelector(".send-btn");
     if(sendBtn) sendBtn.disabled = true;
-    statusEl.className = "file-status pending";
-    statusEl.innerHTML = `<span class="spinner"></span>Enviando "${file.name}"${sheetName ? ` (aba "${sheetName}")` : ""}...`;
+    statusEl.className = "fr-status pending";
+    statusEl.innerHTML = `<span class="spinner"></span>Enviando${sheetName ? ` (aba "${sheetName}")` : ""}...`;
+
+    const label = TABLE_BY_KEY[tableKey]?.label || tableKey;
 
     try{
       const contentBase64 = await fileToBase64(file);
       const { data, error } = await client.functions.invoke("ingest", {
-        body: { table: tableCfg.table, fileName: file.name, sheetName, contentBase64 },
+        body: { table: tableKey, fileName: file.name, sheetName, contentBase64 },
       });
 
       if(error || !data?.ok){
         const msg = data?.error || error?.message || "erro desconhecido";
-        statusEl.className = "file-status error";
+        statusEl.className = "fr-status error";
         statusEl.textContent = "Falhou: " + msg;
-        pushLog({ ok:false, text: `${tableCfg.label}: ${file.name} — ${msg}` });
+        pushLog({ ok:false, text: `${label}: ${file.name} — ${msg}` });
         return;
       }
 
-      statusEl.className = "file-status ok";
+      if(sheetName) rememberSheet(tableKey, sheetName);
+      statusEl.className = "fr-status ok";
       statusEl.textContent = `${data.linhas} linhas gravadas (aba "${data.sheet}").`;
-      pushLog({ ok:true, text: `${tableCfg.label}: ${file.name} [${data.sheet}] — ${data.linhas} linhas` });
+      pushLog({ ok:true, text: `${label}: ${file.name} [${data.sheet}] — ${data.linhas} linhas` });
     }catch(err){
-      statusEl.className = "file-status error";
+      statusEl.className = "fr-status error";
       statusEl.textContent = "Falhou: " + err.message;
-      pushLog({ ok:false, text: `${tableCfg.label}: ${file.name} — ${err.message}` });
+      pushLog({ ok:false, text: `${label}: ${file.name} — ${err.message}` });
     }finally{
       if(sendBtn) sendBtn.disabled = false;
     }
   }
 
-  async function handleFile(cardEl, tableCfg, file){
-    const statusEl = cardEl.querySelector(".file-status");
-    const sheetRow = cardEl.querySelector(".sheet-row");
-    const sheetSelect = cardEl.querySelector("select");
-    const sendBtn = cardEl.querySelector(".send-btn");
+  function tableOptionsHtml(selected){
+    return TABLES.map(t=> `<option value="${t.table}" ${t.table===selected?"selected":""}>${t.label}</option>`).join("");
+  }
 
-    // .csv não tem abas — manda direto.
+  async function handleOneFile(file){
+    const rows = document.getElementById("file-rows");
+    const row = document.createElement("div");
+    row.className = "file-row";
+    row.innerHTML = `
+      <div class="fr-name">${file.name}</div>
+      <div class="fr-controls">
+        <span class="fr-badge">detectando…</span>
+      </div>
+      <div class="fr-status pending"><span class="spinner"></span>Analisando arquivo...</div>
+    `;
+    rows.prepend(row);
+
+    const controls = row.querySelector(".fr-controls");
+    const statusEl = row.querySelector(".fr-status");
+    const detectedTable = detectTable(file.name);
+
+    // .csv não tem abas.
     if(/\.csv$/i.test(file.name)){
-      sheetRow.classList.remove("show");
-      sendBtn.classList.remove("show");
-      await sendFile(cardEl, tableCfg, file, undefined);
+      controls.innerHTML = `<select class="table-select">${tableOptionsHtml(detectedTable)}</select>`;
+      const tableSelect = controls.querySelector(".table-select");
+      statusEl.className = "fr-status";
+      statusEl.textContent = "";
+      await sendFile(row, tableSelect.value, file, undefined);
+      tableSelect.addEventListener("change", ()=> sendFile(row, tableSelect.value, file, undefined));
       return;
     }
-
-    statusEl.className = "file-status pending";
-    statusEl.textContent = "Lendo abas da planilha...";
 
     try{
       const buffer = await file.arrayBuffer();
       const workbook = XLSX.read(buffer, { type: "array", bookSheets: true });
       const sheetNames = workbook.SheetNames;
+      const tableKey = detectedTable || TABLES[0].table;
+      const chosenSheet = rememberedSheet(tableKey, sheetNames) || detectSheet(tableKey, sheetNames);
+      const ambiguous = sheetNames.length > 1;
 
-      statusEl.className = "file-status";
-      statusEl.textContent = "";
+      controls.innerHTML = `
+        <select class="table-select">${tableOptionsHtml(tableKey)}</select>
+        ${ambiguous ? `<select class="sheet-select">${sheetNames.map(n=> `<option value="${n}" ${n===chosenSheet?"selected":""}>${n}</option>`).join("")}</select>` : ""}
+        <button class="send-btn" type="button">${ambiguous ? "Enviar" : "Reenviar"}</button>
+      `;
+      const tableSelect = controls.querySelector(".table-select");
+      const sheetSelect = controls.querySelector(".sheet-select");
+      const sendBtn = controls.querySelector(".send-btn");
 
-      if(sheetNames.length <= 1){
-        sheetRow.classList.remove("show");
-        sendBtn.classList.remove("show");
-        await sendFile(cardEl, tableCfg, file, sheetNames[0]);
+      const doSend = ()=> sendFile(row, tableSelect.value, file, sheetSelect ? sheetSelect.value : chosenSheet);
+      sendBtn.addEventListener("click", doSend);
+
+      if(!detectedTable){
+        statusEl.className = "fr-status error";
+        statusEl.textContent = `Não reconheci esse arquivo pelo nome — escolha o indicador certo e clique em Enviar.`;
         return;
       }
 
-      // Várias abas: deixa escolher, em vez de adivinhar.
-      sheetSelect.innerHTML = sheetNames.map(n=> `<option value="${n}">${n}</option>`).join("");
-      sheetRow.classList.add("show");
-      sendBtn.classList.add("show");
-      sendBtn.onclick = ()=> sendFile(cardEl, tableCfg, file, sheetSelect.value);
-      statusEl.textContent = `${sheetNames.length} abas encontradas — escolha a certa e clique em Enviar.`;
+      statusEl.className = "fr-status";
+      statusEl.textContent = ambiguous ? `${sheetNames.length} abas encontradas — confira a aba selecionada e clique em Enviar.` : "";
+
+      if(!ambiguous){
+        await sendFile(row, tableKey, file, chosenSheet);
+      }
     }catch(err){
-      statusEl.className = "file-status error";
+      controls.innerHTML = `<select class="table-select">${tableOptionsHtml(detectedTable)}</select>`;
+      statusEl.className = "fr-status error";
       statusEl.textContent = "Não consegui ler o arquivo: " + err.message;
     }
   }
 
-  function renderCard(tableCfg){
-    const card = document.createElement("div");
-    card.className = "drop-card";
-    card.innerHTML = `
-      <div class="table-name">${tableCfg.label}</div>
-      <div class="table-hint">${tableCfg.hint}</div>
-      <input type="file" accept=".xlsx,.xls,.csv" />
-      <button class="pick-btn" type="button">Escolher arquivo</button>
-      <div class="sheet-row">
-        <label>Aba com os dados:</label>
-        <select></select>
-      </div>
-      <button class="send-btn" type="button">Enviar</button>
-      <div class="file-status"></div>
-    `;
-    const input = card.querySelector("input[type=file]");
-    const pickBtn = card.querySelector(".pick-btn");
-
-    pickBtn.addEventListener("click", ()=> input.click());
-    input.addEventListener("change", ()=>{
-      if(input.files[0]) handleFile(card, tableCfg, input.files[0]);
-    });
-
-    ["dragenter","dragover"].forEach(evt=> card.addEventListener(evt, (e)=>{
-      e.preventDefault(); card.classList.add("drag-over");
-    }));
-    ["dragleave","drop"].forEach(evt=> card.addEventListener(evt, (e)=>{
-      e.preventDefault(); card.classList.remove("drag-over");
-    }));
-    card.addEventListener("drop", (e)=>{
-      const file = e.dataTransfer.files[0];
-      if(file) handleFile(card, tableCfg, file);
-    });
-
-    return card;
+  function handleFiles(fileList){
+    Array.from(fileList).forEach(handleOneFile);
   }
 
   function renderShell(){
     root.innerHTML = `
       <div class="panel">
         <h2>Enviar planilhas</h2>
-        <div class="sub">Arraste o arquivo pro card certo, ou clique em "Escolher arquivo". Aceita .xlsx, .xls e .csv — a primeira linha precisa ser o cabeçalho.</div>
-        <div class="upload-grid" id="upload-grid"></div>
+        <div class="sub">Arraste todas as planilhas do dia de uma vez — o sistema identifica sozinho qual indicador é cada uma pelo nome do arquivo. Aceita .xlsx, .xls e .csv.</div>
+        <div class="dropzone" id="dropzone">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3v12M7 10l5-5 5 5"/><path d="M5 21h14"/></svg>
+          <div class="dz-title">Arraste os arquivos aqui</div>
+          <div class="dz-sub">ou clique para escolher (pode selecionar vários de uma vez)</div>
+          <input type="file" id="file-input" accept=".xlsx,.xls,.csv" multiple />
+        </div>
+        <div class="file-rows" id="file-rows"></div>
       </div>
       <div class="panel">
         <h2>Últimos envios</h2>
@@ -486,8 +535,13 @@ h1,h2{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; m
         <div class="empty-state" id="log-empty">Nenhum envio ainda.</div>
       </div>
     `;
-    const grid = document.getElementById("upload-grid");
-    TABLES.forEach(t=> grid.appendChild(renderCard(t)));
+    const dz = document.getElementById("dropzone");
+    const input = document.getElementById("file-input");
+    dz.addEventListener("click", ()=> input.click());
+    input.addEventListener("change", ()=>{ handleFiles(input.files); input.value = ""; });
+    ["dragenter","dragover"].forEach(evt=> dz.addEventListener(evt, (e)=>{ e.preventDefault(); dz.classList.add("drag-over"); }));
+    ["dragleave","drop"].forEach(evt=> dz.addEventListener(evt, (e)=>{ e.preventDefault(); dz.classList.remove("drag-over"); }));
+    dz.addEventListener("drop", (e)=>{ if(e.dataTransfer.files.length) handleFiles(e.dataTransfer.files); });
     renderLog();
   }
 
