@@ -95,6 +95,42 @@ select * from sync_log order by started_at desc limit 10;
 select * from apontamentos order by dt_producao desc limit 10;
 ```
 
+## 7. Ativar a sincronização automática (quando a TI liberar o acesso)
+
+O upload manual continua sendo o fluxo real até lá. Mas o script que vai
+substituir isso já está pronto e esperando, em
+[`backend/sync-sharepoint/`](./sync-sharepoint/) — mesma lógica de detecção
+de tabela/aba do `upload.html`, só que rodando sozinho todo dia via GitHub
+Actions em vez de alguém arrastar arquivo.
+
+Quando a TI devolver os três valores do registro do app (Tenant ID, Client
+ID, Client Secret — ver o pedido que te passei), o que falta é só
+configuração, nenhum código novo:
+
+1. No repositório: `Settings` → `Secrets and variables` → `Actions` →
+   criar 6 secrets:
+
+   | Secret | Valor |
+   |---|---|
+   | `SUPABASE_URL` | `https://iwocigbdywkypvagrrjk.supabase.co` |
+   | `SUPABASE_SERVICE_ROLE_KEY` | `Project Settings > API > service_role` no Supabase |
+   | `MS_TENANT_ID` | devolvido pela TI |
+   | `MS_CLIENT_ID` | devolvido pela TI |
+   | `MS_CLIENT_SECRET` | devolvido pela TI |
+   | `SHAREPOINT_SITE` | ex: `gualapackspa-my.sharepoint.com:/personal/felipe_panini_gualapack_com` |
+   | `SHAREPOINT_FOLDER_PATH` | caminho da pasta dentro do site acima |
+
+2. Testar manualmente: aba `Actions` do repositório → `Carga automática via
+   SharePoint (pré-montado — inativo)` → `Run workflow`. Confira o resultado
+   em `sync_log` no Supabase.
+3. Depois de validar, edite
+   [`.github/workflows/sync-sharepoint.yml`](../.github/workflows/sync-sharepoint.yml)
+   e descomente o bloco `schedule:` — passa a rodar sozinho todo dia às 3h
+   (horário de Brasília).
+
+A partir daí `upload.html` vira só um botão de emergência (subir manual se
+o automático falhar por algum motivo), não mais a rotina do dia a dia.
+
 ## Próximo passo: os gráficos do painel
 
 As tabelas e o upload já refletem a estrutura real. O próximo passo é trocar
