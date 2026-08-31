@@ -1,0 +1,451 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>Atualizar dados — Gualapack</title>
+<link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600;1,700&family=Archivo:wght@500;600;700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="./supabase-config.js"></script>
+<style>
+:root{
+  color-scheme: light;
+  --bg: #eef2f6;
+  --surface-1: #ffffff;
+  --surface-2: #ffffff;
+  --surface-sunken: #e6ecf3;
+  --border: #d7e0e9;
+  --border-strong: #b9c8d8;
+  --text-primary: #0a1524;
+  --text-secondary: #3d5066;
+  --text-muted: #7288a0;
+  --accent: #0f5ea6;
+  --accent-ink: #ffffff;
+  --accent-soft: #dbeaf8;
+  --series-1: #0c3868;
+  --series-3: #2f78c4;
+  --good: #0d8f4f;
+  --good-bg: #dff3e8;
+  --warning: #a9720a;
+  --warning-bg: #faedd2;
+  --critical: #c22b3c;
+  --critical-bg: #fbdfe2;
+  --glass-bg: rgba(255,255,255,0.6);
+  --glass-bg-strong: rgba(255,255,255,0.78);
+  --glass-border: rgba(255,255,255,0.65);
+  --glass-highlight: rgba(255,255,255,0.9);
+  --glass-shadow: 0 1px 1px rgba(10,47,87,0.05), 0 20px 40px -20px rgba(10,47,87,0.28);
+  --ease: cubic-bezier(.22,1,.36,1);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg: #07090c;
+    --surface-1: #0e1116;
+    --surface-2: #12161d;
+    --surface-sunken: #0a0d12;
+    --border: #212833;
+    --border-strong: #303b4a;
+    --text-primary: #eef3f9;
+    --text-secondary: #a7b7c9;
+    --text-muted: #6d7d90;
+    --accent: #4f9ce0;
+    --accent-ink: #071019;
+    --accent-soft: #132639;
+    --series-1: #175a99;
+    --series-3: #4f9ce0;
+    --good: #2fbf2f;
+    --good-bg: #16301a;
+    --warning: #e0a834;
+    --warning-bg: #382d10;
+    --critical: #e66767;
+    --critical-bg: #3a1616;
+    --glass-bg: rgba(20,26,36,0.5);
+    --glass-bg-strong: rgba(24,30,41,0.68);
+    --glass-border: rgba(146,180,214,0.16);
+    --glass-highlight: rgba(255,255,255,0.06);
+    --glass-shadow: 0 1px 1px rgba(0,0,0,0.3), 0 24px 48px -20px rgba(0,0,0,0.65);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg: #07090c;
+  --surface-1: #0e1116;
+  --surface-2: #12161d;
+  --surface-sunken: #0a0d12;
+  --border: #212833;
+  --border-strong: #303b4a;
+  --text-primary: #eef3f9;
+  --text-secondary: #a7b7c9;
+  --text-muted: #6d7d90;
+  --accent: #4f9ce0;
+  --accent-ink: #071019;
+  --accent-soft: #132639;
+  --series-1: #175a99;
+  --series-3: #4f9ce0;
+  --good: #2fbf2f;
+  --good-bg: #16301a;
+  --warning: #e0a834;
+  --warning-bg: #382d10;
+  --critical: #e66767;
+  --critical-bg: #3a1616;
+  --glass-bg: rgba(20,26,36,0.5);
+  --glass-bg-strong: rgba(24,30,41,0.68);
+  --glass-border: rgba(146,180,214,0.16);
+  --glass-highlight: rgba(255,255,255,0.06);
+  --glass-shadow: 0 1px 1px rgba(0,0,0,0.3), 0 24px 48px -20px rgba(0,0,0,0.65);
+}
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+html:focus, body:focus, html:focus-visible, body:focus-visible{ outline: none; }
+body{
+  background: var(--bg);
+  color: var(--text-primary);
+  font-family: "Public Sans", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  min-height:100vh;
+}
+body.auth-pending{ visibility:hidden; }
+h1,h2{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; margin:0; }
+.mono{ font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric: tabular-nums; }
+
+.topbar{
+  display:flex; align-items:center; justify-content:space-between; gap:16px;
+  padding:18px 28px; border-bottom:1px solid var(--glass-border);
+  background: var(--glass-bg); backdrop-filter: blur(20px) saturate(160%); -webkit-backdrop-filter: blur(20px) saturate(160%);
+  position: sticky; top:0; z-index:10;
+}
+.brand-word{ font-family:"Playfair Display","Georgia",serif; font-style:italic; font-weight:700; font-size:19px; }
+.brand-word .ink-accent{ color:var(--accent); }
+.back-link{
+  display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-secondary);
+  text-decoration:none; background:var(--glass-bg-strong); border:1px solid var(--glass-border);
+  padding:8px 14px; border-radius:999px; transition: color .2s var(--ease), border-color .2s var(--ease);
+}
+.back-link:hover{ color:var(--text-primary); border-color:var(--accent); }
+.theme-toggle{
+  width:36px; height:36px; border-radius:50%; border:1px solid var(--glass-border);
+  background:var(--glass-bg-strong); color:var(--text-secondary); cursor:pointer;
+  display:flex; align-items:center; justify-content:center;
+  transition: border-color .2s var(--ease), color .2s var(--ease);
+}
+.theme-toggle:hover{ border-color:var(--accent); color:var(--text-primary); }
+::view-transition-old(root), ::view-transition-new(root){ animation:none; mix-blend-mode:normal; }
+::view-transition-old(root){ z-index:1; } ::view-transition-new(root){ z-index:2; }
+
+.content{ padding:28px; max-width:1040px; margin:0 auto; }
+.page-title{ font-size:24px; margin-bottom:4px; }
+.page-sub{ color:var(--text-muted); font-size:13.5px; margin-bottom:26px; }
+
+.panel{
+  background: var(--glass-bg);
+  backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%);
+  border:1px solid var(--glass-border); border-radius:14px;
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+  padding:22px 24px; margin-bottom:20px;
+}
+.panel h2{ font-size:16px; margin-bottom:4px; }
+.panel .sub{ color:var(--text-muted); font-size:12.5px; margin-bottom:18px; }
+
+.upload-grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:14px; }
+
+.drop-card{
+  border:1.5px dashed var(--glass-border); border-radius:12px; padding:18px 16px;
+  background: var(--glass-bg-strong); display:flex; flex-direction:column; gap:10px;
+  transition: border-color .2s var(--ease), background .2s var(--ease);
+  position:relative;
+}
+.drop-card.drag-over{ border-color:var(--accent); background: var(--accent-soft); }
+.drop-card .table-name{ font-size:13.5px; font-weight:700; }
+.drop-card .table-hint{ font-size:11.5px; color:var(--text-muted); line-height:1.4; }
+.drop-card input[type=file]{ display:none; }
+.drop-card .pick-btn{
+  align-self:flex-start; background: var(--surface-1); border:1px solid var(--border-strong);
+  color:var(--text-secondary); border-radius:8px; padding:7px 13px; font-size:12px; cursor:pointer;
+  font-family:inherit; transition: color .2s var(--ease), border-color .2s var(--ease);
+}
+.drop-card .pick-btn:hover{ color:var(--text-primary); border-color:var(--accent); }
+.drop-card .file-status{ font-size:12px; min-height:16px; }
+.drop-card .file-status.ok{ color:var(--good); }
+.drop-card .file-status.error{ color:var(--critical); }
+.drop-card .file-status.pending{ color:var(--text-secondary); }
+.drop-card .spinner{
+  width:12px; height:12px; border-radius:50%; border:2px solid var(--glass-border);
+  border-top-color: var(--accent); display:inline-block; margin-right:6px; vertical-align:-2px;
+  animation: spin .7s linear infinite;
+}
+@keyframes spin{ to{ transform: rotate(360deg); } }
+
+.log-list{ display:flex; flex-direction:column; gap:8px; max-height:280px; overflow-y:auto; }
+.log-row{ display:flex; justify-content:space-between; gap:12px; font-size:12.5px; padding:8px 10px; border-radius:8px; background: var(--surface-1); border:1px solid var(--border); }
+.log-row .when{ color:var(--text-muted); font-size:11px; white-space:nowrap; }
+.log-row.ok{ border-color: var(--good); }
+.log-row.error{ border-color: var(--critical); color:var(--critical); }
+
+.empty-state, .denied, .loading-state{ color:var(--text-muted); font-size:13.5px; padding:20px 0; text-align:center; }
+.denied{ color:var(--critical); }
+</style>
+</head>
+<body class="auth-pending">
+
+<script>
+(function(){
+  const root = document.documentElement;
+  const STORAGE_KEY = "gualapack-theme";
+  function systemPrefersDark(){ return window.matchMedia("(prefers-color-scheme: dark)").matches; }
+  function effectiveTheme(){
+    const explicit = root.getAttribute("data-theme");
+    if(explicit === "light" || explicit === "dark") return explicit;
+    return systemPrefersDark() ? "dark" : "light";
+  }
+  let saved = null;
+  try{ saved = localStorage.getItem(STORAGE_KEY); }catch(e){}
+  root.setAttribute("data-theme", saved === "light" || saved === "dark" ? saved : effectiveTheme());
+
+  document.addEventListener("DOMContentLoaded", ()=>{
+    const btn = document.getElementById("theme-toggle");
+    if(!btn) return;
+    const sunIcon = document.getElementById("theme-icon-sun");
+    const moonIcon = document.getElementById("theme-icon-moon");
+    function updateIcon(theme){
+      const showSun = theme === "dark";
+      sunIcon.hidden = !showSun;
+      moonIcon.hidden = showSun;
+      btn.title = showSun ? "Mudar para tema claro" : "Mudar para tema escuro";
+    }
+    function applyTheme(theme){
+      root.setAttribute("data-theme", theme);
+      try{ localStorage.setItem(STORAGE_KEY, theme); }catch(e){}
+      updateIcon(theme);
+    }
+    updateIcon(effectiveTheme());
+    btn.addEventListener("click", ()=>{
+      const next = effectiveTheme() === "dark" ? "light" : "dark";
+      if(window.matchMedia("(prefers-reduced-motion: reduce)").matches || !document.startViewTransition){
+        applyTheme(next);
+        return;
+      }
+      const rect = btn.getBoundingClientRect();
+      const x = rect.left + rect.width/2, y = rect.top + rect.height/2;
+      const endRadius = Math.hypot(Math.max(x, window.innerWidth-x), Math.max(y, window.innerHeight-y));
+      const transition = document.startViewTransition(()=> applyTheme(next));
+      transition.ready.then(()=>{
+        root.animate(
+          { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`] },
+          { duration: 680, easing: "cubic-bezier(.65,0,.35,1)", pseudoElement: "::view-transition-new(root)" }
+        );
+      });
+    });
+  });
+})();
+</script>
+
+<script>
+(function(){
+  const cfg = window.SUPABASE_CONFIG;
+  const configured = cfg && !cfg.url.includes("SEU-PROJETO");
+  if(!configured){
+    document.addEventListener("DOMContentLoaded", ()=> document.body.classList.remove("auth-pending"));
+    return;
+  }
+  window.gualapackAuth = window.supabase.createClient(cfg.url, cfg.anonKey);
+  window.gualapackAuth.auth.getSession().then(({ data })=>{
+    if(!data.session){
+      window.location.replace("./login.html");
+      return;
+    }
+    window.gualapackSession = data.session;
+    document.body.classList.remove("auth-pending");
+    document.dispatchEvent(new CustomEvent("gualapack-session-ready"));
+  });
+})();
+</script>
+
+<header class="topbar">
+  <div class="brand-word">Guala<span class="ink-accent">pack</span></div>
+  <div style="display:flex; align-items:center; gap:10px;">
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Trocar tema" aria-label="Trocar tema">
+      <svg id="theme-icon-sun" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8L6 18M18 6l1.8-1.8"/></svg>
+      <svg id="theme-icon-moon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" hidden><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>
+    </button>
+    <a class="back-link" href="./index.html">&larr; Voltar ao painel</a>
+  </div>
+</header>
+
+<main class="content">
+  <h1 class="page-title">Atualizar dados</h1>
+  <div class="page-sub">Envie a planilha de cada indicador &mdash; o painel atualiza assim que o arquivo é processado. Restrito a administradores.</div>
+
+  <div id="root">
+    <div class="loading-state">Verificando permissão...</div>
+  </div>
+</main>
+
+<script>
+(function(){
+  const cfg = window.SUPABASE_CONFIG;
+  const configured = cfg && !cfg.url.includes("SEU-PROJETO");
+  const root = document.getElementById("root");
+
+  if(!configured){
+    root.innerHTML = `<div class="denied">Backend não configurado ainda (demo/supabase-config.js). Esta tela só funciona com o Supabase conectado.</div>`;
+    return;
+  }
+
+  const client = window.gualapackAuth;
+
+  const TABLES = [
+    { table: "maquinas_diario", label: "Máquinas (diário)", hint: "TMR, velocidade, apara e aderência por máquina" },
+    { table: "perdas_diario", label: "Perdas (diário)", hint: "Perda em kg por motivo e máquina" },
+    { table: "ops_diario", label: "Ordens de produção", hint: "Refugo por OP" },
+    { table: "wip_diario", label: "WIP", hint: "Metros parados por etapa e cliente" },
+    { table: "carteira_diario", label: "Carteira", hint: "Carteira, produzido e faturado por classificação" },
+    { table: "apontamentos", label: "Apontamentos", hint: "Linha do tempo das máquinas" },
+  ];
+
+  function fmtTime(d){
+    return d.toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit", second:"2-digit" });
+  }
+
+  function fileToBase64(file){
+    return new Promise((resolve, reject)=>{
+      const reader = new FileReader();
+      reader.onload = ()=> resolve(reader.result.split(",")[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  const uploadLog = [];
+  function pushLog(entry){
+    uploadLog.unshift({ ...entry, when: new Date() });
+    renderLog();
+  }
+  function renderLog(){
+    const list = document.getElementById("log-list");
+    const empty = document.getElementById("log-empty");
+    if(!list) return;
+    if(uploadLog.length === 0){
+      list.innerHTML = "";
+      if(empty) empty.style.display = "block";
+      return;
+    }
+    if(empty) empty.style.display = "none";
+    list.innerHTML = uploadLog.map(e=>`
+      <div class="log-row ${e.ok ? "ok" : "error"}">
+        <span>${e.text}</span>
+        <span class="when">${fmtTime(e.when)}</span>
+      </div>
+    `).join("");
+  }
+
+  async function handleFile(cardEl, tableCfg, file){
+    const statusEl = cardEl.querySelector(".file-status");
+    statusEl.className = "file-status pending";
+    statusEl.innerHTML = `<span class="spinner"></span>Enviando "${file.name}"...`;
+
+    try{
+      const contentBase64 = await fileToBase64(file);
+      const { data, error } = await client.functions.invoke("ingest", {
+        body: { table: tableCfg.table, fileName: file.name, contentBase64 },
+      });
+
+      if(error || !data?.ok){
+        const msg = data?.error || error?.message || "erro desconhecido";
+        statusEl.className = "file-status error";
+        statusEl.textContent = "Falhou: " + msg;
+        pushLog({ ok:false, text: `${tableCfg.label}: ${file.name} — ${msg}` });
+        return;
+      }
+
+      statusEl.className = "file-status ok";
+      statusEl.textContent = `${data.linhas} linhas gravadas.`;
+      pushLog({ ok:true, text: `${tableCfg.label}: ${file.name} — ${data.linhas} linhas` });
+    }catch(err){
+      statusEl.className = "file-status error";
+      statusEl.textContent = "Falhou: " + err.message;
+      pushLog({ ok:false, text: `${tableCfg.label}: ${file.name} — ${err.message}` });
+    }
+  }
+
+  function renderCard(tableCfg){
+    const card = document.createElement("div");
+    card.className = "drop-card";
+    card.innerHTML = `
+      <div class="table-name">${tableCfg.label}</div>
+      <div class="table-hint">${tableCfg.hint}</div>
+      <input type="file" accept=".xlsx,.xls,.csv" />
+      <button class="pick-btn" type="button">Escolher arquivo</button>
+      <div class="file-status"></div>
+    `;
+    const input = card.querySelector("input[type=file]");
+    const pickBtn = card.querySelector(".pick-btn");
+
+    pickBtn.addEventListener("click", ()=> input.click());
+    input.addEventListener("change", ()=>{
+      if(input.files[0]) handleFile(card, tableCfg, input.files[0]);
+    });
+
+    ["dragenter","dragover"].forEach(evt=> card.addEventListener(evt, (e)=>{
+      e.preventDefault(); card.classList.add("drag-over");
+    }));
+    ["dragleave","drop"].forEach(evt=> card.addEventListener(evt, (e)=>{
+      e.preventDefault(); card.classList.remove("drag-over");
+    }));
+    card.addEventListener("drop", (e)=>{
+      const file = e.dataTransfer.files[0];
+      if(file) handleFile(card, tableCfg, file);
+    });
+
+    return card;
+  }
+
+  function renderShell(){
+    root.innerHTML = `
+      <div class="panel">
+        <h2>Enviar planilhas</h2>
+        <div class="sub">Arraste o arquivo pro card certo, ou clique em "Escolher arquivo". Aceita .xlsx, .xls e .csv — a primeira linha precisa ser o cabeçalho.</div>
+        <div class="upload-grid" id="upload-grid"></div>
+      </div>
+      <div class="panel">
+        <h2>Últimos envios</h2>
+        <div class="sub">Histórico desta sessão (não persiste ao recarregar a página).</div>
+        <div class="log-list" id="log-list"></div>
+        <div class="empty-state" id="log-empty">Nenhum envio ainda.</div>
+      </div>
+    `;
+    const grid = document.getElementById("upload-grid");
+    TABLES.forEach(t=> grid.appendChild(renderCard(t)));
+    renderLog();
+  }
+
+  async function init(){
+    const session = window.gualapackSession;
+    if(!session){ root.innerHTML = `<div class="denied">Sessão não encontrada.</div>`; return; }
+
+    const { data: profile, error: profileError } = await client
+      .from("profiles")
+      .select("role, full_name")
+      .eq("id", session.user.id)
+      .single();
+
+    if(profileError || !profile || profile.role !== "admin"){
+      root.innerHTML = `<div class="denied">Acesso restrito a administradores. Sua conta (${profile?.full_name ?? session.user.email}) não tem essa permissão.</div>`;
+      return;
+    }
+
+    renderShell();
+  }
+
+  if(window.gualapackSession){
+    init();
+  }else{
+    document.addEventListener("gualapack-session-ready", init);
+  }
+})();
+</script>
+</body>
+</html>

@@ -817,6 +817,9 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
       <button class="rail-btn" data-view="wip" title="WIP &amp; Carteira" aria-label="WIP e Carteira">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8l9-4 9 4-9 4-9-4Z"/><path d="M3 12l9 4 9-4"/><path d="M3 16l9 4 9-4"/></svg>
       </button>
+      <a class="rail-btn" id="upload-link" title="Atualizar dados" aria-label="Atualizar dados" href="./upload.html" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12M7 10l5-5 5 5"/><path d="M5 21h14"/></svg>
+      </a>
       <a class="rail-btn" id="admin-link" title="Administração de acessos" aria-label="Administração de acessos" href="./admin.html" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4Z"/><path d="M9 12l2 2 4-4"/></svg>
       </a>
@@ -2415,6 +2418,7 @@ window.renderGanttForTheme = renderGantt;
       .then(({ data: profile })=>{
         if(profile?.role === "admin"){
           document.getElementById("admin-link").hidden = false;
+          document.getElementById("upload-link").hidden = false;
         }
       });
   }
