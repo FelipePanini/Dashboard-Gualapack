@@ -20,6 +20,8 @@ import { google } from "googleapis";
 import { parse } from "csv-parse/sync";
 import { createClient } from "@supabase/supabase-js";
 
+// sync.js — carga diária dos dados reais de produção
+// Roda agendado pelo GitHub Actions (.github/workflows/sync-daily.yml).
 const required = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SYNC_DRIVE_FOLDER_ID"];
 for (const key of required) {
   if (!process.env[key]) {
@@ -45,8 +47,16 @@ const FILE_MAP = {
 };
 
 function authGoogleDrive() {
+  // Aceita a chave de duas formas: caminho pra um arquivo (uso local) ou o
+  // JSON inteiro numa variável de ambiente (uso no GitHub Actions, onde o
+  // conteúdo vem de um Secret e é escrito num arquivo temporário pelo workflow).
+  const credentials = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+    ? JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
+    : undefined;
+
   const auth = new google.auth.GoogleAuth({
-    keyFile: process.env.GOOGLE_APPLICATION_CREDENTIALS,
+    credentials,
+    keyFile: credentials ? undefined : process.env.GOOGLE_APPLICATION_CREDENTIALS,
     scopes: ["https://www.googleapis.com/auth/drive.readonly"],
   });
   return google.drive({ version: "v3", auth });
