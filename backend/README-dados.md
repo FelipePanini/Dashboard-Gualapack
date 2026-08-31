@@ -2,13 +2,13 @@
 
 Sem SharePoint automático, sem Power Automate, sem app registrado no Azure.
 Quem atualiza os dados faz isso **de dentro do próprio painel**, arrastando
-a planilha do dia — o mesmo login de admin que já existe.
+a planilha (ou a aba certa dela) — o mesmo login de admin que já existe.
 
 ```
-Planilha (exportada de onde for)
+Planilha real (algumas são grandes/têm várias abas — corte com tools/planilha-uma-aba.js)
         │
         ▼
-demo/upload.html — admin arrasta o arquivo, sistema já logado
+demo/upload.html — admin arrasta o arquivo (ou a aba já cortada), escolhe a aba se precisar
         │
         ▼
 Função "ingest" no Supabase — lê a planilha e grava no banco central
@@ -17,77 +17,89 @@ Função "ingest" no Supabase — lê a planilha e grava no banco central
 Dashboard já mostra o dado novo
 ```
 
-## 1. Rodar os schemas no Supabase (uma vez só)
+## 1. Rodar os schemas no Supabase
 
-`SQL Editor` do Supabase → colar e rodar, nesta ordem:
+`SQL Editor` do Supabase → colar e rodar, nesta ordem (**rode `schema_data.sql`
+de novo mesmo se já rodou antes** — as tabelas mudaram pra bater com as
+planilhas reais):
 1. `backend/schema.sql` (se ainda não rodou)
 2. `backend/schema_data.sql`
 
-## 2. Publicar a função `ingest`
+## 2. Publicar a função `ingest` (atualizada)
 
-- Painel do Supabase → `Edge Functions` → `Deploy a new function`.
-- Nome: **`ingest`** (exatamente esse).
-- Cole o conteúdo de [`functions/ingest/index.ts`](./functions/ingest/index.ts).
-- Não precisa configurar nenhum secret novo — `SUPABASE_URL` e
-  `SUPABASE_SERVICE_ROLE_KEY` já existem automaticamente em toda Edge
-  Function do projeto.
-- Mantenha **"Enforce JWT Verification" ligado** (é o padrão) — essa função
-  agora exige que quem chama esteja logado, e checa dentro do código se a
-  pessoa tem `role = admin` antes de gravar qualquer coisa.
+- Painel do Supabase → `Edge Functions` → abre `ingest` → cola o conteúdo
+  novo de [`functions/ingest/index.ts`](./functions/ingest/index.ts) por
+  cima → `Deploy`.
+- Mantenha **"Enforce JWT Verification" ligado**.
 
-## 3. Usar a tela de upload
+## 3. Planilhas grandes/com várias abas — corte primeiro
 
-- Acesse `demo/upload.html` (ou clique no ícone de seta-pra-cima na barra
-  lateral do painel — só aparece pra quem é admin).
-- Pra cada indicador (Máquinas, Perdas, OPs, WIP, Carteira, Apontamentos),
-  arraste o arquivo `.xlsx`/`.xls`/`.csv` correspondente no card certo, ou
-  clique em "Escolher arquivo".
-- A primeira linha da planilha precisa ser o cabeçalho (nome das colunas),
-  com dados a partir da linha 2 — não precisa ser Tabela do Excel, não
-  precisa de nome de arquivo específico (você escolhe o indicador pelo
-  card, não pelo nome do arquivo).
-- Cada card mostra na hora se deu certo (quantas linhas gravou) ou o motivo
-  do erro (geralmente nome de coluna que não bate com o banco).
+Algumas planilhas reais pesam 15–100 MB e têm várias abas — grande demais
+pra arrastar direto. Pra essas, use o script local (roda no seu computador,
+não manda nada pra fora):
 
-## 4. Nomes de coluna esperados
-
-As colunas da planilha (linha 1) precisam ter os mesmos nomes das colunas
-das tabelas em `backend/schema_data.sql` (acentos e maiúsculas não importam
-— `TMR (%)` e `tmr` são tratados como iguais).
-
-| Card | Tabela | Colunas |
-|---|---|---|
-| Máquinas (diário) | `maquinas_diario` | `data_ref`, `maquina_id`, `tmr`, `vel_media`, `aparas_pct`, `perda_confirm_pct`, `horas_prod`, `horas_tot`, `plan_km`, `real_km` |
-| Perdas (diário) | `perdas_diario` | `data_ref`, `tipo_perda`, `maquina_id`, `kg` |
-| Ordens de produção | `ops_diario` | `data_ref`, `op`, `maquina_id`, `descricao`, `peso_bruto_kg`, `refugo_kg`, `apara_pct`, `motivo_principal` |
-| WIP | `wip_diario` | `data_ref`, `etapa`, `cliente`, `classificacao`, `dentro_carteira`, `metros` |
-| Carteira | `carteira_diario` | `data_ref`, `classificacao`, `carteira_kg`, `produzido_kg`, `faturado_kg` |
-| Apontamentos | `apontamentos` | `maquina_id`, `status`, `op`, `inicio`, `fim` |
-
-Se as planilhas reais tiverem nomes de coluna diferentes, me diga os nomes
-reais que eu ajusto o schema pra bater — mais simples que pedir pra
-reformatar as planilhas que o time já usa.
-
-## 5. Conferir que funcionou
-
-No Supabase, `SQL Editor`:
-```sql
-select * from sync_log order by started_at desc limit 10;
-select * from maquinas_diario order by data_ref desc limit 10;
+```bash
+cd tools
+npm install          # só na primeira vez
+node planilha-uma-aba.js "Indicadores Diário - 2026.xlsx" --listar
+node planilha-uma-aba.js "Indicadores Diário - 2026.xlsx" "Base Máquina_Embalagem" "apontamentos-hoje.xlsx"
 ```
 
-## 6. Sobre ser "manual"
+Isso gera um arquivo novo, bem menor, com **só** a aba escolhida — os dados
+dentro dela não são alterados nem resumidos, só as outras abas são
+descartadas. Depois é só arrastar o arquivo gerado (`apontamentos-hoje.xlsx`
+no exemplo) em `demo/upload.html`.
 
-Isso não é 100% automático — alguém precisa abrir a tela e arrastar os
-arquivos, uma vez por dia (leva menos de um minuto). É o nível de automação
-que dá pra ter agora sem depender de acesso de TI/admin no Microsoft 365.
-Se um dia a TI liberar o registro de um aplicativo no Entra ID, dá pra trocar
-essa etapa manual por uma leitura automática do SharePoint sem jogar nada
-fora — a função `ingest` e o banco continuam os mesmos, só muda quem chama.
+Planilhas pequenas (sequenciamento mensal de fardos, tendência, etc.) podem
+ir direto, sem passar pelo script.
 
-## Próximo passo no front-end
+## 4. Mapeamento planilha → card → tabela
 
-Depois que a primeira carga rodar com sucesso, troco os arrays fixos
-(`MAQUINAS`, `TIPOS_PERDA`, `APARAS_MENSAL` etc.) em `demo/index.html` por
-`supabase.from(...).select(...)` — os gráficos e o layout continuam iguais,
-só a origem do número muda.
+| Card no upload | Tabela | Planilha de origem | Aba a usar |
+|---|---|---|---|
+| Apontamentos | `apontamentos` | `Indicadores Diário - 2026.xlsx` (ou `Base Aparas - 2026.xlsx`) | `Base Máquina_Embalagem` (ou `BASE_DETALHE`) — **corte com o script antes**, é enorme |
+| Fardos de aparas | `fardos_aparas` | `0X. SEQUENCIAMENTO DOS FARDOS DE APARAS JGR - <mês> 2026.xlsx` ou `Sequenciamento Acumulado 2026.xlsx` | `COMPLETOS` (planilhas mensais) ou a aba única do acumulado |
+| Aderência — máquinas (diário) | `aderencia_maquinas_diaria` | `Aderência Máquinas - Diária.xlsx` | `Apontamentos_produção` — **corte com o script antes** |
+| Aderência — programação | `aderencia_programacao` | `Histórico Aderência Programação.xlsx` | `Programação Passado` — **corte com o script antes**, é enorme |
+| Refugo/aparas — histórico | `refugo_aparas_historico` | `Refugo Aparas.xlsx` | `Histórico Refugo` |
+| Tendência mensal | `tendencia_mensal` | `Graficos Tendência.xlsx` | `Dados Prod` |
+| Catálogo de máquinas | `maquinas` | `Machine Card Oficial - Genérico.xlsx` | `DIM_EQTOS & GRUPO EQTO` |
+
+`Refugo Produção.xlsx` (estrutura de produto/engenharia) e `Base Aparas -
+Genérico/2024/2025.xlsx` (histórico anual, mesmo formato de `apontamentos`)
+ficam de fora por enquanto — não mapeiam pra nenhum gráfico do painel ainda.
+Se quiser incluir histórico de anos anteriores, é só cortar a aba e subir
+como `apontamentos` também (mesma estrutura).
+
+## 5. Colunas esperadas por tabela
+
+A primeira linha do arquivo (ou da aba) precisa ter esses nomes de coluna —
+acentos e maiúsculas não importam, a função normaliza sozinha.
+
+- **`apontamentos`**: `NumOrdem`, `CodRecurso`, `CodApont`, `Cod_Desc`, `DtProducao`, `HoraInicio`, `HoraFim`, `QtdHoras`, `QtdProduzida`, `Turno`, `DesperdicioAcerto`, `DesperdicioVirando`, `usr_PesoBrutoBobina`, `usr_tipodaperda`, `usr_kgdaperda`, `TipoProduto`, `CodEstrutura`, `Des_NumOrdem`, `CodEst`, `Processo`, `Classificacao` (+ `NomeOperador`, `NomeCliente` se vierem de `Base Aparas`)
+- **`fardos_aparas`**: `CÓDIGO`, `DP ou FP`, `REFUGO`, `REFILE`, `DATA`, `Nº`, `QTD BRUTA (KG)`, `QTD LÍQUIDA (KG)`, `NOME`, `CLASSIFICAÇÃO`, `TIPO`
+- **`aderencia_maquinas_diaria`**: `NumOrdem`, `DtProducao`, `QtdProduzida`, `CodRecurso`, `QtdHoras`, `Classificacao`, `Descrição`, `CodEstrutura`, `Turno`, `Cod_Desc`, `CodApont`
+- **`aderencia_programacao`**: `CodCliente`, `CodEstrutura`, `Recurso_Ctr`, `TipoProduto`, `NumOrdem`, `DtSaidaMaquina`, `Descricao`, `Cliente`, `Atividade`, `Qtd_Produzido`, `QtdPLanejado`, `Meta_qtd_acerto`, `Qtd_AcertoReal`, `Min_Set_Prog`, `Mini_Set_Real` (vira `min_set_real`), `Qtd_ProdKg`, `Meta_Mts_Hora`, `Qtd_HorP`, `Cilindro`
+- **`refugo_aparas_historico`**: `DATE`, `VOLUME JGR`, `SCRAP JGR`, `VOLUME ORF`, `SCRAP ORF`
+- **`tendencia_mensal`**: precisa ser reorganizada antes — a aba original é uma tabela "larga" (vários blocos lado a lado). Monte uma versão simples com colunas `mes`, `ano`, `volume_prod_corte_km`, `lote_medio_km`, `volume_prod_kg`, `aparas_kg`, `aparas_pct` — uma linha por mês.
+- **`maquinas`**: `id` (código da máquina, ex: `REB 01`), `grupo` (ex: `CORTADEIRAS`), `considerar` (`S`/`N`) — pode precisar renomear o cabeçalho da planilha original antes de subir.
+
+Se algum nome real não bater exatamente com o que está aqui, me manda o
+cabeçalho real (a primeira linha da aba) que eu ajusto o schema — é mais
+fácil mudar o banco do que reformatar a planilha que o time já usa.
+
+## 6. Conferir que funcionou
+
+```sql
+select * from sync_log order by started_at desc limit 10;
+select * from apontamentos order by dt_producao desc limit 10;
+```
+
+## Próximo passo: os gráficos do painel
+
+As tabelas e o upload já refletem a estrutura real. O próximo passo é trocar
+os arrays fictícios em `demo/index.html` pelos `select` dessas tabelas e
+ajustar os gráficos pra essas colunas (ex: TMR/velocidade agora vêm de
+`apontamentos` agregado por máquina/dia, não de uma tabela pronta) —
+mantendo o mesmo estilo visual atual. Isso é a próxima etapa, ainda não
+feita nesta rodada.
