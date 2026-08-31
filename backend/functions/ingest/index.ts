@@ -1,43 +1,48 @@
 // ============================================================================
-// ingest — recebe planilhas enviadas pela tela demo/upload.html
+// ingest — recebe planilhas reais enviadas pela tela demo/upload.html
 // ----------------------------------------------------------------------------
 // Chamada direto do navegador (client.functions.invoke), com a sessão do
-// usuário logado — não usa mais senha compartilhada. Em vez disso, verifica
-// que quem está chamando é um usuário autenticado com role = 'admin' na
-// tabela profiles, igual às funções admin_* já usadas em demo/admin.html.
+// usuário logado. Verifica que quem chama é admin (role = 'admin' em
+// profiles), depois faz o parse da aba enviada (SheetJS) e upsert na tabela
+// escolhida — ver backend/README-dados.md pro mapeamento planilha -> tabela.
 //
 // Corpo esperado (POST):
 //   {
-//     "table": "maquinas_diario",
-//     "fileName": "Máquinas Diário.xlsx",   // só pra log, não decide nada
-//     "contentBase64": "<arquivo inteiro em base64>"
+//     "table": "apontamentos",
+//     "fileName": "Indicadores Diário - 2026.xlsx",
+//     "sheetName": "Base Máquina_Embalagem",   // opcional — várias abas
+//     "contentBase64": "<arquivo (ou a aba já cortada) em base64>"
 //   }
-//
-// Faz o parse do Excel/CSV sozinha (SheetJS) e faz upsert na tabela indicada.
 // ============================================================================
 
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import * as XLSX from "https://esm.sh/xlsx@0.18.5";
 
-const ALLOWED_TABLES = new Set([
-  "maquinas_diario",
-  "perdas_diario",
-  "ops_diario",
-  "wip_diario",
-  "carteira_diario",
-  "apontamentos",
-]);
-
-// Colunas que devem ser convertidas de texto pra número em cada tabela —
-// tudo que não estiver aqui fica como veio (texto).
+// Tabela -> colunas que devem virar número (o resto fica como veio: texto).
 const NUMERIC_COLUMNS: Record<string, string[]> = {
-  maquinas_diario: ["tmr", "vel_media", "aparas_pct", "perda_confirm_pct", "horas_prod", "horas_tot", "plan_km", "real_km"],
-  perdas_diario: ["kg"],
-  ops_diario: ["peso_bruto_kg", "refugo_kg", "apara_pct"],
-  wip_diario: ["metros"],
-  carteira_diario: ["carteira_kg", "produzido_kg", "faturado_kg"],
-  apontamentos: [],
+  maquinas: [],
+  apontamentos: [
+    "qtd_horas", "qtd_produzida", "desperdicio_acerto", "desperdicio_virando",
+    "peso_bruto_bobina", "kg_perda",
+  ],
+  fardos_aparas: ["numero", "qtd_bruta_kg", "qtd_liquida_kg"],
+  aderencia_maquinas_diaria: ["qtd_produzida", "qtd_horas"],
+  aderencia_programacao: [
+    "qtd_produzido", "qtd_planejado", "meta_qtd_acerto", "qtd_acerto_real",
+    "min_set_prog", "min_set_real", "qtd_prod_kg", "meta_mts_hora", "qtd_hor_p",
+  ],
+  refugo_aparas_historico: ["volume_jgr", "scrap_jgr", "volume_orf", "scrap_orf"],
+  tendencia_mensal: ["ano", "volume_prod_corte_km", "lote_medio_km", "volume_prod_kg", "aparas_kg", "aparas_pct"],
 };
+
+// Tabelas com chave natural (não a "id" gerada) usam onConflict pra virar
+// upsert de verdade — sem isso, reenviar o mesmo mês/dia duplicaria linhas.
+const CONFLICT_COLUMNS: Record<string, string> = {
+  refugo_aparas_historico: "data",
+  tendencia_mensal: "mes,ano",
+};
+
+const ALLOWED_TABLES = new Set(Object.keys(NUMERIC_COLUMNS));
 
 const supabase = createClient(
   Deno.env.get("SUPABASE_URL")!,
@@ -64,7 +69,8 @@ function coerceRow(row: Record<string, unknown>, numericCols: string[]) {
     if (value === "" || value === undefined || value === null) {
       out[col] = null;
     } else if (numericCols.includes(col)) {
-      out[col] = Number(value);
+      const n = Number(String(value).replace(/\./g, "").replace(",", "."));
+      out[col] = Number.isNaN(n) ? Number(value) : n;
     } else {
       out[col] = value;
     }
@@ -114,7 +120,7 @@ Deno.serve(async (req) => {
     const table = body.table as string;
     const fileName = (body.fileName as string) ?? "arquivo";
     const contentBase64 = body.contentBase64 as string;
-    const sheetName = body.sheetName as string | undefined; // opcional — planilha pode ter várias abas
+    const sheetName = body.sheetName as string | undefined;
 
     if (!ALLOWED_TABLES.has(table)) throw new Error(`Tabela não permitida: ${table}`);
     if (!contentBase64) throw new Error("Nenhum arquivo enviado.");
@@ -125,15 +131,18 @@ Deno.serve(async (req) => {
     const sheet = workbook.Sheets[targetSheet];
     const rawRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
-    if (rawRows.length === 0) throw new Error(`"${fileName}" está vazio.`);
+    if (rawRows.length === 0) throw new Error(`"${fileName}" (aba "${targetSheet}") está vazia.`);
 
     const numericCols = NUMERIC_COLUMNS[table] ?? [];
     const rows = rawRows.map((r) => coerceRow(r, numericCols));
+    const conflictCols = CONFLICT_COLUMNS[table];
 
     let gravadas = 0;
     for (let i = 0; i < rows.length; i += 500) {
       const chunk = rows.slice(i, i + 500);
-      const { error } = await supabase.from(table).upsert(chunk);
+      const { error } = conflictCols
+        ? await supabase.from(table).upsert(chunk, { onConflict: conflictCols })
+        : await supabase.from(table).upsert(chunk);
       if (error) throw new Error(`Erro gravando em ${table}: ${error.message}`);
       gravadas += chunk.length;
     }

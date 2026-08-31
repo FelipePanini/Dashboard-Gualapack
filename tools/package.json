@@ -1,0 +1,9 @@
+{
+  "name": "gualapack-tools",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Scripts locais de apoio — não fazem parte do site nem do backend.",
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}

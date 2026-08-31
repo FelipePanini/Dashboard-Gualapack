@@ -313,12 +313,13 @@ h1,h2{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; m
   const client = window.gualapackAuth;
 
   const TABLES = [
-    { table: "maquinas_diario", label: "Máquinas (diário)", hint: "TMR, velocidade, apara e aderência por máquina" },
-    { table: "perdas_diario", label: "Perdas (diário)", hint: "Perda em kg por motivo e máquina" },
-    { table: "ops_diario", label: "Ordens de produção", hint: "Refugo por OP" },
-    { table: "wip_diario", label: "WIP", hint: "Metros parados por etapa e cliente" },
-    { table: "carteira_diario", label: "Carteira", hint: "Carteira, produzido e faturado por classificação" },
-    { table: "apontamentos", label: "Apontamentos", hint: "Linha do tempo das máquinas" },
+    { table: "apontamentos", label: "Apontamentos", hint: "De \"Indicadores Diário\" ou \"Base Aparas\" — aba com os eventos de máquina (a maior planilha; use tools/planilha-uma-aba.js pra cortar antes)" },
+    { table: "fardos_aparas", label: "Fardos de aparas", hint: "De \"SEQUENCIAMENTO DOS FARDOS DE APARAS\" (mensal) ou \"Sequenciamento Acumulado\" — aba \"COMPLETOS\"" },
+    { table: "aderencia_maquinas_diaria", label: "Aderência — máquinas (diário)", hint: "De \"Aderência Máquinas - Diária\" — aba \"Apontamentos_produção\"" },
+    { table: "aderencia_programacao", label: "Aderência — programação", hint: "De \"Histórico Aderência Programação\" — aba \"Programação Passado\" (use o script de corte, é grande)" },
+    { table: "refugo_aparas_historico", label: "Refugo/aparas — histórico", hint: "De \"Refugo Aparas\" — aba \"Histórico Refugo\"" },
+    { table: "tendencia_mensal", label: "Tendência mensal", hint: "De \"Graficos Tendência\" — aba \"Dados Prod\"" },
+    { table: "maquinas", label: "Catálogo de máquinas", hint: "De \"Machine Card Oficial\" — aba \"DIM_EQTOS & GRUPO EQTO\"" },
   ];
 
   function fmtTime(d){

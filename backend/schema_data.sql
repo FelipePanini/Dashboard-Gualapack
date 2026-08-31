@@ -1,129 +1,174 @@
 -- ============================================================================
--- Painel de Produção Gualapack — schema dos dados operacionais (versão final)
+-- Painel de Produção Gualapack — schema dos dados operacionais REAIS
 -- Alvo: Supabase (Postgres 15+). Rode depois de schema.sql, uma única vez.
 --
--- Estas tabelas são o destino da carga diária feita pela Edge Function
--- "sync-daily" (ver backend/functions/sync-daily). O front-end (demo/index.html)
--- passa a ler daqui em vez dos arrays fixos hoje embutidos no JS.
+-- Tabelas espelhando a estrutura das planilhas reais da produção (ver pasta
+-- do Google Drive compartilhada) — não são mais um modelo fictício. Cada
+-- tabela corresponde a uma aba/arquivo de origem; ver backend/README-dados.md
+-- para o mapeamento planilha -> tabela -> colunas.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
--- 1. Máquinas — catálogo + snapshot diário de indicadores
+-- 1. Máquinas — catálogo (de "Machine Card Oficial")
 -- ----------------------------------------------------------------------------
 create table if not exists public.maquinas (
-  id          text primary key,           -- ex: 'REB01', 'L02', 'R12'
-  nome        text not null,
-  processo    text not null check (processo in ('Impressão','Laminação','Corte','Refile','OF','Coating')),
-  rota        text not null default 'SEM IMPRESSÃO' check (rota in ('FLEXO','ROTO','SEM IMPRESSÃO')),
-  grupo       text,                       -- 'GRUPO 1'..'GRUPO 4' (Grupo Máquinas do BI)
-  vel_ref     numeric,                    -- velocidade de referência (m/min)
-  ordem       int not null default 0      -- ordem de exibição (espelha o eixo do Gantt no BI)
-);
-
--- Snapshot: uma linha por máquina por dia. É o que alimenta TMR, velocidade,
--- apara e aderência do dia — mantém histórico em vez de sobrescrever.
-create table if not exists public.maquinas_diario (
-  id              bigint generated always as identity primary key,
-  data_ref        date not null default current_date,
-  maquina_id      text not null references public.maquinas(id),
-  tmr             numeric,      -- Tempo de Máquina Rodando (%)
-  vel_media       numeric,      -- m/min
-  aparas_pct      numeric,      -- % apontada
-  perda_confirm_pct numeric,    -- % confirmada (balança)
-  horas_prod      numeric,
-  horas_tot       numeric,
-  plan_km         numeric,      -- planejado (aderência)
-  real_km         numeric,      -- realizado (aderência)
-  unique (data_ref, maquina_id)
-);
-
-create index if not exists idx_maquinas_diario_data on public.maquinas_diario (data_ref desc);
-
--- ----------------------------------------------------------------------------
--- 2. Perda por motivo — série diária
--- ----------------------------------------------------------------------------
-create table if not exists public.perdas_diario (
-  id          bigint generated always as identity primary key,
-  data_ref    date not null default current_date,
-  tipo_perda  text not null,     -- ex: '01_Falha_Impressao'
-  maquina_id  text references public.maquinas(id),
-  kg          numeric not null default 0,
-  unique (data_ref, tipo_perda, maquina_id)
-);
-
-create index if not exists idx_perdas_diario_data on public.perdas_diario (data_ref desc);
-
--- ----------------------------------------------------------------------------
--- 3. Ordens de produção (refugo por OP, tabela "Ordens com maior refugo")
--- ----------------------------------------------------------------------------
-create table if not exists public.ops_diario (
-  id            bigint generated always as identity primary key,
-  data_ref      date not null default current_date,
-  op            text not null,
-  maquina_id    text references public.maquinas(id),
-  descricao     text,
-  peso_bruto_kg numeric,
-  refugo_kg     numeric,
-  apara_pct     numeric,
-  motivo_principal text,
-  unique (data_ref, op)
+  id          text primary key,     -- ex: 'REB 01', 'R18', 'L02'
+  grupo       text,                 -- 'CORTADEIRAS', 'FLEXOGRAFIA', 'LAMINADORAS', 'COATING', 'ROTOGRAVURA', 'HOT MELT'...
+  considerar  text                  -- 'S' / 'N' (como vem na planilha)
 );
 
 -- ----------------------------------------------------------------------------
--- 4. WIP e carteira
--- ----------------------------------------------------------------------------
-create table if not exists public.wip_diario (
-  id          bigint generated always as identity primary key,
-  data_ref    date not null default current_date,
-  etapa       text not null,     -- 'IMPRESSO','WIP INTERMEDIÁRIO','CORTE','PAPEL','PRE CORTE','FINAL'
-  cliente     text,
-  classificacao text,
-  dentro_carteira boolean not null default true,  -- DC / FC
-  metros      numeric not null default 0
-);
-
-create index if not exists idx_wip_diario_data on public.wip_diario (data_ref desc);
-
-create table if not exists public.carteira_diario (
-  id            bigint generated always as identity primary key,
-  data_ref      date not null default current_date,
-  classificacao text not null,
-  carteira_kg   numeric not null default 0,
-  produzido_kg  numeric not null default 0,
-  faturado_kg   numeric not null default 0,
-  unique (data_ref, classificacao)
-);
-
--- ----------------------------------------------------------------------------
--- 5. Apontamentos (linha do tempo / Gantt) — janela móvel de 48h é suficiente
+-- 2. Apontamentos — eventos brutos de produção (de "Indicadores Diário" /
+--    "Base Aparas"). É a maior e mais importante tabela — cada linha é um
+--    evento de máquina (produzindo, parada, refugo, setup...).
 -- ----------------------------------------------------------------------------
 create table if not exists public.apontamentos (
-  id          bigint generated always as identity primary key,
-  maquina_id  text not null references public.maquinas(id),
-  status      text not null,     -- 'Produzindo','Parada Produtiva', etc.
-  op          text,
-  inicio      timestamptz not null,
-  fim         timestamptz
+  id                  bigint generated always as identity primary key,
+  num_ordem           text,
+  cod_recurso         text references public.maquinas(id),
+  cod_apont           text,          -- código do tipo de apontamento (ex: '20', '40')
+  cod_desc            text,          -- descrição do apontamento (ex: '20 - Produzindo')
+  dt_producao         date,
+  hora_inicio         timestamptz,
+  hora_fim            timestamptz,
+  qtd_horas           numeric,
+  qtd_produzida       numeric,
+  turno               text,
+  desperdicio_acerto  numeric,
+  desperdicio_virando numeric,
+  peso_bruto_bobina   numeric,
+  tipo_perda          text,          -- usr_tipodaperda (ex: '06_Falha_de_Laminaca')
+  kg_perda            numeric,       -- usr_kgdaperda
+  nome_operador       text,
+  tipo_produto        text,
+  cod_estrutura       text,
+  des_num_ordem       text,          -- descrição do produto/ordem
+  cod_est             text,
+  processo            text,          -- 'Impressão', 'Laminação', 'Corte'...
+  classificacao       text,          -- família de produto
+  nome_cliente         text
 );
 
-create index if not exists idx_apontamentos_janela on public.apontamentos (maquina_id, inicio desc);
+create index if not exists idx_apontamentos_data on public.apontamentos (dt_producao desc);
+create index if not exists idx_apontamentos_recurso on public.apontamentos (cod_recurso, dt_producao desc);
 
 -- ----------------------------------------------------------------------------
--- 6. RLS — leitura para qualquer usuário autenticado, escrita só via
---    service_role (a Edge Function de carga, nunca o navegador).
+-- 3. Fardos de aparas — um por fardo (de "SEQUENCIAMENTO DOS FARDOS DE
+--    APARAS JGR" mensal e "Sequenciamento Acumulado")
 -- ----------------------------------------------------------------------------
-alter table public.maquinas          enable row level security;
-alter table public.maquinas_diario   enable row level security;
-alter table public.perdas_diario     enable row level security;
-alter table public.ops_diario        enable row level security;
-alter table public.wip_diario        enable row level security;
-alter table public.carteira_diario   enable row level security;
-alter table public.apontamentos      enable row level security;
+create table if not exists public.fardos_aparas (
+  id              bigint generated always as identity primary key,
+  codigo          text,          -- código da classificação (numérico, ex: '1', '11')
+  dp_fp           text,          -- 'DP' ou 'FP'
+  refugo          text,          -- 'X' ou vazio
+  refile          text,          -- 'X' ou vazio
+  data            date,
+  numero          int,           -- Nº do fardo no dia
+  qtd_bruta_kg    numeric,
+  qtd_liquida_kg  numeric,
+  nome            text,          -- operador
+  classificacao   text,          -- texto da classificação (ex: 'PROCESSO PRODUTIVO', 'REFILE')
+  tipo            text
+);
+
+create index if not exists idx_fardos_aparas_data on public.fardos_aparas (data desc);
+
+-- ----------------------------------------------------------------------------
+-- 4. Aderência — apontamentos de produção por máquina/dia (de "Aderência
+--    Máquinas - Diária", aba "Apontamentos_produção")
+-- ----------------------------------------------------------------------------
+create table if not exists public.aderencia_maquinas_diaria (
+  id             bigint generated always as identity primary key,
+  num_ordem      text,
+  dt_producao    date,
+  qtd_produzida  numeric,
+  cod_recurso    text references public.maquinas(id),
+  qtd_horas      numeric,
+  classificacao  text,
+  descricao      text,
+  cod_estrutura  text,
+  turno          text,
+  cod_desc       text,
+  cod_apont      text
+);
+
+create index if not exists idx_aderencia_maq_data on public.aderencia_maquinas_diaria (dt_producao desc);
+
+-- ----------------------------------------------------------------------------
+-- 5. Aderência à programação (de "Histórico Aderência Programação")
+-- ----------------------------------------------------------------------------
+create table if not exists public.aderencia_programacao (
+  id                bigint generated always as identity primary key,
+  cod_cliente       text,
+  cod_estrutura     text,
+  recurso_ctr       text references public.maquinas(id),
+  tipo_produto      text,
+  num_ordem         text,
+  dt_saida_maquina  timestamptz,
+  descricao         text,
+  cliente           text,
+  atividade         text,
+  qtd_produzido     numeric,
+  qtd_planejado     numeric,
+  meta_qtd_acerto   numeric,
+  qtd_acerto_real   numeric,
+  min_set_prog      numeric,
+  min_set_real      numeric,
+  qtd_prod_kg       numeric,
+  meta_mts_hora     numeric,
+  qtd_hor_p         numeric,
+  cilindro          text
+);
+
+create index if not exists idx_aderencia_prog_data on public.aderencia_programacao (dt_saida_maquina desc);
+
+-- ----------------------------------------------------------------------------
+-- 6. Refugo/aparas — série histórica mensal (de "Refugo Aparas")
+-- ----------------------------------------------------------------------------
+create table if not exists public.refugo_aparas_historico (
+  id          bigint generated always as identity primary key,
+  data        date not null,
+  volume_jgr  numeric,
+  scrap_jgr   numeric,
+  volume_orf  numeric,
+  scrap_orf   numeric,
+  unique (data)
+);
+
+-- ----------------------------------------------------------------------------
+-- 7. Tendência mensal — pré-agregado (de "Graficos Tendência")
+-- ----------------------------------------------------------------------------
+create table if not exists public.tendencia_mensal (
+  id                   bigint generated always as identity primary key,
+  mes                  text not null,  -- ex: 'Janeiro', 'W-27'
+  ano                  int,
+  volume_prod_corte_km numeric,
+  lote_medio_km        numeric,
+  volume_prod_kg       numeric,
+  aparas_kg            numeric,
+  aparas_pct           numeric,
+  unique (mes, ano)
+);
+
+-- ----------------------------------------------------------------------------
+-- 8. RLS — leitura para qualquer usuário autenticado, escrita só via
+--    service_role (a função "ingest", nunca o navegador direto).
+-- ----------------------------------------------------------------------------
+alter table public.maquinas                   enable row level security;
+alter table public.apontamentos               enable row level security;
+alter table public.fardos_aparas              enable row level security;
+alter table public.aderencia_maquinas_diaria  enable row level security;
+alter table public.aderencia_programacao      enable row level security;
+alter table public.refugo_aparas_historico    enable row level security;
+alter table public.tendencia_mensal           enable row level security;
 
 do $$
 declare t text;
 begin
-  foreach t in array array['maquinas','maquinas_diario','perdas_diario','ops_diario','wip_diario','carteira_diario','apontamentos']
+  foreach t in array array[
+    'maquinas','apontamentos','fardos_aparas','aderencia_maquinas_diaria',
+    'aderencia_programacao','refugo_aparas_historico','tendencia_mensal'
+  ]
   loop
     execute format(
       'create policy "%1$s: leitura por usuário autenticado" on public.%1$s for select to authenticated using (true);',
@@ -132,12 +177,8 @@ begin
   end loop;
 end $$;
 
--- Nenhuma policy de insert/update/delete para authenticated/anon — só
--- service_role (que ignora RLS por padrão) consegue escrever, ou seja, só a
--- Edge Function "sync-daily" grava dado novo.
-
 -- ----------------------------------------------------------------------------
--- 7. Log da carga diária — pra você conferir se rodou e o que veio
+-- 9. Log da carga — pra conferir se um upload rodou e o que veio
 -- ----------------------------------------------------------------------------
 create table if not exists public.sync_log (
   id          bigint generated always as identity primary key,
