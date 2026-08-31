@@ -1,21 +1,21 @@
-# Carga diária de dados reais — Power Automate (sem TI, sem admin)
+# Carga diária de dados reais — 1 flow só, sem mexer planilha por planilha
 
-Nenhum passo aqui precisa de acesso administrador nem de TI. Tudo roda com o
-seu próprio login do Microsoft 365, usando o **Power Automate** (já incluído
-na maioria dos planos do 365 — a licença gratuita "per-user plan" também
-serve pra isso).
+Nenhum passo aqui precisa de acesso administrador, TI, ou transformar as
+planilhas em Tabela do Excel. **Um único flow no Power Automate** observa a
+pasta inteira do SharePoint — qualquer arquivo que mudar lá, ele manda pra
+função `ingest`, que entende sozinha qual planilha é aquela e onde gravar.
 
 ```
-Planilhas (sua pasta no OneDrive/SharePoint)
+Planilhas (sua pasta no SharePoint — do jeito que já é hoje)
         │
         ▼
-Power Automate — flow agendado, roda com sua conta, sem app nem admin consent
-        │  (lê as linhas da planilha, chama uma URL)
+Power Automate — 1 flow, gatilho "arquivo criado ou alterado na pasta"
+        │  (manda o arquivo bruto)
         ▼
-Supabase — função "ingest" grava no banco central
+Supabase — função "ingest" identifica a planilha, lê e grava sozinha
         │
         ▼
-Dashboard (GitHub Pages) — lê do Supabase, como já faz hoje
+Dashboard (GitHub Pages)
 ```
 
 ## 1. Rodar os schemas no Supabase (uma vez só)
@@ -24,103 +24,89 @@ Dashboard (GitHub Pages) — lê do Supabase, como já faz hoje
 1. `backend/schema.sql` (se ainda não rodou)
 2. `backend/schema_data.sql`
 
-## 2. Publicar a função `ingest` no Supabase
+## 2. Publicar a função `ingest`
 
-Igual ao que você já fez pra função `register`:
 - Painel do Supabase → `Edge Functions` → `Deploy a new function`.
 - Nome: **`ingest`** (exatamente esse).
 - Cole o conteúdo de [`functions/ingest/index.ts`](./functions/ingest/index.ts).
 - Em `Settings` da função → `Secrets`, adicione:
-  - `INGEST_SHARED_SECRET`: invente uma senha longa e aleatória (ex: gere em
-    [1password.com/password-generator](https://1password.com/password-generator/),
-    32+ caracteres). Guarde essa mesma senha — vai usar no Power Automate.
-  - (`SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` já existem automaticamente
-    em toda Edge Function do projeto, não precisa recriar.)
-- Também em `Settings`, **desligue "Enforce JWT Verification"** — quem chama
-  essa função é o Power Automate, sem sessão de usuário; a proteção real é o
-  `INGEST_SHARED_SECRET` checado dentro do código.
-- Anote a URL final:
-  `https://SEU_PROJECT_REF.supabase.co/functions/v1/ingest`
+  - `INGEST_SHARED_SECRET`: uma senha longa e aleatória (gere em
+    [1password.com/password-generator](https://1password.com/password-generator/)).
+    Guarde essa senha — vai usar no Power Automate.
+- Em `Settings`, **desligue "Enforce JWT Verification"**.
+- Anote a URL: `https://SEU_PROJECT_REF.supabase.co/functions/v1/ingest`
 
-## 3. Preparar cada planilha de origem
+## 3. Nomear as planilhas (o único cuidado que resta)
 
-Cada planilha (export do BI ou controle manual) precisa estar em formato
-**Excel (.xlsx) com os dados numa Tabela** (não só um intervalo de células —
-selecione os dados e `Inserir > Tabela` no Excel, se ainda não for uma).
-Isso é o que permite o Power Automate ler "linha por linha" sem código.
+A função reconhece a planilha certa pelo **nome do arquivo** — não precisa
+ser exato, só precisa *conter* uma dessas palavras (maiúscula/minúscula e
+acento não importam):
 
-As colunas de cada tabela Excel devem ter o mesmo nome das colunas da tabela
-correspondente no banco (`backend/schema_data.sql`):
-
-| Planilha (Tabela do Excel) | Tabela no banco |
+| O nome do arquivo precisa conter... | Vira a tabela |
 |---|---|
-| Máquinas (diário) | `maquinas_diario` |
-| Perdas (diário) | `perdas_diario` |
-| Ordens de produção | `ops_diario` |
-| WIP | `wip_diario` |
-| Carteira | `carteira_diario` |
-| Apontamentos | `apontamentos` |
+| `maquinas_diario` (ex: "Máquinas Diário.xlsx") | `maquinas_diario` |
+| `perdas_diario` | `perdas_diario` |
+| `ops_diario` | `ops_diario` |
+| `wip_diario` | `wip_diario` |
+| `carteira_diario` | `carteira_diario` |
+| `apontamentos` | `apontamentos` |
 
-Se os nomes das colunas nas planilhas reais forem diferentes dos que estão em
-`schema_data.sql`, me diga os nomes reais que eu ajusto o schema pra bater
-exatamente — mais fácil mudar o banco do que pedir pra reformatar planilha.
+Se os arquivos reais já tiverem nomes bem diferentes disso (ex: "Refugo
+Semanal.xlsx"), me diga os nomes reais que eu ajusto a lista — mais fácil
+mudar o código do que renomear planilha que o time já usa.
 
-## 4. Criar o flow no Power Automate
+**Não precisa** virar Tabela do Excel (`Ctrl+T`) — a função lê a primeira
+aba da planilha inteira, contanto que a primeira linha seja o cabeçalho
+(nome das colunas) e os dados comecem na linha 2. É como a maioria das
+planilhas já vem.
 
-Em [make.powerautomate.com](https://make.powerautomate.com) (entra com o
-mesmo login do 365):
+## 4. Criar o flow (uma vez só, cobre TODAS as planilhas)
 
-1. `Criar` → `Fluxo de nuvem agendado`.
+Em [make.powerautomate.com](https://make.powerautomate.com):
+
+1. `Criar` → `Fluxo de nuvem automatizado`.
    - Nome: `Sync diário - Painel Produção`.
-   - Repetir a cada `1` `Dia`, no horário que preferir (ex: 6h da manhã).
-2. Adicionar uma ação **"Listar linhas presentes em uma tabela"** (conector
-   Excel Online (Business)):
-   - Localização: OneDrive ou SharePoint Site, onde está a planilha.
-   - Arquivo: selecione a planilha (ex: "Máquinas diário.xlsx").
-   - Tabela: selecione a tabela dentro dela.
-3. Adicionar uma ação **HTTP**:
+   - Gatilho: **"Quando um arquivo é criado ou modificado (somente
+     propriedades)"** (conector SharePoint) — ou o equivalente do OneDrive,
+     dependendo de onde está a pasta.
+   - Configure apontando pra pasta onde estão as planilhas (a pasta inteira,
+     não um arquivo específico).
+2. Adicionar ação **"Obter conteúdo do arquivo"** (SharePoint/OneDrive),
+   usando o ID do arquivo que veio do gatilho.
+3. Adicionar ação **HTTP**:
    - Método: `POST`
    - URI: a URL da função `ingest` (passo 2).
    - Cabeçalhos:
      ```
      Content-Type: application/json
-     x-ingest-secret: <a senha que você gerou no passo 2>
+     x-ingest-secret: <a senha do passo 2>
      ```
-   - Corpo:
+   - Corpo (use "Conteúdo dinâmico" pra inserir o nome do arquivo e o
+     conteúdo em base64 — o Power Automate já entrega o arquivo em base64
+     automaticamente na ação anterior):
      ```json
      {
-       "table": "maquinas_diario",
-       "rows": @{outputs('Listar_linhas_presentes_em_uma_tabela')?['body/value']}
+       "fileName": "@{triggerOutputs()?['body/{FilenameWithExtension}']}",
+       "contentBase64": "@{base64(body('Obter_conteúdo_do_arquivo'))}"
      }
      ```
-     (o nome exato entre `@{outputs(...)}` é o nome da ação anterior — o
-     Power Automate autocompleta isso se você clicar em "Conteúdo dinâmico"
-     e escolher o valor da ação de listar linhas, em vez de digitar à mão.)
-4. Repita os passos 2–3 para cada planilha/tabela da lista acima (o mesmo
-   flow pode ter 6 blocos "Listar linhas" + "HTTP", um par por tabela).
-5. Salvar e clicar em **"Testar"** → "Manualmente" pra rodar agora e conferir.
+4. Salvar. Pronto — esse único flow cobre qualquer planilha que existir hoje
+   ou for adicionada depois na pasta, sem precisar criar um flow novo pra
+   cada uma.
 
-## 5. Conferir que funcionou
+## 5. Testar
 
-No Supabase, `SQL Editor`:
-```sql
-select * from sync_log order by started_at desc limit 10;
-select * from maquinas_diario order by data_ref desc limit 10;
-```
-
-Se aparecer `status = 'error'` no `sync_log`, o campo `detalhe` mostra o
-motivo (geralmente nome de coluna que não bate com o schema).
+- Edite/salve uma das planilhas na pasta do SharePoint (ou use "Testar" →
+  "Manualmente" no próprio flow).
+- No Supabase: `select * from sync_log order by started_at desc limit 10;`
+  — o campo `detalhe` mostra qual arquivo caiu em qual tabela, ou o motivo
+  do erro se algo não bateu.
 
 ## 6. Segurança
 
-- O `INGEST_SHARED_SECRET` é a única coisa protegendo a gravação — trate como
-  senha (não cole em chat, print, etc.). Se vazar, gere um novo no Supabase e
-  atualize no Power Automate.
-- Como o flow roda com a sua conta, ele só enxerga arquivos que você já tem
-  acesso — não precisa dar nenhuma permissão nova a ninguém.
-- Se você sair da empresa ou perder acesso, o flow para de funcionar (porque
-  depende do seu login) — nesse caso, qualquer outra pessoa pode "assumir a
-  propriedade" do flow no Power Automate, ou recriar com a conta dela.
+- O `INGEST_SHARED_SECRET` é a única coisa protegendo a gravação — trate
+  como senha.
+- O flow roda com a sua conta — só enxerga arquivos que você já acessa.
 
 ## Próximo passo no front-end
 
