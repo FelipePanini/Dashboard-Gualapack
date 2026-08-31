@@ -114,14 +114,16 @@ Deno.serve(async (req) => {
     const table = body.table as string;
     const fileName = (body.fileName as string) ?? "arquivo";
     const contentBase64 = body.contentBase64 as string;
+    const sheetName = body.sheetName as string | undefined; // opcional — planilha pode ter várias abas
 
     if (!ALLOWED_TABLES.has(table)) throw new Error(`Tabela não permitida: ${table}`);
     if (!contentBase64) throw new Error("Nenhum arquivo enviado.");
 
     const bytes = Uint8Array.from(atob(contentBase64), (c) => c.charCodeAt(0));
     const workbook = XLSX.read(bytes, { type: "array" });
-    const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-    const rawRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(firstSheet, { defval: "" });
+    const targetSheet = sheetName && workbook.SheetNames.includes(sheetName) ? sheetName : workbook.SheetNames[0];
+    const sheet = workbook.Sheets[targetSheet];
+    const rawRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
 
     if (rawRows.length === 0) throw new Error(`"${fileName}" está vazio.`);
 
@@ -142,11 +144,11 @@ Deno.serve(async (req) => {
         status: "ok",
         finished_at: new Date().toISOString(),
         linhas_gravadas: gravadas,
-        detalhe: `${fileName} -> ${table} (por ${userData.user.email})`,
+        detalhe: `${fileName} [${targetSheet}] -> ${table} (por ${userData.user.email})`,
       })
       .eq("id", logRow?.id);
 
-    return new Response(JSON.stringify({ ok: true, table, linhas: gravadas }), {
+    return new Response(JSON.stringify({ ok: true, table, sheet: targetSheet, linhas: gravadas }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   } catch (err) {
