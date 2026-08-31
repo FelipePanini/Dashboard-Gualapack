@@ -1,28 +1,34 @@
 // ============================================================================
 // sync.js — carga diária dos dados reais de produção
 // ----------------------------------------------------------------------------
-// Roda como cron job no VPS Hostinger (ver README-vps.md). Faz três coisas:
+// Roda agendado pelo GitHub Actions (.github/workflows/sync-daily.yml). Faz
+// três coisas:
 //
-//   1. Lê os CSVs mais recentes de uma pasta do Google Drive (exports diários
-//      dos BIs + planilhas manuais, tudo na mesma pasta combinada).
-//   2. Valida e transforma cada linha (tipos numéricos, datas).
+//   1. Lê os CSVs mais recentes de uma pasta do SharePoint/OneDrive (exports
+//      diários dos BIs + planilhas manuais, tudo na mesma pasta combinada),
+//      via Microsoft Graph API.
+//   2. Valida e transforma cada linha (tipos numéricos).
 //   3. Upsert nas tabelas do Supabase Postgres (backend/schema_data.sql),
 //      usando a service_role key — grava mesmo com RLS ativo.
 //
 // Cada arquivo CSV precisa ter cabeçalho com os nomes de coluna da tabela de
 // destino (mesmo nome). Se um export vier com nomes diferentes, ajuste o
-// mapeamento em COLUMN_MAP abaixo em vez de pedir pra mudar o export.
+// mapeamento em FILE_MAP abaixo em vez de pedir pra mudar o export.
 // ============================================================================
 
 import "dotenv/config";
-import fs from "node:fs";
-import { google } from "googleapis";
 import { parse } from "csv-parse/sync";
 import { createClient } from "@supabase/supabase-js";
 
-// sync.js — carga diária dos dados reais de produção
-// Roda agendado pelo GitHub Actions (.github/workflows/sync-daily.yml).
-const required = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "SYNC_DRIVE_FOLDER_ID"];
+const required = [
+  "SUPABASE_URL",
+  "SUPABASE_SERVICE_ROLE_KEY",
+  "MS_TENANT_ID",
+  "MS_CLIENT_ID",
+  "MS_CLIENT_SECRET",
+  "SHAREPOINT_SITE",
+  "SHAREPOINT_FOLDER_PATH",
+];
 for (const key of required) {
   if (!process.env[key]) {
     console.error(`Faltando variável de ambiente: ${key} (veja .env.example)`);
@@ -46,36 +52,58 @@ const FILE_MAP = {
   "apontamentos.csv": { table: "apontamentos", numeric: [] },
 };
 
-function authGoogleDrive() {
-  // Aceita a chave de duas formas: caminho pra um arquivo (uso local) ou o
-  // JSON inteiro numa variável de ambiente (uso no GitHub Actions, onde o
-  // conteúdo vem de um Secret e é escrito num arquivo temporário pelo workflow).
-  const credentials = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-    ? JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
-    : undefined;
-
-  const auth = new google.auth.GoogleAuth({
-    credentials,
-    keyFile: credentials ? undefined : process.env.GOOGLE_APPLICATION_CREDENTIALS,
-    scopes: ["https://www.googleapis.com/auth/drive.readonly"],
+// ----------------------------------------------------------------------------
+// Autenticação Microsoft Graph — fluxo "client credentials" (app-only), sem
+// nenhum usuário logando: o app registrado no Entra ID recebe permissão de
+// leitura no site do SharePoint e busca os arquivos sozinho.
+// ----------------------------------------------------------------------------
+async function getGraphToken() {
+  const url = `https://login.microsoftonline.com/${process.env.MS_TENANT_ID}/oauth2/v2.0/token`;
+  const body = new URLSearchParams({
+    client_id: process.env.MS_CLIENT_ID,
+    client_secret: process.env.MS_CLIENT_SECRET,
+    scope: "https://graph.microsoft.com/.default",
+    grant_type: "client_credentials",
   });
-  return google.drive({ version: "v3", auth });
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body,
+  });
+  const json = await res.json();
+  if (!json.access_token) throw new Error(`Falha ao autenticar no Microsoft Graph: ${JSON.stringify(json)}`);
+  return json.access_token;
 }
 
-async function listDriveFiles(drive) {
-  const res = await drive.files.list({
-    q: `'${process.env.SYNC_DRIVE_FOLDER_ID}' in parents and trashed = false`,
-    fields: "files(id, name, modifiedTime)",
-    pageSize: 100,
+// SHAREPOINT_SITE no formato "gualapackspa.sharepoint.com:/personal/felipe_panini_gualapack_com"
+// (o Graph identifica sites por hostname + caminho, não pela URL de compartilhamento).
+async function getSiteId(token) {
+  const res = await fetch(`https://graph.microsoft.com/v1.0/sites/${process.env.SHAREPOINT_SITE}`, {
+    headers: { Authorization: `Bearer ${token}` },
   });
+  const json = await res.json();
+  if (!json.id) throw new Error(`Não encontrei o site do SharePoint: ${JSON.stringify(json)}`);
+  return json.id;
+}
+
+async function listFolderFiles(token, siteId) {
+  const path = process.env.SHAREPOINT_FOLDER_PATH; // ex: "Documentos Compartilhados/Painel Produção"
+  const res = await fetch(
+    `https://graph.microsoft.com/v1.0/sites/${siteId}/drive/root:/${encodeURI(path)}:/children`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  );
+  const json = await res.json();
+  if (!json.value) throw new Error(`Não consegui listar a pasta do SharePoint: ${JSON.stringify(json)}`);
   const map = {};
-  for (const f of res.data.files ?? []) map[f.name] = f.id;
+  for (const f of json.value) map[f.name] = f.id;
   return map;
 }
 
-async function downloadDriveFile(drive, fileId) {
-  const res = await drive.files.get({ fileId, alt: "media" }, { responseType: "text" });
-  return res.data;
+async function downloadFile(token, siteId, itemId) {
+  const res = await fetch(`https://graph.microsoft.com/v1.0/sites/${siteId}/drive/items/${itemId}/content`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  return await res.text();
 }
 
 function coerceRow(row, numericCols) {
@@ -109,17 +137,18 @@ async function main() {
   let totalLinhas = 0;
 
   try {
-    const drive = authGoogleDrive();
-    const files = await listDriveFiles(drive);
+    const token = await getGraphToken();
+    const siteId = await getSiteId(token);
+    const files = await listFolderFiles(token, siteId);
 
     for (const [fileName, cfg] of Object.entries(FILE_MAP)) {
-      const fileId = files[fileName];
-      if (!fileId) {
+      const itemId = files[fileName];
+      if (!itemId) {
         console.log(`[skip] ${fileName} não encontrado na pasta hoje.`);
         continue;
       }
 
-      const csvText = await downloadDriveFile(drive, fileId);
+      const csvText = await downloadFile(token, siteId, itemId);
       const rows = parse(csvText, { columns: true, skip_empty_lines: true, trim: true });
       if (rows.length === 0) {
         console.log(`[skip] ${fileName} está vazio.`);
