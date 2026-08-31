@@ -1,0 +1,5 @@
+node_modules/
+.env
+*.env
+service-account.json
+backend/vps-sync/service-account.json
