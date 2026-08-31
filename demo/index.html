@@ -141,6 +141,18 @@ body.auth-pending{ visibility:hidden; }
 
 *{ box-sizing: border-box; }
 html,body{ margin:0; padding:0; }
+/* O Chrome dá foco de teclado automático a containers com rolagem (html/body
+   incluídos) e desenha um contorno reto em volta da tela inteira quando isso
+   acontece — foi o que apareceu depois de interagir com o botão de tema. Isso
+   não é uma borda de UI nossa, é o outline padrão do navegador no elemento
+   errado; desligamos aqui e definimos foco visível só nos elementos
+   realmente interativos, sempre acompanhando o raio de borda deles. */
+html:focus, body:focus, html:focus-visible, body:focus-visible{ outline: none; }
+button:focus-visible, a:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible{
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+:root{ --mx: 0; --my: 0; }
 body{
   background: var(--bg);
   color: var(--text-primary);
@@ -150,8 +162,13 @@ body{
     linear-gradient(var(--grid-line) 1px, transparent 1px),
     linear-gradient(90deg, var(--grid-line) 1px, transparent 1px);
   background-size: 28px 28px;
-  background-attachment: fixed;
+  background-position: 0 0, 0 0;
+  animation: grid-drift 42s linear infinite;
   overflow-x: hidden;
+}
+@keyframes grid-drift{
+  0%{ background-position: 0 0, 0 0; }
+  100%{ background-position: 336px 224px, 336px 224px; }
 }
 
 /* ---------- ambient liquid field ---------- */
@@ -162,48 +179,90 @@ body{
   overflow: hidden;
   pointer-events: none;
 }
+/* washes de luz/sombra bem grandes e suaves, para o fundo respirar como um todo */
+.liquid-field .wash{
+  position: absolute;
+  inset: -25%;
+  mix-blend-mode: soft-light;
+  will-change: transform;
+}
+.liquid-field .wash-light{
+  background: radial-gradient(38% 38% at 28% 32%, rgba(255,255,255,0.6), transparent 70%);
+  animation: wash-light 28s ease-in-out infinite, color-pulse-a 34s ease-in-out infinite;
+}
+.liquid-field .wash-dark{
+  background: radial-gradient(36% 36% at 74% 70%, rgba(4,10,20,0.6), transparent 70%);
+  animation: wash-dark 32s ease-in-out infinite, color-pulse-b 38s ease-in-out infinite;
+}
+@keyframes wash-light{
+  0%,100%{ transform: translate(0,0) scale(1); }
+  50%{ transform: translate(22%,15%) scale(1.25); }
+}
+@keyframes wash-dark{
+  0%,100%{ transform: translate(0,0) scale(1); }
+  50%{ transform: translate(-19%,-17%) scale(1.22); }
+}
+/* Pulso de cor bem lento e sutil, por cima do movimento — só a intensidade
+   respira, não a posição. Durações distintas e primas entre si pra nunca
+   sincronizarem visivelmente. */
+@keyframes color-pulse-a{ 0%,100%{ opacity:.65; } 50%{ opacity:.95; } }
+@keyframes color-pulse-b{ 0%,100%{ opacity:.65; } 50%{ opacity:.95; } }
+@keyframes color-pulse-c{ 0%,100%{ opacity:.38; } 50%{ opacity:.58; } }
 .liquid-field .blob{
   position: absolute;
   border-radius: 50%;
   filter: blur(70px);
-  opacity: .38;
+  opacity: .46;
   will-change: transform;
 }
 .liquid-field .blob-a{
   width: 620px; height: 620px; left: -160px; top: -180px;
   background: radial-gradient(circle at 35% 35%, var(--blob-3), var(--blob-1) 60%, transparent 75%);
-  animation: drift-a 26s var(--ease) infinite;
+  animation: drift-a 16s var(--ease) infinite, color-pulse-c 26s ease-in-out infinite;
 }
 .liquid-field .blob-b{
   width: 520px; height: 520px; right: -140px; top: 8%;
   background: radial-gradient(circle at 60% 40%, var(--blob-1), var(--blob-2) 65%, transparent 78%);
-  animation: drift-b 32s var(--ease) infinite;
+  animation: drift-b 20s var(--ease) infinite, color-pulse-c 31s ease-in-out infinite;
 }
 .liquid-field .blob-c{
   width: 460px; height: 460px; left: 30%; bottom: -220px;
   background: radial-gradient(circle at 50% 50%, var(--blob-3), var(--blob-1) 60%, transparent 75%);
-  animation: drift-c 30s var(--ease) infinite;
+  animation: drift-c 18s var(--ease) infinite, color-pulse-c 23s ease-in-out infinite;
 }
 @keyframes drift-a{
   0%,100%{ transform: translate(0,0) scale(1); }
-  33%{ transform: translate(60px,40px) scale(1.08); }
-  66%{ transform: translate(20px,90px) scale(0.96); }
+  33%{ transform: translate(90px,60px) scale(1.14); }
+  66%{ transform: translate(30px,130px) scale(0.92); }
 }
 @keyframes drift-b{
   0%,100%{ transform: translate(0,0) scale(1); }
-  40%{ transform: translate(-70px,50px) scale(1.05); }
-  75%{ transform: translate(-30px,-40px) scale(0.94); }
+  40%{ transform: translate(-100px,75px) scale(1.08); }
+  75%{ transform: translate(-45px,-60px) scale(0.9); }
 }
 @keyframes drift-c{
   0%,100%{ transform: translate(0,0) scale(1); }
-  50%{ transform: translate(50px,-60px) scale(1.1); }
+  50%{ transform: translate(75px,-90px) scale(1.18); }
 }
 @media (prefers-reduced-motion: reduce){
-  .liquid-field .blob{ animation: none !important; }
+  .liquid-field .blob, .liquid-field .wash, body{ animation: none !important; }
 }
 @media (max-width: 1080px){
   .liquid-field{ display:none; }
 }
+
+/* ---------- brilho de vidro nos cards — bem discreto, só ao passar o mouse ---------- */
+.glass-live{ position: relative; overflow: hidden; }
+.glass-live::before{
+  content:""; position:absolute; inset:0; pointer-events:none; z-index:0;
+  opacity: 0;
+  background: radial-gradient(420px circle at calc(50% + var(--mx) * 40px) calc(45% + var(--my) * 40px), rgba(255,255,255,0.08), transparent 65%);
+  transition: opacity .5s ease;
+}
+:root[data-theme="dark"] .glass-live:hover::before{ opacity: .16; }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .glass-live:hover::before{ opacity: .16; } }
+.glass-live:hover::before{ opacity: .5; }
+.glass-live > *{ position: relative; z-index: 1; }
 h1,h2,h3,.display{
   font-family: "Archivo", "Public Sans", sans-serif;
   letter-spacing: -0.01em;
@@ -315,6 +374,21 @@ h1,h2,h3,.display{
 }
 .icon-btn{ display:flex; align-items:center; gap:6px; }
 .icon-btn[hidden]{ display:none; }
+.theme-toggle{ padding: 8px 10px; }
+.theme-toggle svg{ transition: transform .4s var(--ease), opacity .3s var(--ease); }
+.theme-toggle:active svg{ transform: rotate(-25deg) scale(.85); }
+
+/* ---------- transição de tema em círculo ("fecha um ciclo, abre outro") ---------- */
+::view-transition-old(root),
+::view-transition-new(root){
+  animation: none;
+  mix-blend-mode: normal;
+}
+::view-transition-old(root){ z-index: 1; }
+::view-transition-new(root){ z-index: 2; }
+@media (prefers-reduced-motion: reduce){
+  ::view-transition-group(root){ animation: none !important; }
+}
 .icon-btn:hover, .pill-select:hover{ border-color: var(--accent); color: var(--text-primary); transform: translateY(-1px); }
 .live-dot{
   width:7px; height:7px; border-radius:50%; background: var(--good);
@@ -345,7 +419,12 @@ h1,h2,h3,.display{
   animation: rise .6s var(--ease) forwards;
   transition: transform .3s var(--ease), box-shadow .3s var(--ease);
 }
-.kpi:hover{ transform: translateY(-3px); box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight), 0 14px 30px -14px rgba(15,94,166,0.35); }
+.kpi:hover{ box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight), 0 8px 18px -14px rgba(15,94,166,0.3); }
+/* Pulso via transition (não animation) — não pode disputar o shorthand
+   "animation" com a entrada .rise do card, senão ela é substituída
+   inteira e o card perde o "forwards" que o mantém visível. */
+.kpi{ transition: transform .3s var(--ease), box-shadow .5s var(--ease); }
+.kpi.pulse{ box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight), 0 0 0 3px var(--accent-soft); }
 .kpi:nth-child(1){ animation-delay: .02s; }
 .kpi:nth-child(2){ animation-delay: .08s; }
 .kpi:nth-child(3){ animation-delay: .14s; }
@@ -361,6 +440,10 @@ h1,h2,h3,.display{
 
 /* ---------- panels/grid ---------- */
 .grid-2{ display:grid; grid-template-columns: 1.55fr 1fr; gap: 16px; margin-bottom: 16px; align-items: stretch; }
+/* Pares onde os dois gráficos têm alturas naturais bem diferentes: sem isso,
+   o painel mais curto estica e sobra uma área vazia grande dentro dele. */
+.grid-2.uneven{ align-items: start; }
+.grid-2.equal-cols{ grid-template-columns: 1fr 1fr; }
 .panel{
   background: var(--glass-bg);
   backdrop-filter: blur(18px) saturate(160%);
@@ -411,18 +494,41 @@ body.no-scroll{ overflow:hidden; }
   transition: transform .3s var(--ease), box-shadow .3s var(--ease), border-color .3s var(--ease);
   cursor: pointer;
 }
-.machine-card:hover{ transform: translateY(-4px) scale(1.012); box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight), 0 16px 32px -16px rgba(15,94,166,0.4); }
+.machine-card:hover{ box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight), 0 8px 20px -16px rgba(15,94,166,0.35); }
 .machine-card:focus-visible{ outline: 2px solid var(--accent); outline-offset: 2px; }
 .machine-card.st-good{ border-left-color: var(--good); }
 .machine-card.st-warning{ border-left-color: var(--warning); }
 .machine-card.st-critical{ border-left-color: var(--critical); }
-.machine-top{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
-.machine-name{ font-weight:600; font-size:14px; }
-.machine-line{ color:var(--text-muted); font-size:12px; margin-top:1px; }
-.machine-metrics{ display:flex; gap: 16px; margin-top: 12px; }
-.mm{ flex:1; }
-.mm-label{ font-size:10.5px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.04em; }
-.mm-value{ font-family:"IBM Plex Mono",monospace; font-size:15px; font-weight:600; margin-top:2px; }
+.machine-top{ display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.machine-name{ font-weight:600; font-size:14.5px; }
+.machine-hero{ display:flex; align-items:center; justify-content:space-between; gap:12px; margin-top:16px; }
+.machine-oee{ display:flex; flex-direction:column; }
+.machine-oee .v{ font-size:26px; font-weight:700; line-height:1; }
+.machine-oee .l{ font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:.05em; margin-top:5px; }
+.machine-foot{
+  display:flex; align-items:center; gap:4px; margin-top:14px;
+  font-size:11.5px; color:var(--text-muted);
+  transition: color .25s var(--ease), gap .25s var(--ease);
+}
+.machine-card:hover .machine-foot{ color:var(--accent); gap:7px; }
+
+/* aderência por processo — anéis de progresso */
+.proc-grid{ display:grid; grid-template-columns: repeat(3,1fr); gap:14px; }
+.proc-card{
+  background: var(--glass-bg);
+  backdrop-filter: blur(16px) saturate(160%);
+  -webkit-backdrop-filter: blur(16px) saturate(160%);
+  border:1px solid var(--glass-border);
+  border-radius:12px;
+  padding:20px 16px 18px;
+  box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+  display:flex; flex-direction:column; align-items:center; gap:4px;
+  transition: box-shadow .3s var(--ease);
+}
+.proc-card:hover{ box-shadow: var(--glass-shadow), inset 0 1px 0 var(--glass-highlight), 0 8px 20px -16px rgba(15,94,166,0.35); }
+.proc-name{ font-size:13.5px; font-weight:600; margin-top:6px; }
+.proc-sub{ font-size:11.5px; color:var(--text-muted); }
+@media (max-width: 760px){ .proc-grid{ grid-template-columns: 1fr; } }
 
 /* table */
 .table-wrap{ overflow-x:auto; }
@@ -564,7 +670,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
   padding:14px 16px; border-radius:12px; border:1px solid var(--glass-border); background:var(--glass-bg);
   cursor:pointer; transition: transform .25s var(--ease), box-shadow .25s var(--ease), border-color .25s var(--ease);
 }
-.line-row:hover{ transform: translateX(3px); box-shadow: 0 10px 24px -16px rgba(15,94,166,0.4); border-color: var(--accent); }
+.line-row:hover{ box-shadow: 0 6px 16px -14px rgba(15,94,166,0.35); border-color: var(--accent); }
 .line-row-name{ font-weight:600; font-size:13.5px; }
 .line-row-sub{ font-size:11.5px; color:var(--text-muted); margin-top:1px; }
 .line-metric{ text-align:center; }
@@ -637,10 +743,10 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 .drawer-section-title{ font-size:12.5px; font-weight:600; color:var(--text-secondary); margin:20px 0 10px; text-transform:uppercase; letter-spacing:.04em; }
 .drawer-bars{ display:flex; flex-direction:column; gap:10px; }
 .drawer-bar-row{ display:flex; align-items:center; gap:10px; font-size:12.5px; }
-.drawer-bar-label{ width:88px; flex:none; color:var(--text-secondary); }
+.drawer-bar-label{ width:76px; flex:none; color:var(--text-secondary); }
 .drawer-bar-track{ flex:1; height:8px; border-radius:99px; background:var(--surface-sunken); overflow:hidden; }
 .drawer-bar-fill{ height:100%; border-radius:99px; }
-.drawer-bar-value{ width:38px; text-align:right; font-family:"IBM Plex Mono",monospace; font-weight:600; }
+.drawer-bar-value{ width:66px; flex:none; text-align:right; white-space:nowrap; font-family:"IBM Plex Mono",monospace; font-weight:600; }
 .drawer-facas-item{ display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--glass-border); font-size:12.5px; }
 .drawer-facas-item:last-child{ border-bottom:none; }
 
@@ -682,6 +788,8 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 </script>
 
 <div class="liquid-field" aria-hidden="true">
+  <div class="wash wash-light"></div>
+  <div class="wash wash-dark"></div>
   <div class="blob blob-a"></div>
   <div class="blob blob-b"></div>
   <div class="blob blob-c"></div>
@@ -694,15 +802,24 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
       <button class="rail-btn active" data-view="overview" title="Visão geral" aria-label="Visão geral">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
       </button>
-      <button class="rail-btn" data-view="lines" title="Linhas" aria-label="Linhas">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 17l5-6 4 3 5-7 4 5"/></svg>
+      <button class="rail-btn" data-view="aparas" title="Aparas &amp; Refugo" aria-label="Aparas e Refugo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3v7.5a3 3 0 0 0 6 0V3"/><path d="M9 13.5V21"/><path d="M15 21V9a3 3 0 0 1 3-3h3"/></svg>
       </button>
-      <button class="rail-btn" data-view="facas" title="Facas" aria-label="Facas">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20L20 4M14 4h6v6M9 15l-4 4"/></svg>
+      <button class="rail-btn" data-view="produtividade" title="Produtividade &amp; TMR" aria-label="Produtividade e TMR">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20a8 8 0 1 1 8-8"/><path d="M12 12l4.5-3.5"/><path d="M12 20h8"/></svg>
       </button>
-      <button class="rail-btn" data-view="reports" title="Relatórios" aria-label="Relatórios">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3h9l5 5v13H6z"/><path d="M9 12h6M9 16h6M9 8h3"/></svg>
+      <button class="rail-btn" data-view="aderencia" title="Aderência ao Planejado" aria-label="Aderência ao Planejado">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".8" fill="currentColor"/></svg>
       </button>
+      <button class="rail-btn" data-view="timeline" title="Linha do Tempo" aria-label="Linha do Tempo">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h11M4 12h16M4 18h8"/><circle cx="18" cy="6" r="1.6"/><circle cx="14" cy="18" r="1.6"/></svg>
+      </button>
+      <button class="rail-btn" data-view="wip" title="WIP &amp; Carteira" aria-label="WIP e Carteira">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8l9-4 9 4-9 4-9-4Z"/><path d="M3 12l9 4 9-4"/><path d="M3 16l9 4 9-4"/></svg>
+      </button>
+      <a class="rail-btn" id="upload-link" title="Atualizar dados" aria-label="Atualizar dados" href="./upload.html" hidden>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12M7 10l5-5 5 5"/><path d="M5 21h14"/></svg>
+      </a>
       <a class="rail-btn" id="admin-link" title="Administração de acessos" aria-label="Administração de acessos" href="./admin.html" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4Z"/><path d="M9 12l2 2 4-4"/></svg>
       </a>
@@ -725,13 +842,17 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
         </div>
       </div>
       <div class="topbar-right">
-        <span class="tag-demo"><span class="dot"></span>Demonstração &middot; dados fictícios</span>
+        <span class="tag-demo" title="Indicadores, máquinas e motivos de perda vêm dos BIs de Produção. Os valores numéricos são de referência até a conexão com a fonte de dados."><span class="dot"></span>Estrutura dos BIs &middot; valores de referência</span>
         <select class="pill-select" id="period-select" aria-label="Período">
           <option value="14" selected>Últimos 14 dias</option>
           <option value="7">Últimos 7 dias</option>
           <option value="30">Este mês</option>
         </select>
         <button class="icon-btn" id="live-toggle" aria-pressed="true"><span class="live-dot" id="live-dot"></span><span id="live-label">Ao vivo</span></button>
+        <button class="icon-btn theme-toggle" id="theme-toggle" type="button" title="Trocar tema" aria-label="Trocar tema">
+          <svg id="theme-icon-sun" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8L6 18M18 6l1.8-1.8"/></svg>
+          <svg id="theme-icon-moon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" hidden><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>
+        </button>
         <button class="icon-btn" id="logout-btn" title="Sair" aria-label="Sair" hidden>
           <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
           Sair
@@ -746,125 +867,219 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
         <section class="kpi-row" id="kpi-row"></section>
 
         <section class="grid-2">
-          <div class="panel">
+          <div class="panel glass-live">
             <div class="panel-head">
               <div>
-                <h2 class="panel-title">Disponibilidade de máquina</h2>
-                <div class="panel-sub" id="avail-panel-sub">% do tempo programado, por linha &middot; últimos 14 dias</div>
+                <h2 class="panel-title">Aparas GPK — Apontado x Confirmado</h2>
+                <div class="panel-sub" id="aparas-panel-sub">% sobre peso bruto REBs &middot; últimos 12 meses</div>
               </div>
-              <div class="legend" id="avail-legend"></div>
+              <div class="legend" id="aparas-legend"></div>
             </div>
-            <div id="avail-chart"></div>
+            <div id="aparas-chart"></div>
           </div>
 
-          <div class="panel">
+          <div class="panel glass-live">
             <div class="panel-head">
               <div>
-                <h2 class="panel-title">Aparas por linha</h2>
-                <div class="panel-sub">% de refugo sobre produção, semana atual</div>
+                <h2 class="panel-title">Perda por motivo</h2>
+                <div class="panel-sub">kg apontados no período &middot; maiores ofensores</div>
               </div>
             </div>
-            <div id="scrap-chart"></div>
+            <div id="motivo-chart"></div>
           </div>
         </section>
 
-        <section class="panel">
+        <section class="panel glass-live">
           <div class="panel-head">
             <div>
-              <h2 class="panel-title">Etapas do processo produtivo</h2>
-              <div class="panel-sub">Status atual e OEE, de Extrusão a Controle de Qualidade &middot; clique num card para ver o detalhe</div>
+              <h2 class="panel-title">Máquinas</h2>
+              <div class="panel-sub">TMR, velocidade e apara por recurso &middot; clique para ver o detalhe</div>
             </div>
+            <div class="filter-chips" id="maq-filters"></div>
           </div>
           <div class="machine-grid" id="machine-grid"></div>
         </section>
       </div>
 
-      <!-- ============ LINHAS (detalhe) ============ -->
-      <div class="view" id="view-lines" hidden>
-        <section class="panel">
+      <!-- ============ APARAS & REFUGO ============ -->
+      <div class="view" id="view-aparas">
+        <section class="kpi-row" id="aparas-kpis"></section>
+
+        <section class="grid-2 uneven equal-cols">
+          <div class="panel glass-live">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">Perda por motivo (kg)</h2>
+                <div class="panel-sub">Estratificação por tipo de apontamento</div>
+              </div>
+            </div>
+            <div id="perda-tipo-chart"></div>
+          </div>
+          <div class="panel glass-live">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">Perda por máquina (kg)</h2>
+                <div class="panel-sub">Recursos ordenados por volume de refugo</div>
+              </div>
+            </div>
+            <div id="perda-maquina-chart"></div>
+          </div>
+        </section>
+
+        <section class="panel glass-live">
           <div class="panel-head">
             <div>
-              <h2 class="panel-title">Linhas &amp; etapas de processo</h2>
-              <div class="panel-sub">OEE decomposto (disponibilidade &times; performance &times; qualidade) e tendência de 7 dias &middot; clique para expandir</div>
+              <h2 class="panel-title">Apara por classificação de produto</h2>
+              <div class="panel-sub">% apontada sobre peso bruto, por família de estrutura</div>
             </div>
           </div>
-          <div class="lines-detail" id="lines-detail"></div>
+          <div id="classe-chart"></div>
         </section>
-      </div>
 
-      <!-- ============ FACAS ============ -->
-      <div class="view" id="view-facas" hidden>
-        <section class="panel">
+        <section class="panel glass-live">
           <div class="panel-head">
             <div>
-              <h2 class="panel-title">Controle de facas</h2>
-              <div class="panel-sub">Ferramental por linha &middot; vida útil estimada em ciclos</div>
-            </div>
-            <div class="filter-chips" id="facas-filters">
-              <button class="filter-chip active" data-status="all">Todas</button>
-              <button class="filter-chip" data-status="good">Em uso</button>
-              <button class="filter-chip" data-status="warning">Agendar troca</button>
-              <button class="filter-chip" data-status="critical">Trocar</button>
+              <h2 class="panel-title">Ordens com maior refugo</h2>
+              <div class="panel-sub">OPs do período ordenadas por % de apara apontada</div>
             </div>
           </div>
           <div class="table-wrap">
-            <table id="facas-table">
+            <table id="ops-table">
               <thead>
-                <tr>
-                  <th>ID</th><th>Linha</th><th>Tipo</th><th>Ciclos</th><th>Vida útil</th><th>Status</th><th>Última afiação</th>
-                </tr>
+                <tr><th>OP</th><th>Máquina</th><th>Descrição</th><th>Peso bruto</th><th>Refugo</th><th>% apara</th><th>Motivo principal</th></tr>
               </thead>
               <tbody></tbody>
             </table>
           </div>
-          <div class="empty-state" id="facas-empty" hidden>Nenhuma faca nesse status.</div>
         </section>
       </div>
 
-      <!-- ============ RELATÓRIOS ============ -->
-      <div class="view" id="view-reports" hidden>
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <h2 class="panel-title">Gerar relatório</h2>
-              <div class="panel-sub">Resumo do período selecionado, pronto para exportar</div>
+      <!-- ============ PRODUTIVIDADE & TMR ============ -->
+      <div class="view" id="view-produtividade">
+        <section class="kpi-row" id="prod-kpis"></section>
+
+        <section class="grid-2 uneven equal-cols">
+          <div class="panel glass-live">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">TMR por máquina</h2>
+                <div class="panel-sub">Tempo de máquina rodando (%) &middot; horas produzindo ÷ horas totais</div>
+              </div>
             </div>
+            <div id="tmr-chart"></div>
           </div>
-          <form class="report-form" id="report-form">
-            <div class="field">
-              <label for="rep-line">Linha / etapa</label>
-              <select id="rep-line">
-                <option value="all">Todas as etapas</option>
-              </select>
+          <div class="panel glass-live">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">Horas por classificação de parada</h2>
+                <div class="panel-sub">Distribuição do downtime no período</div>
+              </div>
             </div>
-            <div class="field">
-              <label for="rep-period">Período</label>
-              <select id="rep-period">
-                <option value="7">Últimos 7 dias</option>
-                <option value="14" selected>Últimos 14 dias</option>
-                <option value="30">Este mês</option>
-              </select>
-            </div>
-            <button class="primary-btn" type="submit">Gerar relatório</button>
-          </form>
+            <div id="downtime-chart"></div>
+          </div>
         </section>
 
-        <section class="panel" id="report-result" hidden>
+        <section class="panel glass-live">
           <div class="panel-head">
             <div>
-              <h2 class="panel-title" id="report-title">Resumo</h2>
-              <div class="panel-sub" id="report-sub"></div>
+              <h2 class="panel-title">Velocidade média por máquina</h2>
+              <div class="panel-sub">m/min &middot; comparado à velocidade de referência de cada recurso</div>
             </div>
-            <button class="icon-btn" id="report-export">
+          </div>
+          <div id="velocidade-chart"></div>
+        </section>
+      </div>
+
+      <!-- ============ ADERÊNCIA ============ -->
+      <div class="view" id="view-aderencia">
+        <section class="kpi-row" id="ader-kpis"></section>
+
+        <section class="panel glass-live">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Planejado x Realizado por máquina</h2>
+              <div class="panel-sub">Km lineares no período &middot; barra clara = planejado, sólida = realizado</div>
+            </div>
+          </div>
+          <div id="ader-chart"></div>
+        </section>
+
+        <section class="panel glass-live">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Aderência por processo</h2>
+              <div class="panel-sub">% de aderência à OP em cada etapa da rota</div>
+            </div>
+          </div>
+          <div class="proc-grid" id="proc-grid"></div>
+        </section>
+      </div>
+
+      <!-- ============ LINHA DO TEMPO ============ -->
+      <div class="view" id="view-timeline">
+        <section class="panel glass-live">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Linha do tempo de apontamentos</h2>
+              <div class="panel-sub">Ocupação das máquinas nas últimas 24 h &middot; passe o mouse para ver a OP</div>
+            </div>
+            <div class="legend" id="status-legend"></div>
+          </div>
+          <div id="gantt-chart"></div>
+        </section>
+
+        <section class="panel glass-live">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">Pareto de paradas</h2>
+              <div class="panel-sub">Horas acumuladas por motivo &middot; linha mostra o % acumulado</div>
+            </div>
+          </div>
+          <div id="pareto-chart"></div>
+        </section>
+      </div>
+
+      <!-- ============ WIP & CARTEIRA ============ -->
+      <div class="view" id="view-wip">
+        <section class="kpi-row" id="wip-kpis"></section>
+
+        <section class="grid-2">
+          <div class="panel glass-live">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">WIP por etapa</h2>
+                <div class="panel-sub">Metros lineares parados em cada estágio do processo</div>
+              </div>
+            </div>
+            <div id="wip-chart"></div>
+          </div>
+          <div class="panel glass-live">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">Carteira x Produção</h2>
+                <div class="panel-sub">Carteira, produzido e faturado em kg &middot; mês corrente</div>
+              </div>
+              <div class="legend" id="carteira-legend"></div>
+            </div>
+            <div id="carteira-chart"></div>
+          </div>
+        </section>
+
+        <section class="panel glass-live">
+          <div class="panel-head">
+            <div>
+              <h2 class="panel-title">WIP em aberto por cliente</h2>
+              <div class="panel-sub">Dentro (DC) e fora (FC) da carteira do mês</div>
+            </div>
+            <button class="icon-btn" id="wip-export">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
               Exportar CSV
             </button>
           </div>
-          <div class="report-stats" id="report-stats"></div>
           <div class="table-wrap">
-            <table id="report-table">
+            <table id="wip-table">
               <thead>
-                <tr><th>Etapa</th><th>OEE</th><th>Disponib.</th><th>Aparas</th><th>Status</th></tr>
+                <tr><th>Cliente</th><th>Classificação</th><th>Etapa</th><th>Carteira</th><th>Metros WIP</th><th>Situação</th></tr>
               </thead>
               <tbody></tbody>
             </table>
@@ -872,13 +1087,17 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
         </section>
       </div>
 
-      <footer>Protótipo interno &middot; valores simulados para validação de layout &middot; gerado para apresentação à gerência de Produção</footer>
+      <footer>
+        Painel interno de Produção &middot; Gualapack Jaguariúna &middot;
+        indicadores, máquinas e motivos de perda espelhados dos BIs de Produção &mdash;
+        valores numéricos de referência até a conexão com a fonte de dados.
+      </footer>
     </main>
   </div>
 </div>
 
 <div class="drawer-backdrop" id="drawer-backdrop" hidden></div>
-<aside class="drawer" id="line-drawer" hidden aria-label="Detalhe da etapa">
+<aside class="drawer" id="line-drawer" hidden aria-label="Detalhe da máquina">
   <div class="drawer-head">
     <div>
       <div class="drawer-eyebrow" id="drawer-product">&nbsp;</div>
@@ -919,82 +1138,157 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 </div>
 
 <script>
-/* ============ DEMO DATA (fictício) ============ */
-const LINES = [
-  { id:"L1", name:"Extrusão", short:"Extrusão", product:"Filmes e substratos", oee:78, avail:88, perf:91, qual:97, scrap:3.1, status:"good",
-    trend:[86,87,85,89,90,88,91] },
-  { id:"L2", name:"Impressão", short:"Impressão", product:"Rotogravura / Flexografia", oee:64, avail:74, perf:88, qual:98, scrap:5.4, status:"warning",
-    trend:[80,78,75,72,74,73,74] },
-  { id:"L3", name:"Laminação", short:"Laminação", product:"Estruturas multicamada", oee:82, avail:93, perf:90, qual:98, scrap:2.2, status:"good",
-    trend:[90,91,92,93,92,94,93] },
-  { id:"L4", name:"Refile e Corte", short:"Refile", product:"Bobinas sob medida", oee:55, avail:61, perf:83, qual:96, scrap:7.8, status:"critical",
-    trend:[70,66,63,60,58,62,61] },
-  { id:"L5", name:"Formação e Selagem", short:"Formação", product:"Pouches e sachês", oee:74, avail:85, perf:89, qual:98, scrap:3.6, status:"good",
-    trend:[81,83,82,84,85,84,85] },
-  { id:"L6", name:"Controle de Qualidade", short:"CQ", product:"Inspeção e liberação", oee:69, avail:80, perf:87, qual:97, scrap:4.4, status:"warning",
-    trend:[76,77,79,78,81,79,80] },
+/* ============================================================================
+   DADOS — estrutura espelhada dos BIs de Produção (Gualapack Jaguariúna)
+   ----------------------------------------------------------------------------
+   Nomes de máquinas, motivos de perda, status de apontamento, classificações
+   e cores vieram dos arquivos .pbix (ver docs/estrutura-bi.md). Os valores
+   numéricos são de referência até a conexão com a fonte de dados — trocar
+   apenas este bloco quando a carga real estiver disponível.
+   ========================================================================== */
+
+/* Ordem oficial das máquinas (eixo do Gantt no BI "Linha do Tempo") */
+const MAQUINAS = [
+  { id:"COATING01", nome:"COATING 01", processo:"Coating",   rota:"—",     tmr:71, vel:186, velRef:210, aparas:4.1, horasProd:412, horasTot:580 },
+  { id:"R12",       nome:"R12",        processo:"Impressão", rota:"ROTO",  tmr:64, vel:214, velRef:280, aparas:6.8, horasProd:371, horasTot:580 },
+  { id:"R18",       nome:"R18",        processo:"Impressão", rota:"ROTO",  tmr:76, vel:262, velRef:290, aparas:5.2, horasProd:441, horasTot:580 },
+  { id:"R20",       nome:"R20",        processo:"Impressão", rota:"ROTO",  tmr:73, vel:248, velRef:290, aparas:5.9, horasProd:423, horasTot:580 },
+  { id:"RT01",      nome:"RT01",       processo:"Impressão", rota:"FLEXO", tmr:58, vel:171, velRef:240, aparas:8.4, horasProd:336, horasTot:580 },
+  { id:"L02",       nome:"L02",        processo:"Laminação", rota:"—",     tmr:79, vel:318, velRef:350, aparas:2.4, horasProd:458, horasTot:580 },
+  { id:"L03",       nome:"L03",        processo:"Laminação", rota:"—",     tmr:82, vel:341, velRef:360, aparas:2.1, horasProd:476, horasTot:580 },
+  { id:"L04",       nome:"L04",        processo:"Laminação", rota:"—",     tmr:68, vel:274, velRef:350, aparas:3.6, horasProd:394, horasTot:580 },
+  { id:"REB01",     nome:"REB 01",     processo:"Corte / Refile", rota:"—", tmr:74, vel:392, velRef:450, aparas:3.2, horasProd:429, horasTot:580 },
+  { id:"REB04",     nome:"REB 04",     processo:"Corte / Refile", rota:"—", tmr:61, vel:307, velRef:430, aparas:4.7, horasProd:354, horasTot:580 },
+  { id:"REB05",     nome:"REB 05",     processo:"Corte / Refile", rota:"—", tmr:55, vel:286, velRef:430, aparas:7.3, horasProd:319, horasTot:580 },
+  { id:"REB09",     nome:"REB 09",     processo:"Corte / Refile", rota:"—", tmr:77, vel:418, velRef:460, aparas:2.8, horasProd:447, horasTot:580 },
+  { id:"REB10",     nome:"REB 10",     processo:"Corte / Refile", rota:"—", tmr:70, vel:365, velRef:450, aparas:3.9, horasProd:406, horasTot:580 },
 ];
 
-let DAYS = 14;
-function buildDayLabels(days){
-  return Array.from({length: days}, (_,i)=>{
-    const d = new Date(2026,7,26 - (days-1-i));
-    return d.toLocaleDateString("pt-BR",{day:"2-digit", month:"2-digit"});
-  });
-}
-let dayLabels = buildDayLabels(DAYS);
-// aggregate availability trend per line over N days, seeded around current avail
-function genTrend(base, vol, days){
-  days = days || DAYS;
-  let v = base, out=[];
-  for(let i=0;i<days;i++){
-    v += (Math.sin(i*0.9+base)*vol*0.4) + (Math.random()-0.5)*vol;
-    v = Math.max(35, Math.min(99, v));
-    out.push(Math.round(v));
-  }
-  return out;
-}
-const availSeries = LINES.slice(0,4).map((l,i)=>({
-  id: l.id, name: l.name, short: l.short, color: `var(--series-${i+1})`,
-  data: genTrend(l.avail, 4)
-}));
+const PROCESSOS = ["Coating", "Impressão", "Laminação", "Corte / Refile"];
 
-const FACAS = [
-  { id:"FC-102", linha:"Refile e Corte", tipo:"Corte rotativo", ciclos: 812000, vida: 1000000, afiacao: "12/08/2026" },
-  { id:"FC-118", linha:"Formação e Selagem", tipo:"Vinco", ciclos: 960000, vida: 1000000, afiacao: "03/07/2026" },
-  { id:"FC-131", linha:"Laminação", tipo:"Corte reto (refile)", ciclos: 410000, vida: 900000, afiacao: "20/08/2026" },
-  { id:"FC-140", linha:"Refile e Corte", tipo:"Corte rotativo", ciclos: 1040000, vida: 1000000, afiacao: "02/06/2026" },
-  { id:"FC-155", linha:"Formação e Selagem", tipo:"Solda lateral", ciclos: 233000, vida: 850000, afiacao: "15/08/2026" },
-  { id:"FC-162", linha:"Formação e Selagem", tipo:"Vinco", ciclos: 705000, vida: 950000, afiacao: "29/07/2026" },
+/* Motivos de perda — códigos reais do campo usr_tipodaperda */
+const TIPOS_PERDA = [
+  { cod:"08", nome:"Refile",             kg: 41280 },
+  { cod:"15", nome:"Ajuste de Máquina",  kg: 28640 },
+  { cod:"01", nome:"Falha de Impressão", kg: 21470 },
+  { cod:"05", nome:"Acerto de Cor",      kg: 18930 },
+  { cod:"02", nome:"Acerto de Máquina",  kg: 16250 },
+  { cod:"06", nome:"Falha de Laminação", kg: 12880 },
+  { cod:"03", nome:"Cor Fora do Padrão", kg:  9740 },
+  { cod:"04", nome:"Marcas de Emenda",   kg:  7310 },
+  { cod:"16", nome:"Borra Extrusora",    kg:  5920 },
+  { cod:"12", nome:"Falha de Fungicida", kg:  4680 },
+  { cod:"11", nome:"Capa",               kg:  3850 },
+  { cod:"10", nome:"Manta",              kg:  3120 },
+  { cod:"18", nome:"Material de Acerto", kg:  2640 },
+  { cod:"09", nome:"Roda de Carroça",    kg:  1780 },
+  { cod:"19", nome:"Movimentação MP",    kg:  1240 },
+];
+
+/* Status de apontamento — cores oficiais do BI Linha do Tempo.
+   corDark: variação usada no tema escuro para os tons que ficariam ilegíveis. */
+const STATUS_APONTAMENTO = [
+  { nome:"Produzindo",          cor:"#2E7D32", corDark:"#3FA046", peso: 46 },
+  { nome:"Parada Produtiva",    cor:"#C62828", corDark:"#E05252", peso: 13 },
+  { nome:"Setup",               cor:"#CD853F", corDark:"#D79A5F", peso: 10 },
+  { nome:"Acerto de Cores",     cor:"#FFA500", corDark:"#FFB733", peso:  8 },
+  { nome:"Fim de Turno",        cor:"#BDBDBD", corDark:"#8A8A8A", peso:  6 },
+  { nome:"Manutenção",          cor:"#000000", corDark:"#6C757D", peso:  5 },
+  { nome:"Logística",           cor:"#00BFFF", corDark:"#33CCFF", peso:  4 },
+  { nome:"PCP",                 cor:"#9400D3", corDark:"#B44BE8", peso:  3 },
+  { nome:"Refeição Autorizada", cor:"#FA8072", corDark:"#FA9385", peso:  2 },
+  { nome:"Casa de Tintas",      cor:"#000080", corDark:"#4F6BD8", peso:  2 },
+  { nome:"Informar Parada",     cor:"#E6C200", corDark:"#F2D633", peso:  1 },
+];
+
+/* Classificações de produto — páginas do BI Indicadores de Produção */
+const CLASSIFICACOES = [
+  { nome:"Bi/Tri Laminated",           aparas: 6.4, kg: 184300 },
+  { nome:"Simple Laminated",           aparas: 4.1, kg: 246800 },
+  { nome:"Sylvamo Bopp & Paper",       aparas: 5.7, kg: 132500 },
+  { nome:"Soap Wrappen and Multipack", aparas: 3.8, kg:  98400 },
+  { nome:"Bula & Paper",               aparas: 7.2, kg:  61200 },
+];
+
+/* Aderência ao planejado — derivada de uma única base por máquina, para que
+   o KPI consolidado, as barras por recurso e os anéis por processo sempre
+   contem a mesma história (km lineares planejados x realizados). */
+const FATOR_KM = 8; // converte horas × m/min de referência em km lineares do período
+MAQUINAS.forEach(m=>{
+  m.planKm = Math.round(m.horasTot * m.velRef * 60 / 1e6 * FATOR_KM);
+  m.realKm = Math.round(m.planKm * (0.55 + m.tmr/100 * 0.45));
+  m.aderencia = m.realKm / m.planKm * 100;
+});
+
+/* Medidas % IMPRESSAO / % LAMINAÇAO / % CORTE do BI, agregando as máquinas
+   de cada etapa da rota (Coating entra só no consolidado, como no BI). */
+const ADERENCIA_PROCESSO = ["Impressão","Laminação","Corte / Refile"].map(p=>{
+  const ms = MAQUINAS.filter(m=>m.processo===p);
+  const planejado = ms.reduce((a,m)=>a+m.planKm,0);
+  const realizado = ms.reduce((a,m)=>a+m.realKm,0);
+  return { nome:p, planejado, realizado, pct: realizado/planejado*100 };
+});
+
+/* Etapas de WIP — campo WIP_Etapa do BI Carteira x Produção */
+const WIP_ETAPAS = [
+  { nome:"IMPRESSO",           metros: 486200, dc: 318400 },
+  { nome:"WIP INTERMEDIÁRIO",  metros: 312700, dc: 224900 },
+  { nome:"CORTE",              metros: 198400, dc: 161300 },
+  { nome:"PAPEL",              metros:  87600, dc:  52100 },
+];
+
+const CLIENTES = [
+  "CRISTALINA ALIMENTOS LTDA",
+  "UNILEVER BRASIL INDUSTRIAL LTDA",
+  "GUALAPACK IPERÓ",
+  "GPK JGR / OF",
+  "INTERCOMPANY",
+];
+
+/* Série mensal de aparas: apontado (operador) x confirmado (balança) */
+const MESES = ["set","out","nov","dez","jan","fev","mar","abr","mai","jun","jul","ago"];
+const APARAS_MENSAL = {
+  apontado:   [5.9, 6.2, 5.4, 5.8, 6.4, 6.1, 5.6, 5.2, 5.5, 4.9, 5.1, 4.8],
+  confirmado: [7.1, 7.4, 6.6, 7.0, 7.8, 7.2, 6.9, 6.3, 6.5, 6.0, 6.2, 5.9],
+};
+const META_APARAS = 5.0;
+
+/* OPs com maior refugo */
+const OPS = [
+  { op:"OP-248713", maq:"RT01",   desc:"Sachê Stand-up 180 ml — Cristalina",  peso: 12480, refugo: 1184, motivo:"Falha de Impressão" },
+  { op:"OP-248566", maq:"REB 05", desc:"Bobina laminada 620 mm — Unilever",   peso:  9860, refugo:  742, motivo:"Refile" },
+  { op:"OP-248901", maq:"R12",    desc:"Filme impresso BOPP 40 µ",            peso: 18240, refugo: 1204, motivo:"Acerto de Cor" },
+  { op:"OP-248322", maq:"REB 04", desc:"Pouch pré-formado 250 ml",            peso:  7420, refugo:  468, motivo:"Ajuste de Máquina" },
+  { op:"OP-249104", maq:"R20",    desc:"Bula & Paper — inserto farma",        peso: 11060, refugo:  652, motivo:"Marcas de Emenda" },
+  { op:"OP-248745", maq:"L04",    desc:"Estrutura tri-laminada alta barreira", peso: 15320, refugo:  598, motivo:"Falha de Laminação" },
+  { op:"OP-249217", maq:"REB 10", desc:"Multipack sabonete 5×90 g",           peso:  8940, refugo:  322, motivo:"Refile" },
 ];
 
 /* ============ helpers ============ */
-const fmt = n => n.toLocaleString("pt-BR");
-const statusLabel = { good:"Estável", warning:"Atenção", serious:"Sério", critical:"Crítico" };
+const fmt   = n => Math.round(n).toLocaleString("pt-BR");
+const fmt1  = n => n.toLocaleString("pt-BR", { minimumFractionDigits:1, maximumFractionDigits:1 });
+const esc   = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 
-function wearInfo(ciclos, vida){
-  const pct = ciclos/vida;
-  if (ciclos > vida) return { pct:1, status:"critical", label:"Trocar" };
-  if (pct > 0.9) return { pct, status:"warning", label:"Agendar troca" };
-  return { pct, status:"good", label:"Em uso" };
+function isDark(){
+  const t = document.documentElement.getAttribute("data-theme");
+  if(t === "dark") return true;
+  if(t === "light") return false;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
 }
+function statusColor(s){ return isDark() ? s.corDark : s.cor; }
 
-/* ============ KPI row ============ */
-const avgOEE = Math.round(LINES.reduce((a,l)=>a+l.oee,0)/LINES.length);
-const avgAvail = Math.round(LINES.reduce((a,l)=>a+l.avail,0)/LINES.length);
-const avgScrap = (LINES.reduce((a,l)=>a+l.scrap,0)/LINES.length).toFixed(1);
-const totalProd = 428.6;
-
-const kpis = [
-  { label:"OEE médio", value: avgOEE+"%", delta:"+2.4 pts vs. semana anterior", dir:"up",
-    spark: genTrend(avgOEE, 3) },
-  { label:"Disponibilidade média", value: avgAvail+"%", delta:"-1.1 pt vs. semana anterior", dir:"down",
-    spark: genTrend(avgAvail, 3) },
-  { label:"Aparas (média)", value: avgScrap+"%", delta:"+0.6 pt vs. meta de 3.5%", dir:"down",
-    spark: genTrend(avgScrap*10, 4) },
-  { label:"Produção total", value: totalProd+" t", delta:"+18.2 t vs. semana anterior", dir:"up",
-    spark: genTrend(70, 5) },
-];
+function tmrStatus(v){
+  if(v >= 75) return "good";
+  if(v >= 62) return "warning";
+  return "critical";
+}
+function aparasStatus(v){
+  if(v <= META_APARAS) return "good";
+  if(v <= META_APARAS + 2) return "warning";
+  return "critical";
+}
+const statusLabel = { good:"Dentro da meta", warning:"Atenção", critical:"Crítico" };
+const statusCor   = { good:"var(--good)", warning:"var(--warning)", critical:"var(--critical)" };
 
 function sparkPath(data, w, h, pad=2){
   const min = Math.min(...data), max = Math.max(...data);
@@ -1008,151 +1302,263 @@ function sparkPath(data, w, h, pad=2){
 }
 
 function easeOutExpo(t){ return t===1 ? 1 : 1 - Math.pow(2, -10*t); }
-function animateCount(el, target, prefix, suffix, decimals){
-  const start = performance.now();
-  const dur = 900;
+function animateCount(el, target, suffix, decimals){
+  const start = performance.now(), dur = 900;
   function step(now){
     const t = Math.min(1, (now-start)/dur);
-    const v = target * easeOutExpo(t);
-    el.textContent = prefix + v.toFixed(decimals) + suffix;
+    el.textContent = (target * easeOutExpo(t)).toFixed(decimals) + suffix;
     if(t < 1) requestAnimationFrame(step);
-    else el.textContent = prefix + target.toFixed(decimals) + suffix;
+    else el.textContent = target.toFixed(decimals) + suffix;
   }
   requestAnimationFrame(step);
 }
 
-const kpiRow = document.getElementById("kpi-row");
-kpis.forEach((k,ki)=>{
-  const w=120,h=32;
-  const path = sparkPath(k.spark, w, h);
-  const color = k.dir==="up" ? "var(--good)" : k.dir==="down" ? "var(--critical)" : "var(--text-muted)";
-  const arrow = k.dir==="up" ? "&#8599;" : k.dir==="down" ? "&#8600;" : "&#8594;";
-  const div = document.createElement("div");
-  div.className = "kpi";
-  const m = k.value.match(/^(-?\d+(\.\d+)?)(.*)$/);
-  const targetNum = m ? parseFloat(m[1]) : 0;
-  const decimals = m && m[2] ? m[2].length-1 : 0;
-  const suffix = m ? m[3] : "";
-  div.innerHTML = `
-    <div class="kpi-label">${k.label}</div>
-    <div class="kpi-value mono" id="kpi-val-${ki}">0${suffix}</div>
-    <div class="kpi-delta ${k.dir}">${arrow} ${k.delta}</div>
-    <svg class="kpi-spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-      <path d="${path}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
-        stroke-dasharray="200" stroke-dashoffset="200">
-        <animate attributeName="stroke-dashoffset" from="200" to="0" dur="1s" begin="${0.15+ki*0.06}s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
-      </path>
-    </svg>`;
-  kpiRow.appendChild(div);
-  setTimeout(()=> animateCount(div.querySelector(`#kpi-val-${ki}`), targetNum, "", suffix, decimals), 150 + ki*60);
-});
-
-/* ============ availability line chart ============ */
-(function(){
-  const holder = document.getElementById("avail-chart");
-  const legend = document.getElementById("avail-legend");
-  const sub = document.getElementById("avail-panel-sub");
-  const W = 640, H = 220, padL = 34, padR = 82, padT = 12, padB = 26;
-  const plotW = W - padL - padR, plotH = H - padT - padB;
-  const yMin = 40, yMax = 100;
-
-  const visible = new Set(availSeries.map(s=>s.id));
-
-  function x(i){ return padL + (i/(DAYS-1))*plotW; }
-  function y(v){ return padT + (1 - (v-yMin)/(yMax-yMin)) * plotH; }
-  function tickIndices(){
-    const n = Math.min(5, DAYS);
-    const out = [];
-    for(let k=0;k<n;k++) out.push(Math.round(k*(DAYS-1)/(n-1)));
-    return [...new Set(out)];
+/* Tooltip compartilhado pelos gráficos */
+function attachTip(holder, html, evt){
+  holder.style.position = "relative";
+  let tip = holder.querySelector(".chart-tooltip");
+  if(!tip){
+    tip = document.createElement("div");
+    tip.className = "chart-tooltip";
+    tip.style.cssText = "position:absolute;pointer-events:none;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:var(--shadow);z-index:5;white-space:nowrap;";
+    holder.appendChild(tip);
   }
+  tip.innerHTML = html;
+  const r = holder.getBoundingClientRect();
+  let x = evt.clientX - r.left + 14;
+  const y = evt.clientY - r.top + 12;
+  if(x + tip.offsetWidth > r.width) x = evt.clientX - r.left - tip.offsetWidth - 14;
+  tip.style.left = Math.max(0,x) + "px";
+  tip.style.top  = y + "px";
+}
+function clearTip(holder){
+  const t = holder.querySelector(".chart-tooltip");
+  if(t) t.remove();
+}
+
+/* ---------------------------------------------------------------------------
+   Gráfico de barras horizontais reutilizável
+   ------------------------------------------------------------------------- */
+function hBarChart(holder, rows, opts={}){
+  const labelW = opts.labelW ?? 130;
+  const valueW = opts.valueW ?? 62;
+  const rowH = opts.rowH ?? 30, gap = 8;
+  // O SVG escala pela largura do painel. Em painéis largos com poucas linhas,
+  // um viewBox estreito faz tudo crescer demais — por isso a largura do
+  // viewBox acompanha o painel (opts.W), não um valor fixo.
+  const W = opts.W ?? 460;
+  const H = rows.length*(rowH+gap);
+  const barMax = W - labelW - valueW;
+  const max = Math.max(...rows.map(r=>r.value), opts.min ?? 0) || 1;
+  const target = opts.target;
+  const targetX = target != null ? labelW + (target/max)*barMax : null;
+
+  let defs = "<defs>", bars = "";
+  rows.forEach((r,i)=>{
+    const y = i*(rowH+gap);
+    const w = (r.value/max)*barMax;
+    const c2 = r.color || "var(--series-2)";
+    const c1 = r.color2 || "var(--series-4)";
+    defs += `<linearGradient id="${opts.idPrefix}-g${i}" x1="0" y1="0" x2="1" y2="0"><stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/></linearGradient>`;
+    bars += `
+      <g class="bar-row" data-i="${i}">
+        <rect class="bar-hover-bg" x="-6" y="${y-2}" width="${W+6}" height="${rowH+4}" rx="6" fill="transparent"/>
+        <text x="0" y="${y+rowH/2+4}" font-size="11" fill="var(--text-secondary)" font-family="Public Sans">${esc(r.label)}</text>
+        <rect x="${labelW}" y="${y+5}" width="${barMax}" height="${rowH-10}" rx="4" fill="var(--surface-sunken)"/>
+        <rect class="bar-fill" x="${labelW}" y="${y+5}" width="0" height="${rowH-10}" rx="4" fill="url(#${opts.idPrefix}-g${i})">
+          <animate attributeName="width" from="0" to="${w.toFixed(1)}" dur="0.7s" fill="freeze" begin="${(i*0.05).toFixed(2)}s" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
+        </rect>
+        <text x="${labelW+barMax+8}" y="${y+rowH/2+4}" font-size="11.5" font-family="IBM Plex Mono, monospace" fill="var(--text-primary)" font-weight="600" text-anchor="end" transform="translate(${valueW-14},0)">${esc(r.display)}</text>
+      </g>`;
+  });
+  defs += "</defs>";
+
+  holder.innerHTML = `
+    <svg width="100%" viewBox="0 0 ${W} ${H + (target!=null?12:2)}" role="img" aria-label="${esc(opts.aria||'')}">
+      <style>
+        .bar-row{ cursor:default; }
+        .bar-hover-bg{ transition: fill .2s ease; }
+        .bar-row:hover .bar-hover-bg{ fill: var(--glass-bg-strong); }
+        .bar-fill{ transition: filter .2s ease; }
+        .bar-row:hover .bar-fill{ filter: brightness(1.12); }
+      </style>
+      ${defs}${bars}
+      ${target!=null ? `<line x1="${targetX}" y1="0" x2="${targetX}" y2="${H}" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="4,3"/>
+      <text x="${targetX}" y="${H+9}" font-size="9.5" text-anchor="middle" fill="var(--text-muted)" font-family="IBM Plex Mono, monospace">${esc(opts.targetLabel||'')}</text>` : ""}
+    </svg>`;
+
+  holder.querySelectorAll(".bar-row").forEach(g=>{
+    const r = rows[+g.dataset.i];
+    if(!r.tip) return;
+    g.addEventListener("mousemove", e=> attachTip(holder, r.tip, e));
+    g.addEventListener("mouseleave", ()=> clearTip(holder));
+  });
+}
+
+/* ---------------------------------------------------------------------------
+   Gráfico de linhas com área em gradiente
+   ------------------------------------------------------------------------- */
+function multiLineChart(holder, labels, series, opts={}){
+  const W = 640, H = opts.height ?? 220;
+  const padL = 38, padR = 58, padT = 14, padB = 26;
+  const plotW = W-padL-padR, plotH = H-padT-padB;
+  const all = series.flatMap(s=>s.data);
+  const yMin = opts.yMin ?? Math.max(0, Math.floor(Math.min(...all) - 1));
+  const yMax = opts.yMax ?? Math.ceil(Math.max(...all) + 1);
+  const n = labels.length;
+  const x = i => padL + (n<2 ? plotW/2 : (i/(n-1))*plotW);
+  const y = v => padT + (1 - (v-yMin)/((yMax-yMin)||1)) * plotH;
+
+  const ticks = opts.ticks ?? 4;
+  let grid = "";
+  for(let k=0;k<=ticks;k++){
+    const v = yMin + (yMax-yMin)*k/ticks;
+    const yy = y(v);
+    grid += `<line x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}" stroke="var(--border)" stroke-width="1"/>`;
+    grid += `<text x="${padL-8}" y="${yy+3}" text-anchor="end" font-size="10" fill="var(--text-muted)" font-family="IBM Plex Mono, monospace">${opts.fmtY ? opts.fmtY(v) : v.toFixed(0)}</text>`;
+  }
+  let xLab = "";
+  const stepLab = Math.max(1, Math.round(n/6));
+  labels.forEach((l,i)=>{
+    if(i % stepLab !== 0 && i !== n-1) return;
+    xLab += `<text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="10" fill="var(--text-muted)" font-family="IBM Plex Mono, monospace">${esc(l)}</text>`;
+  });
+
+  let defs = `<defs><filter id="${opts.idPrefix}-glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
+  series.forEach((s,si)=>{
+    defs += `<linearGradient id="${opts.idPrefix}-a${si}" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${s.color}" stop-opacity="0.3"/><stop offset="100%" stop-color="${s.color}" stop-opacity="0"/></linearGradient>`;
+  });
+  defs += "</defs>";
+
+  let areas="", glow="", lines="", dots="";
+  series.forEach((s,si)=>{
+    const d = s.data.map((v,i)=> `${i===0?"M":"L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+    areas += `<path d="${d} L${x(n-1).toFixed(1)},${y(yMin).toFixed(1)} L${x(0).toFixed(1)},${y(yMin).toFixed(1)} Z" fill="url(#${opts.idPrefix}-a${si})" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.6s" fill="freeze"/></path>`;
+    glow  += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0" filter="url(#${opts.idPrefix}-glow)"><animate attributeName="opacity" from="0" to="0.5" dur="0.5s" fill="freeze"/></path>`;
+    lines += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="${s.dashed?'5,4':'none'}" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.5s" fill="freeze"/></path>`;
+    const li = n-1;
+    dots  += `<circle cx="${x(li)}" cy="${y(s.data[li])}" r="3.5" fill="${s.color}" stroke="var(--surface-1)" stroke-width="1.5"/>`;
+    dots  += `<text x="${x(li)+8}" y="${y(s.data[li])+3.5}" font-size="10.5" font-weight="600" fill="${s.color}" font-family="Public Sans, sans-serif">${esc(s.short||"")}</text>`;
+  });
+
+  let metaLine = "";
+  if(opts.meta != null){
+    const my = y(opts.meta);
+    // Rótulo à esquerda: à direita ele colidiria com os nomes das séries,
+    // que ficam ancorados no último ponto de cada linha.
+    metaLine = `<line x1="${padL}" y1="${my}" x2="${W-padR}" y2="${my}" stroke="var(--good)" stroke-width="1.2" stroke-dasharray="5,4" opacity=".85"/>
+      <text x="${padL+5}" y="${my-5}" font-size="9.5" fill="var(--good)" font-family="IBM Plex Mono, monospace">meta ${opts.fmtY ? opts.fmtY(opts.meta) : opts.meta}</text>`;
+  }
+
+  holder.innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc(opts.aria||'')}">
+      ${defs}${grid}${xLab}${areas}${glow}${lines}${metaLine}${dots}<g class="hover-layer"></g>
+    </svg>`;
+
+  const svg = holder.querySelector("svg");
+  const hover = svg.querySelector(".hover-layer");
+  const hit = document.createElementNS("http://www.w3.org/2000/svg","rect");
+  hit.setAttribute("x",padL); hit.setAttribute("y",padT);
+  hit.setAttribute("width",plotW); hit.setAttribute("height",plotH);
+  hit.setAttribute("fill","transparent");
+  svg.appendChild(hit);
+
+  hit.addEventListener("mousemove", e=>{
+    const r = svg.getBoundingClientRect();
+    const mx = (e.clientX - r.left) * (W/r.width);
+    const idx = Math.max(0, Math.min(n-1, Math.round((mx-padL)/plotW*(n-1))));
+    const cx = x(idx);
+    hover.innerHTML = `<line x1="${cx}" y1="${padT}" x2="${cx}" y2="${padT+plotH}" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="3,3"/>`;
+    let rowsHtml = `<div style="font-size:11px;color:var(--text-muted);margin-bottom:5px;">${esc(labels[idx])}</div>`;
+    series.forEach(s=>{
+      rowsHtml += `<div style="display:flex;align-items:center;gap:10px;justify-content:space-between;"><span style="display:flex;align-items:center;gap:6px;"><span style="width:7px;height:7px;border-radius:2px;background:${s.color};display:inline-block;"></span>${esc(s.name)}</span><span class="mono">${opts.fmtTip ? opts.fmtTip(s.data[idx]) : s.data[idx]}</span></div>`;
+    });
+    attachTip(holder, rowsHtml, e);
+  });
+  hit.addEventListener("mouseleave", ()=>{ hover.innerHTML=""; clearTip(holder); });
+}
+
+/* ---------------------------------------------------------------------------
+   KPI cards
+   ------------------------------------------------------------------------- */
+function renderKpis(container, kpis){
+  container.innerHTML = "";
+  kpis.forEach((k,ki)=>{
+    const w=120,h=32;
+    const path = sparkPath(k.spark, w, h);
+    const color = k.dir==="up" ? "var(--good)" : k.dir==="down" ? "var(--critical)" : "var(--text-muted)";
+    const arrow = k.dir==="up" ? "&#8599;" : k.dir==="down" ? "&#8600;" : "&#8594;";
+    const div = document.createElement("div");
+    div.className = "kpi";
+    const uid = container.id + "-" + ki;
+    div.innerHTML = `
+      <div class="kpi-label">${esc(k.label)}</div>
+      <div class="kpi-value mono" id="kv-${uid}">0${k.suffix||""}</div>
+      <div class="kpi-delta ${k.dir}">${arrow} ${esc(k.delta)}</div>
+      <svg class="kpi-spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+        <path d="${path}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+          stroke-dasharray="200" stroke-dashoffset="200">
+          <animate attributeName="stroke-dashoffset" from="200" to="0" dur="1s" begin="${(0.15+ki*0.06).toFixed(2)}s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
+        </path>
+      </svg>`;
+    container.appendChild(div);
+    setTimeout(()=> animateCount(div.querySelector(`#kv-${uid}`), k.value, k.suffix||"", k.decimals??0), 150 + ki*60);
+  });
+}
+
+/* Séries auxiliares para os sparklines dos KPIs */
+function wobble(base, amp, n=12){
+  const out=[]; let v=base;
+  for(let i=0;i<n;i++){ v += Math.sin(i*0.9+base)*amp*0.4 + (Math.random()-0.5)*amp; out.push(v); }
+  return out;
+}
+
+/* ============ VISÃO GERAL ============ */
+const aparasMedia   = APARAS_MENSAL.apontado[APARAS_MENSAL.apontado.length-1];
+const confirmMedia  = APARAS_MENSAL.confirmado[APARAS_MENSAL.confirmado.length-1];
+const tmrMedio      = MAQUINAS.reduce((a,m)=>a+m.tmr,0)/MAQUINAS.length;
+const aderMedia     = ADERENCIA_PROCESSO.reduce((a,p)=>a+p.pct,0)/ADERENCIA_PROCESSO.length;
+const produtividade = 214.6; // m²/h
+const perdaTotalKg  = TIPOS_PERDA.reduce((a,t)=>a+t.kg,0);
+
+renderKpis(document.getElementById("kpi-row"), [
+  { label:"Apara apontada", value:aparasMedia, suffix:"%", decimals:1,
+    delta:`meta ${fmt1(META_APARAS)}% · confirmado ${fmt1(confirmMedia)}%`,
+    dir: aparasMedia <= META_APARAS ? "up" : "down", spark: APARAS_MENSAL.apontado.slice() },
+  { label:"TMR médio", value:tmrMedio, suffix:"%", decimals:1,
+    delta:"tempo de máquina rodando", dir:"up", spark: wobble(tmrMedio, 3) },
+  { label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:1,
+    delta:"+6,2 m²/h vs. mês anterior", dir:"up", spark: wobble(produtividade, 8) },
+  { label:"Aderência ao plano", value:aderMedia, suffix:"%", decimals:1,
+    delta:"km lineares realizados ÷ planejados", dir: aderMedia>=90?"up":"down", spark: wobble(aderMedia, 4) },
+]);
+
+/* Gráfico principal: apara apontada x confirmada */
+(function(){
+  const holder = document.getElementById("aparas-chart");
+  const legend = document.getElementById("aparas-legend");
+  const sub = document.getElementById("aparas-panel-sub");
+  const visible = new Set(["apontado","confirmado"]);
+  let janela = 12;
+
+  const defs = [
+    { id:"apontado",   name:"Apontado (operador)", short:"Apont.", color:"var(--series-2)" },
+    { id:"confirmado", name:"Confirmado (balança)", short:"Conf.",  color:"var(--series-4)", dashed:true },
+  ];
 
   function render(){
-    let defs = `<defs><filter id="line-glow" x="-40%" y="-40%" width="180%" height="180%"><feGaussianBlur stdDeviation="4.5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>`;
-    availSeries.forEach(s=>{
-      defs += `<linearGradient id="grad-${s.id}" x1="0" y1="0" x2="0" y2="1">
-        <stop offset="0%" stop-color="${s.color}" stop-opacity="0.32"/>
-        <stop offset="100%" stop-color="${s.color}" stop-opacity="0"/>
-      </linearGradient>`;
-    });
-    defs += `</defs>`;
-
-    let gridLines = "";
-    [40,60,80,100].forEach(v=>{
-      const yy = y(v);
-      gridLines += `<line x1="${padL}" y1="${yy}" x2="${W-padR}" y2="${yy}" stroke="var(--border)" stroke-width="1"/>`;
-      gridLines += `<text x="${padL-8}" y="${yy+3}" text-anchor="end" font-size="10" fill="var(--text-muted)" font-family="IBM Plex Mono, monospace">${v}</text>`;
-    });
-    let xLabels = "";
-    tickIndices().forEach(i=>{
-      xLabels += `<text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="10" fill="var(--text-muted)" font-family="IBM Plex Mono, monospace">${dayLabels[i]}</text>`;
-    });
-
-    let areas = "", glow = "", paths = "", dots = "";
-    availSeries.forEach(s=>{
-      if(!visible.has(s.id)) return;
-      const line = s.data.map((v,i)=> `${i===0?"M":"L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-      const area = `${line} L${x(s.data.length-1).toFixed(1)},${y(yMin).toFixed(1)} L${x(0).toFixed(1)},${y(yMin).toFixed(1)} Z`;
-      areas += `<path d="${area}" fill="url(#grad-${s.id})" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.6s" fill="freeze"/></path>`;
-      glow += `<path d="${line}" fill="none" stroke="${s.color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0" filter="url(#line-glow)"><animate attributeName="opacity" from="0" to="0.55" dur="0.5s" fill="freeze"/></path>`;
-      paths += `<path class="series-path" data-id="${s.id}" d="${line}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.5s" fill="freeze"/></path>`;
-      const li = s.data.length-1;
-      dots += `<circle cx="${x(li)}" cy="${y(s.data[li])}" r="3.5" fill="${s.color}" stroke="var(--surface-1)" stroke-width="1.5"/>`;
-      dots += `<text x="${x(li)+8}" y="${y(s.data[li])+3.5}" font-size="10.5" font-weight="600" fill="${s.color}" font-family="Public Sans, sans-serif">${s.short}</text>`;
-    });
-
-    holder.innerHTML = `
-      <svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Disponibilidade de máquina por linha ao longo do período selecionado">
-        ${defs}${gridLines}${xLabels}${areas}${glow}${paths}${dots}
-        <g id="hover-layer"></g>
-      </svg>`;
-
-    // hover crosshair
-    const svg = holder.querySelector("svg");
-    const hoverLayer = svg.querySelector("#hover-layer");
-    const hitRect = document.createElementNS("http://www.w3.org/2000/svg","rect");
-    hitRect.setAttribute("x", padL); hitRect.setAttribute("y", padT);
-    hitRect.setAttribute("width", plotW); hitRect.setAttribute("height", plotH);
-    hitRect.setAttribute("fill", "transparent");
-    svg.appendChild(hitRect);
-
-    hitRect.addEventListener("mousemove", (e)=>{
-      const rect = svg.getBoundingClientRect();
-      const scaleX = W/rect.width;
-      const mx = (e.clientX - rect.left) * scaleX;
-      const idx = Math.max(0, Math.min(DAYS-1, Math.round((mx-padL)/plotW*(DAYS-1))));
-      const cx = x(idx);
-      let rows = "";
-      availSeries.forEach(s=>{
-        if(!visible.has(s.id)) return;
-        rows += `<div style="display:flex;align-items:center;gap:6px;justify-content:space-between;"><span style="display:flex;align-items:center;gap:6px;"><span style="width:7px;height:7px;border-radius:2px;background:${s.color};display:inline-block;"></span>${s.name}</span><span class="mono">${s.data[idx]}%</span></div>`;
-      });
-      hoverLayer.innerHTML = `<line x1="${cx}" y1="${padT}" x2="${cx}" y2="${padT+plotH}" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="3,3"/>`;
-      let tip = holder.querySelector(".chart-tooltip");
-      if(!tip){
-        tip = document.createElement("div");
-        tip.className = "chart-tooltip";
-        tip.style.cssText = "position:absolute;pointer-events:none;background:var(--surface-2);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:12px;box-shadow:var(--shadow);min-width:150px;z-index:5;";
-        holder.style.position = "relative";
-        holder.appendChild(tip);
-      }
-      tip.innerHTML = `<div style="font-size:11px;color:var(--text-muted);margin-bottom:5px;">${dayLabels[idx]}</div>${rows}`;
-      const leftPct = (cx/W*100);
-      tip.style.left = leftPct > 62 ? "auto" : `calc(${leftPct}% + 14px)`;
-      tip.style.right = leftPct > 62 ? `calc(${100-leftPct}% + 14px)` : "auto";
-      tip.style.top = "6px";
-    });
-    hitRect.addEventListener("mouseleave", ()=>{
-      hoverLayer.innerHTML = "";
-      const tip = holder.querySelector(".chart-tooltip");
-      if(tip) tip.remove();
+    const labels = MESES.slice(-janela);
+    const series = defs.filter(d=>visible.has(d.id)).map(d=>({
+      ...d, data: APARAS_MENSAL[d.id].slice(-janela)
+    }));
+    if(!series.length) return;
+    multiLineChart(holder, labels, series, {
+      idPrefix:"ap", yMin:3, yMax:9, meta:META_APARAS,
+      fmtY: v=> v.toFixed(0)+"%", fmtTip: v=> fmt1(v)+"%",
+      aria:"Apara apontada e confirmada por mês"
     });
   }
 
-  legend.innerHTML = availSeries.map(s=>`
-    <span class="legend-item" data-id="${s.id}">
-      <span class="legend-dot" style="background:${s.color}"></span>${s.name}
-    </span>`).join("");
+  legend.innerHTML = defs.map(d=>`<span class="legend-item" data-id="${d.id}"><span class="legend-dot" style="background:${d.color}"></span>${d.name}</span>`).join("");
   legend.querySelectorAll(".legend-item").forEach(item=>{
     item.addEventListener("click", ()=>{
       const id = item.dataset.id;
@@ -1161,255 +1567,495 @@ kpis.forEach((k,ki)=>{
       render();
     });
   });
-
   render();
 
-  // Exposto pro seletor de período (topbar) conseguir trocar a janela de dias.
-  window.setAvailPeriod = function(days){
-    DAYS = days;
-    dayLabels = buildDayLabels(days);
-    LINES.slice(0,4).forEach((l,i)=>{ availSeries[i].data = genTrend(l.avail, 4, days); });
-    if(sub){
-      const label = days===7 ? "últimos 7 dias" : days===30 ? "este mês" : "últimos 14 dias";
-      sub.textContent = `% do tempo programado, por linha · ${label}`;
-    }
+  window.setDashboardPeriod = function(dias){
+    janela = dias<=7 ? 6 : dias<=14 ? 12 : 12;
+    if(sub) sub.textContent = `% sobre peso bruto REBs · últimos ${janela} meses`;
     render();
   };
+  window.rerenderAparas = render;
 })();
 
-/* ============ scrap bar chart ============ */
-(function(){
-  const holder = document.getElementById("scrap-chart");
-  const data = [...LINES].sort((a,b)=>b.scrap-a.scrap);
-  const W = 420, rowH = 34, gap = 10;
-  const H = data.length*(rowH+gap);
-  const maxVal = Math.max(...data.map(d=>d.scrap), 8);
-  const labelW = 118, barMaxW = W-labelW-56;
+/* Perda por motivo (visão geral — top 8) */
+function renderMotivoChart(){
+  const holder = document.getElementById("motivo-chart");
+  if(!holder) return;
+  const top = TIPOS_PERDA.slice(0,8);
+  hBarChart(holder, top.map(t=>({
+    label: t.nome,
+    value: t.kg,
+    display: fmt(t.kg/1000)+"t",
+    color:"var(--series-2)", color2:"var(--series-4)",
+    tip:`<b>${t.cod} — ${esc(t.nome)}</b><br>${fmt(t.kg)} kg · ${fmt1(t.kg/perdaTotalKg*100)}% do refugo`
+  })), { idPrefix:"mot", labelW:126, valueW:56, aria:"Perda por motivo em quilos" });
+}
+renderMotivoChart();
 
-  const target = 3.5;
-  const targetX = labelW + (target/maxVal)*barMaxW;
-
-  let bars = "", defs = "<defs>";
-  data.forEach((d,i)=>{
-    const yTop = i*(rowH+gap);
-    const barW = (d.scrap/maxVal)*barMaxW;
-    const over = d.scrap > target;
-    const c1 = over ? "var(--serious)" : "var(--series-3)";
-    const c2 = over ? "var(--critical)" : "var(--good)";
-    defs += `<linearGradient id="bargrad-${i}" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="${c1}"/><stop offset="100%" stop-color="${c2}"/>
-    </linearGradient>`;
-    bars += `
-      <g class="bar-row" data-line="${d.id}">
-        <rect class="bar-hover-bg" x="-8" y="${yTop-2}" width="${W+8}" height="${rowH+4}" rx="6" fill="transparent"/>
-        <text x="0" y="${yTop+rowH/2+4}" font-size="11" fill="var(--text-secondary)" font-family="Public Sans">${d.name}</text>
-        <rect x="${labelW}" y="${yTop+5}" width="${barMaxW}" height="${rowH-10}" rx="4" fill="var(--surface-sunken)"/>
-        <rect class="bar-fill" x="${labelW}" y="${yTop+5}" width="0" height="${rowH-10}" rx="4" fill="url(#bargrad-${i})">
-          <animate attributeName="width" from="0" to="${barW}" dur="0.7s" fill="freeze" begin="${i*0.06}s" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
-        </rect>
-        <text x="${labelW+barW+8}" y="${yTop+rowH/2+4}" font-size="12" font-family="IBM Plex Mono, monospace" fill="var(--text-primary)" font-weight="600">${d.scrap}%</text>
-      </g>
-    `;
-  });
-  defs += "</defs>";
-
-  holder.innerHTML = `
-    <svg width="100%" viewBox="0 0 ${W} ${H+10}" role="img" aria-label="Percentual de aparas por linha, comparado à meta de 3,5%">
-      <style>
-        .bar-row{ cursor: pointer; }
-        .bar-hover-bg{ transition: fill .2s ease; }
-        .bar-row:hover .bar-hover-bg{ fill: var(--glass-bg-strong); }
-        .bar-fill{ transition: filter .2s ease; }
-        .bar-row:hover .bar-fill{ filter: brightness(1.12); }
-      </style>
-      ${defs}
-      ${bars}
-      <line x1="${targetX}" y1="0" x2="${targetX}" y2="${H}" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="4,3"/>
-      <text x="${targetX}" y="${H+8}" font-size="10" text-anchor="middle" fill="var(--text-muted)" font-family="IBM Plex Mono, monospace">meta ${target}%</text>
-    </svg>`;
-
-  holder.querySelectorAll(".bar-row").forEach(row=>{
-    row.addEventListener("click", ()=>{
-      const line = LINES.find(l=>l.id === row.dataset.line);
-      if(line && window.openLineDrawer) window.openLineDrawer(line);
-    });
-  });
-})();
-
-/* ============ machine grid ============ */
+/* Cards de máquina */
 (function(){
   const grid = document.getElementById("machine-grid");
-  grid.innerHTML = LINES.map(l=>{
-    const w=100,h=26;
-    const path = sparkPath(l.trend, w, h);
-    const area = path + ` L${w-2},${h-2} L2,${h-2} Z`;
-    const strokeColor = l.status==="good" ? "var(--good)" : l.status==="warning" ? "var(--warning)" : "var(--critical)";
-    return `
-    <div class="machine-card st-${l.status}" data-line="${l.id}" tabindex="0" role="button">
-      <div class="machine-top">
-        <div>
-          <div class="machine-name">${l.name}</div>
-          <div class="machine-line">${l.product}</div>
-        </div>
-        <span class="status-pill status-${l.status}"><span class="dot" style="background:currentColor"></span>${statusLabel[l.status]}</span>
-      </div>
-      <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-        <defs><linearGradient id="mgrad-${l.id}" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.35"/>
-          <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0"/>
-        </linearGradient></defs>
-        <path d="${area}" fill="url(#mgrad-${l.id})"/>
-        <path d="${path}" fill="none" stroke="${strokeColor}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-      <div class="machine-metrics">
-        <div class="mm"><div class="mm-label">OEE</div><div class="mm-value">${l.oee}%</div></div>
-        <div class="mm"><div class="mm-label">Disponib.</div><div class="mm-value">${l.avail}%</div></div>
-        <div class="mm"><div class="mm-label">Aparas</div><div class="mm-value">${l.scrap}%</div></div>
-      </div>
-    </div>`;
-  }).join("");
+  const filters = document.getElementById("maq-filters");
+  let filtro = "all";
 
-  grid.querySelectorAll(".machine-card").forEach(card=>{
-    function open(){
-      const line = LINES.find(l=>l.id === card.dataset.line);
-      if(line && window.openLineDrawer) window.openLineDrawer(line);
-    }
-    card.addEventListener("click", open);
-    card.addEventListener("keydown", (e)=>{ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); open(); } });
+  filters.innerHTML = `<button class="filter-chip active" data-p="all">Todas</button>` +
+    PROCESSOS.map(p=>`<button class="filter-chip" data-p="${esc(p)}">${esc(p)}</button>`).join("");
+
+  function render(){
+    const lista = filtro==="all" ? MAQUINAS : MAQUINAS.filter(m=>m.processo===filtro);
+    grid.innerHTML = lista.map(m=>{
+      const w=128,h=40;
+      const trend = wobble(m.tmr, 4, 7);
+      const path = sparkPath(trend, w, h);
+      const area = path + ` L${w-2},${h-2} L2,${h-2} Z`;
+      const st = tmrStatus(m.tmr);
+      const cor = statusCor[st];
+      return `
+      <div class="machine-card glass-live st-${st}" data-maq="${m.id}" tabindex="0" role="button">
+        <div class="machine-top">
+          <div>
+            <div class="machine-name">${esc(m.nome)}</div>
+            <div class="machine-line">${esc(m.processo)}${m.rota!=="—" ? " · "+esc(m.rota) : ""}</div>
+          </div>
+          <span class="status-pill status-${st}"><span class="dot" style="background:currentColor"></span>${statusLabel[st]}</span>
+        </div>
+        <div class="machine-hero">
+          <div class="machine-oee"><span class="v mono">${m.tmr}%</span><span class="l">TMR</span></div>
+          <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
+            <defs><linearGradient id="mg-${m.id}" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stop-color="${cor}" stop-opacity="0.35"/>
+              <stop offset="100%" stop-color="${cor}" stop-opacity="0"/>
+            </linearGradient></defs>
+            <path d="${area}" fill="url(#mg-${m.id})"/>
+            <path d="${path}" fill="none" stroke="${cor}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div class="machine-foot">Ver detalhe <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></div>
+      </div>`;
+    }).join("");
+
+    grid.querySelectorAll(".machine-card").forEach(card=>{
+      const open = ()=>{
+        const m = MAQUINAS.find(x=>x.id===card.dataset.maq);
+        if(m && window.openMaquinaDrawer) window.openMaquinaDrawer(m);
+      };
+      card.addEventListener("click", open);
+      card.addEventListener("keydown", e=>{ if(e.key==="Enter"||e.key===" "){ e.preventDefault(); open(); } });
+    });
+  }
+
+  filters.querySelectorAll(".filter-chip").forEach(chip=>{
+    chip.addEventListener("click", ()=>{
+      filters.querySelectorAll(".filter-chip").forEach(c=>c.classList.remove("active"));
+      chip.classList.add("active");
+      filtro = chip.dataset.p;
+      render();
+    });
   });
+  render();
 })();
 
-/* ============ facas table ============ */
-(function(){
-  const tbody = document.querySelector("#facas-table tbody");
-  const empty = document.getElementById("facas-empty");
-  const table = document.getElementById("facas-table");
+/* ============ VIEW: APARAS & REFUGO ============ */
+renderKpis(document.getElementById("aparas-kpis"), [
+  { label:"Refugo total", value: perdaTotalKg/1000, suffix:" t", decimals:1,
+    delta:"acumulado do período", dir:"down", spark: wobble(perdaTotalKg/1000, 12) },
+  { label:"Apara apontada", value: aparasMedia, suffix:"%", decimals:1,
+    delta:`meta ${fmt1(META_APARAS)}%`, dir: aparasMedia<=META_APARAS?"up":"down", spark: APARAS_MENSAL.apontado.slice() },
+  { label:"Apara confirmada", value: confirmMedia, suffix:"%", decimals:1,
+    delta:"medição por balança", dir:"down", spark: APARAS_MENSAL.confirmado.slice() },
+  { label:"Diferença apont. x conf.", value: confirmMedia-aparasMedia, suffix:" p.p.", decimals:1,
+    delta:"quanto o apontamento subestima", dir:"down", spark: wobble(1.1, .5) },
+]);
 
-  tbody.innerHTML = FACAS.map(f=>{
-    const w = wearInfo(f.ciclos, f.vida);
-    const barColor = w.status==="critical" ? "var(--critical)" : w.status==="warning" ? "var(--warning)" : "var(--good)";
-    return `
-    <tr data-status="${w.status}">
-      <td class="mono">${f.id}</td>
-      <td>${f.linha}</td>
-      <td>${f.tipo}</td>
-      <td class="mono">${fmt(f.ciclos)}</td>
-      <td>
-        <span class="wear-bar"><span class="wear-fill" style="width:${Math.min(100,w.pct*100)}%;background:${barColor}"></span></span>
-        <span class="mono" style="font-size:12px;color:var(--text-muted)">${Math.round(w.pct*100)}%</span>
-      </td>
-      <td><span class="status-pill status-${w.status}"><span class="dot" style="background:currentColor"></span>${w.label}</span></td>
-      <td class="mono">${f.afiacao}</td>
+hBarChart(document.getElementById("perda-tipo-chart"), TIPOS_PERDA.map(t=>({
+  label:`${t.cod} · ${t.nome}`,
+  value:t.kg, display: fmt(t.kg)+" kg",
+  color:"var(--series-2)", color2:"var(--series-4)",
+  tip:`<b>${esc(t.nome)}</b><br>${fmt(t.kg)} kg · ${fmt1(t.kg/perdaTotalKg*100)}% do total`
+})), { idPrefix:"pt", labelW:158, valueW:74, rowH:26, aria:"Perda por motivo" });
+
+(function(){
+  const porMaq = MAQUINAS.map(m=>({
+    nome:m.nome,
+    kg: Math.round(perdaTotalKg * (m.aparas/MAQUINAS.reduce((a,x)=>a+x.aparas,0))),
+    pct:m.aparas
+  })).sort((a,b)=>b.kg-a.kg);
+  hBarChart(document.getElementById("perda-maquina-chart"), porMaq.map(m=>({
+    label:m.nome, value:m.kg, display: fmt(m.kg)+" kg",
+    color: m.pct>META_APARAS+2 ? "var(--critical)" : m.pct>META_APARAS ? "var(--warning)" : "var(--good)",
+    color2: m.pct>META_APARAS+2 ? "var(--serious)" : m.pct>META_APARAS ? "var(--warning)" : "var(--series-3)",
+    tip:`<b>${esc(m.nome)}</b><br>${fmt(m.kg)} kg · ${fmt1(m.pct)}% de apara`
+  })), { idPrefix:"pm", labelW:92, valueW:76, rowH:26, aria:"Perda por máquina" });
+})();
+
+hBarChart(document.getElementById("classe-chart"), CLASSIFICACOES.map(c=>({
+  label:c.nome, value:c.aparas, display: fmt1(c.aparas)+"%",
+  color: c.aparas>META_APARAS ? "var(--critical)" : "var(--good)",
+  color2: c.aparas>META_APARAS ? "var(--serious)" : "var(--series-3)",
+  tip:`<b>${esc(c.nome)}</b><br>${fmt1(c.aparas)}% de apara · ${fmt(c.kg)} kg produzidos`
+})), { idPrefix:"cl", W:1040, labelW:220, valueW:66, rowH:30, target: META_APARAS, targetLabel:`meta ${fmt1(META_APARAS)}%`, aria:"Apara por classificação de produto" });
+
+(function(){
+  const tbody = document.querySelector("#ops-table tbody");
+  const rows = OPS.map(o=>({ ...o, pct: o.refugo/o.peso*100 })).sort((a,b)=>b.pct-a.pct);
+  tbody.innerHTML = rows.map(o=>{
+    const st = aparasStatus(o.pct);
+    return `<tr>
+      <td class="mono">${esc(o.op)}</td>
+      <td>${esc(o.maq)}</td>
+      <td>${esc(o.desc)}</td>
+      <td class="mono">${fmt(o.peso)} kg</td>
+      <td class="mono">${fmt(o.refugo)} kg</td>
+      <td><span class="status-pill status-${st}"><span class="dot" style="background:currentColor"></span>${fmt1(o.pct)}%</span></td>
+      <td>${esc(o.motivo)}</td>
     </tr>`;
   }).join("");
+})();
 
-  const chips = document.querySelectorAll("#facas-filters .filter-chip");
-  chips.forEach(chip=>{
-    chip.addEventListener("click", ()=>{
-      chips.forEach(c=>c.classList.remove("active"));
-      chip.classList.add("active");
-      const status = chip.dataset.status;
-      const rows = [...tbody.querySelectorAll("tr")];
-      let visibleCount = 0;
-      rows.forEach(r=>{
-        const show = status === "all" || r.dataset.status === status;
-        r.style.display = show ? "" : "none";
-        if(show) visibleCount++;
-      });
-      empty.hidden = visibleCount > 0;
-      table.style.display = visibleCount > 0 ? "" : "none";
-    });
+/* ============ VIEW: PRODUTIVIDADE & TMR ============ */
+(function(){
+  const horasProd = MAQUINAS.reduce((a,m)=>a+m.horasProd,0);
+  const horasTot  = MAQUINAS.reduce((a,m)=>a+m.horasTot,0);
+  const velMedia  = MAQUINAS.reduce((a,m)=>a+m.vel,0)/MAQUINAS.length;
+  renderKpis(document.getElementById("prod-kpis"), [
+    { label:"TMR médio", value:tmrMedio, suffix:"%", decimals:1, delta:"horas produzindo ÷ horas totais", dir:"up", spark: wobble(tmrMedio,3) },
+    { label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:1, delta:"m² por hora trabalhada", dir:"up", spark: wobble(produtividade,8) },
+    { label:"Velocidade média", value:velMedia, suffix:" m/min", decimals:0, delta:"média ponderada das máquinas", dir:"flat", spark: wobble(velMedia,14) },
+    { label:"Horas produzindo", value:horasProd, suffix:" h", decimals:0, delta:`de ${fmt(horasTot)} h totais`, dir:"up", spark: wobble(horasProd/12,20) },
+  ]);
+
+  hBarChart(document.getElementById("tmr-chart"), MAQUINAS.slice().sort((a,b)=>b.tmr-a.tmr).map(m=>({
+    label:m.nome, value:m.tmr, display: m.tmr+"%",
+    color: statusCor[tmrStatus(m.tmr)],
+    color2: tmrStatus(m.tmr)==="good" ? "var(--series-3)" : tmrStatus(m.tmr)==="warning" ? "var(--warning)" : "var(--serious)",
+    tip:`<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br>TMR ${m.tmr}% · ${fmt(m.horasProd)} h de ${fmt(m.horasTot)} h`
+  })), { idPrefix:"tmr", labelW:92, valueW:52, rowH:26, min:100, aria:"TMR por máquina" });
+
+  const downtime = STATUS_APONTAMENTO.filter(s=>s.nome!=="Produzindo")
+    .map(s=>({ nome:s.nome, horas: Math.round((horasTot-horasProd) * s.peso/54), cor: statusColor(s) }))
+    .sort((a,b)=>b.horas-a.horas);
+  hBarChart(document.getElementById("downtime-chart"), downtime.map(d=>({
+    label:d.nome, value:d.horas, display: fmt(d.horas)+" h",
+    color:d.cor, color2:d.cor,
+    tip:`<b>${esc(d.nome)}</b><br>${fmt(d.horas)} h de parada`
+  })), { idPrefix:"dt", labelW:140, valueW:60, rowH:24, aria:"Horas por classificação de parada" });
+
+  const holder = document.getElementById("velocidade-chart");
+  const W=1120, rowH=30, gap=8, H=MAQUINAS.length*(rowH+gap);
+  const labelW=110, valW=104, barMax=W-labelW-valW;
+  const maxVel = Math.max(...MAQUINAS.map(m=>m.velRef));
+  holder.innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Velocidade média por máquina contra a referência">
+    <style>.vrow:hover .vfill{ filter:brightness(1.12); } .vrow:hover .vbg{ fill:var(--glass-bg-strong); }</style>
+    ${MAQUINAS.map((m,i)=>{
+      const y=i*(rowH+gap);
+      const wRef=(m.velRef/maxVel)*barMax, wVel=(m.vel/maxVel)*barMax;
+      const ating = m.vel/m.velRef*100;
+      const cor = ating>=90 ? "var(--good)" : ating>=75 ? "var(--warning)" : "var(--critical)";
+      return `<g class="vrow" data-i="${i}">
+        <rect class="vbg" x="-6" y="${y-2}" width="${W+6}" height="${rowH+4}" rx="6" fill="transparent"/>
+        <text x="0" y="${y+rowH/2+4}" font-size="11" fill="var(--text-secondary)" font-family="Public Sans">${esc(m.nome)}</text>
+        <rect x="${labelW}" y="${y+6}" width="${wRef}" height="${rowH-12}" rx="4" fill="var(--surface-sunken)"/>
+        <rect class="vfill" x="${labelW}" y="${y+6}" width="0" height="${rowH-12}" rx="4" fill="${cor}">
+          <animate attributeName="width" from="0" to="${wVel.toFixed(1)}" dur="0.7s" begin="${(i*0.04).toFixed(2)}s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
+        </rect>
+        <line x1="${labelW+wRef}" y1="${y+3}" x2="${labelW+wRef}" y2="${y+rowH-3}" stroke="var(--text-muted)" stroke-width="1.5" stroke-dasharray="2,2"/>
+        <text x="${W-6}" y="${y+rowH/2+4}" font-size="11" text-anchor="end" font-family="IBM Plex Mono, monospace" fill="var(--text-primary)" font-weight="600">${m.vel} <tspan fill="var(--text-muted)" font-weight="400">/ ${m.velRef}</tspan></text>
+      </g>`;
+    }).join("")}
+  </svg>`;
+  holder.querySelectorAll(".vrow").forEach(g=>{
+    const m = MAQUINAS[+g.dataset.i];
+    g.addEventListener("mousemove", e=> attachTip(holder,
+      `<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br>${m.vel} m/min de ${m.velRef} m/min<br>${fmt1(m.vel/m.velRef*100)}% da referência`, e));
+    g.addEventListener("mouseleave", ()=> clearTip(holder));
   });
 })();
 
-/* ============ assistant (RAG simulado sobre os dados fictícios) ============ */
+/* ============ VIEW: ADERÊNCIA ============ */
 (function(){
-  const fab = document.getElementById("assistant-fab");
-  const panel = document.getElementById("assistant-panel");
-  const closeBtn = document.getElementById("assistant-close");
-  const body = document.getElementById("assistant-body");
-  const input = document.getElementById("assistant-input");
-  const sendBtn = document.getElementById("assistant-send");
+  // Consolidado inclui todas as máquinas (Coating incluído).
+  const planTot = MAQUINAS.reduce((a,m)=>a+m.planKm,0);
+  const realTot = MAQUINAS.reduce((a,m)=>a+m.realKm,0);
+  renderKpis(document.getElementById("ader-kpis"), [
+    { label:"Aderência ao plano", value: realTot/planTot*100, suffix:"%", decimals:1, delta:"km lineares realizados ÷ planejados", dir:"down", spark: wobble(aderMedia,4) },
+    { label:"Planejado", value: planTot, suffix:" km", decimals:0, delta:"programação do período", dir:"flat", spark: wobble(planTot/12,30) },
+    { label:"Realizado", value: realTot, suffix:" km", decimals:0, delta:"apontado pelas máquinas", dir:"up", spark: wobble(realTot/12,30) },
+    { label:"GAP", value: planTot-realTot, suffix:" km", decimals:0, delta:"o que faltou para o plano", dir:"down", spark: wobble((planTot-realTot)/12,8) },
+  ]);
 
-  function addMsg(role, html){
-    const el = document.createElement("div");
-    el.className = `msg ${role}`;
-    el.innerHTML = html;
-    body.appendChild(el);
-    body.scrollTop = body.scrollHeight;
-    return el;
+  const holder = document.getElementById("ader-chart");
+  const dados = MAQUINAS.map(m=>({ nome:m.nome, plan:m.planKm, real:m.realKm, pct:m.aderencia }));
+  const W=700, colW = W/dados.length, H=210, padB=34, padT=10, plotH=H-padB-padT;
+  const maxV = Math.max(...dados.map(d=>d.plan));
+  holder.innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Planejado contra realizado por máquina">
+    <style>.acol:hover .abar{ filter:brightness(1.1); }</style>
+    ${[0,0.5,1].map(f=>{
+      const y=padT+plotH*(1-f);
+      return `<line x1="0" y1="${y}" x2="${W}" y2="${y}" stroke="var(--border)" stroke-width="1"/>
+              <text x="2" y="${y-4}" font-size="9.5" fill="var(--text-muted)" font-family="IBM Plex Mono, monospace">${Math.round(maxV*f)} km</text>`;
+    }).join("")}
+    ${dados.map((d,i)=>{
+      const x=i*colW, bw=colW*0.32;
+      const hp=(d.plan/maxV)*plotH, hr=(d.real/maxV)*plotH;
+      const cor = d.pct>=88 ? "var(--good)" : d.pct>=82 ? "var(--warning)" : "var(--critical)";
+      return `<g class="acol" data-i="${i}">
+        <rect x="${x}" y="${padT}" width="${colW}" height="${plotH+padB}" fill="transparent"/>
+        <rect x="${x+colW/2-bw-2}" y="${padT+plotH-hp}" width="${bw}" height="${hp}" rx="3" fill="var(--surface-sunken)" stroke="var(--border)"/>
+        <rect class="abar" x="${x+colW/2+2}" y="${padT+plotH}" width="${bw}" height="0" rx="3" fill="${cor}">
+          <animate attributeName="height" from="0" to="${hr.toFixed(1)}" dur="0.7s" begin="${(i*0.04).toFixed(2)}s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
+          <animate attributeName="y" from="${padT+plotH}" to="${(padT+plotH-hr).toFixed(1)}" dur="0.7s" begin="${(i*0.04).toFixed(2)}s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
+        </rect>
+        <text x="${x+colW/2}" y="${H-18}" text-anchor="middle" font-size="9.5" fill="var(--text-secondary)" font-family="Public Sans">${esc(d.nome)}</text>
+        <text x="${x+colW/2}" y="${H-5}" text-anchor="middle" font-size="9.5" font-weight="600" fill="${cor}" font-family="IBM Plex Mono, monospace">${Math.round(d.pct)}%</text>
+      </g>`;
+    }).join("")}
+  </svg>`;
+  holder.querySelectorAll(".acol").forEach(g=>{
+    const d = dados[+g.dataset.i];
+    g.addEventListener("mousemove", e=> attachTip(holder,
+      `<b>${esc(d.nome)}</b><br>Planejado ${fmt(d.plan)} km<br>Realizado ${fmt(d.real)} km<br>Aderência ${fmt1(d.pct)}%`, e));
+    g.addEventListener("mouseleave", ()=> clearTip(holder));
+  });
+
+  document.getElementById("proc-grid").innerHTML = ADERENCIA_PROCESSO.map(p=>{
+    const st = p.pct>=88 ? "good" : p.pct>=82 ? "warning" : "critical";
+    const R=32, C=2*Math.PI*R, off=C*(1-p.pct/100);
+    return `<div class="proc-card glass-live">
+      <svg width="86" height="86" viewBox="0 0 86 86">
+        <circle cx="43" cy="43" r="${R}" fill="none" stroke="var(--surface-sunken)" stroke-width="8"/>
+        <circle cx="43" cy="43" r="${R}" fill="none" stroke="${statusCor[st]}" stroke-width="8" stroke-linecap="round"
+          stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${C.toFixed(1)}" transform="rotate(-90 43 43)">
+          <animate attributeName="stroke-dashoffset" from="${C.toFixed(1)}" to="${off.toFixed(1)}" dur="1s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
+        </circle>
+        <text x="43" y="48" text-anchor="middle" font-size="17" font-weight="700" fill="var(--text-primary)" font-family="IBM Plex Mono, monospace">${Math.round(p.pct)}%</text>
+      </svg>
+      <div class="proc-name">${esc(p.nome)}</div>
+      <div class="proc-sub mono">${fmt(p.realizado)} / ${fmt(p.planejado)} km</div>
+    </div>`;
+  }).join("");
+})();
+
+/* ============ VIEW: LINHA DO TEMPO (Gantt de apontamentos) ============ */
+function renderGantt(){
+  const holder = document.getElementById("gantt-chart");
+  if(!holder) return;
+  const legend = document.getElementById("status-legend");
+  const HOURS = 24;
+  const W = 900, rowH = 26, gap = 5, padL = 92, padB = 24;
+  const H = MAQUINAS.length*(rowH+gap) + padB;
+  const plotW = W - padL - 8;
+
+  // segmentos por máquina (peso do status reflete o TMR de cada recurso)
+  const segsPorMaq = MAQUINAS.map(m=>{
+    const segs = [];
+    let t = 0;
+    let guard = 0;
+    while(t < HOURS && guard++ < 60){
+      const produzindo = Math.random()*100 < m.tmr;
+      const st = produzindo
+        ? STATUS_APONTAMENTO[0]
+        : STATUS_APONTAMENTO[1 + Math.floor(Math.random()*(STATUS_APONTAMENTO.length-1))];
+      const dur = produzindo ? 1.2 + Math.random()*3.4 : 0.4 + Math.random()*1.3;
+      const end = Math.min(HOURS, t+dur);
+      segs.push({ st, ini:t, fim:end });
+      t = end;
+    }
+    return segs;
+  });
+
+  let grid = "";
+  for(let hh=0; hh<=HOURS; hh+=4){
+    const x = padL + (hh/HOURS)*plotW;
+    grid += `<line x1="${x}" y1="0" x2="${x}" y2="${H-padB}" stroke="var(--border)" stroke-width="1"/>`;
+    // A última marca cai na borda do gráfico: centralizada ela sai cortada.
+    const anchor = hh === 0 ? "start" : hh === HOURS ? "end" : "middle";
+    grid += `<text x="${x}" y="${H-8}" text-anchor="${anchor}" font-size="9.5" fill="var(--text-muted)" font-family="IBM Plex Mono, monospace">${String(hh%24).padStart(2,"0")}:00</text>`;
   }
 
-  function addSuggestions(list){
-    const wrap = document.createElement("div");
-    wrap.className = "msg-suggestions";
-    list.forEach(q=>{
-      const c = document.createElement("button");
-      c.className = "chip";
-      c.textContent = q;
-      c.addEventListener("click", ()=> ask(q));
-      wrap.appendChild(c);
+  const bars = MAQUINAS.map((m,i)=>{
+    const y = i*(rowH+gap);
+    const segs = segsPorMaq[i].map((s,si)=>{
+      const x = padL + (s.ini/HOURS)*plotW;
+      const w = Math.max(1.5, ((s.fim-s.ini)/HOURS)*plotW);
+      return `<rect class="gseg" data-m="${i}" data-s="${si}" x="${x.toFixed(1)}" y="${y+4}" width="${w.toFixed(1)}" height="${rowH-8}" rx="2.5" fill="${statusColor(s.st)}" opacity="0">
+        <animate attributeName="opacity" from="0" to="1" dur="0.45s" begin="${(i*0.04+si*0.01).toFixed(2)}s" fill="freeze"/>
+      </rect>`;
+    }).join("");
+    return `<g>
+      <text x="0" y="${y+rowH/2+3}" font-size="10.5" font-weight="600" fill="var(--text-secondary)" font-family="Public Sans">${esc(m.nome)}</text>
+      <rect x="${padL}" y="${y+4}" width="${plotW}" height="${rowH-8}" rx="2.5" fill="var(--surface-sunken)" opacity=".5"/>
+      ${segs}
+    </g>`;
+  }).join("");
+
+  holder.innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Linha do tempo de apontamentos por máquina nas últimas 24 horas">
+    <style>.gseg{ cursor:default; transition: filter .15s ease; } .gseg:hover{ filter:brightness(1.3); }</style>
+    ${grid}${bars}
+  </svg>`;
+
+  holder.querySelectorAll(".gseg").forEach(r=>{
+    const m = MAQUINAS[+r.dataset.m];
+    const s = segsPorMaq[+r.dataset.m][+r.dataset.s];
+    const hh = h => String(Math.floor(h)).padStart(2,"0")+":"+String(Math.round((h%1)*60)).padStart(2,"0");
+    r.addEventListener("mousemove", e=> attachTip(holder,
+      `<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br><span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:2px;background:${statusColor(s.st)};display:inline-block;"></span>${esc(s.st.nome)}</span><br>${hh(s.ini)} → ${hh(s.fim)} · ${fmt1(s.fim-s.ini)} h`, e));
+    r.addEventListener("mouseleave", ()=> clearTip(holder));
+  });
+
+  if(legend){
+    legend.innerHTML = STATUS_APONTAMENTO.map(s=>
+      `<span class="legend-item" style="cursor:default;"><span class="legend-dot" style="background:${statusColor(s)}"></span>${esc(s.nome)}</span>`
+    ).join("");
+  }
+}
+renderGantt();
+window.renderGanttForTheme = renderGantt;
+
+/* Pareto de paradas */
+(function(){
+  const holder = document.getElementById("pareto-chart");
+  if(!holder) return;
+  const dados = STATUS_APONTAMENTO.filter(s=>s.nome!=="Produzindo")
+    .map(s=>({ nome:s.nome, horas: s.peso*7.4, cor: statusColor(s) }))
+    .sort((a,b)=>b.horas-a.horas);
+  const tot = dados.reduce((a,d)=>a+d.horas,0);
+  let acc = 0;
+  dados.forEach(d=>{ acc += d.horas; d.acum = acc/tot*100; });
+
+  const W=760, H=250, padT=14, padB=58, padL=38, padR=40;
+  const plotH=H-padT-padB, plotW=W-padL-padR;
+  const colW = plotW/dados.length;
+  const maxH = Math.max(...dados.map(d=>d.horas));
+
+  const bars = dados.map((d,i)=>{
+    const h=(d.horas/maxH)*plotH, x=padL+i*colW, bw=colW*0.6;
+    return `<g class="pcol" data-i="${i}">
+      <rect x="${x}" y="${padT}" width="${colW}" height="${plotH+padB}" fill="transparent"/>
+      <rect x="${x+(colW-bw)/2}" y="${padT+plotH}" width="${bw}" height="0" rx="3" fill="${d.cor}">
+        <animate attributeName="height" from="0" to="${h.toFixed(1)}" dur="0.7s" begin="${(i*0.05).toFixed(2)}s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
+        <animate attributeName="y" from="${padT+plotH}" to="${(padT+plotH-h).toFixed(1)}" dur="0.7s" begin="${(i*0.05).toFixed(2)}s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
+      </rect>
+      <text x="${x+colW/2}" y="${H-padB+14}" text-anchor="end" font-size="9" fill="var(--text-secondary)" font-family="Public Sans" transform="rotate(-38 ${x+colW/2} ${H-padB+14})">${esc(d.nome)}</text>
+    </g>`;
+  }).join("");
+
+  const linePts = dados.map((d,i)=> `${(padL+i*colW+colW/2).toFixed(1)},${(padT+plotH*(1-d.acum/100)).toFixed(1)}`).join(" ");
+
+  holder.innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Pareto de horas de parada por motivo">
+    <style>.pcol:hover rect[rx='3']{ filter:brightness(1.14); }</style>
+    ${[0,0.25,0.5,0.75,1].map(f=>{
+      const y=padT+plotH*(1-f);
+      return `<line x1="${padL}" y1="${y}" x2="${W-padR}" y2="${y}" stroke="var(--border)" stroke-width="1"/>
+        <text x="${padL-6}" y="${y+3}" text-anchor="end" font-size="9.5" fill="var(--text-muted)" font-family="IBM Plex Mono, monospace">${Math.round(maxH*f)}h</text>
+        <text x="${W-padR+6}" y="${y+3}" font-size="9.5" fill="var(--accent)" font-family="IBM Plex Mono, monospace">${Math.round(f*100)}%</text>`;
+    }).join("")}
+    ${bars}
+    <polyline points="${linePts}" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" opacity="0">
+      <animate attributeName="opacity" from="0" to="1" dur="0.5s" begin="0.6s" fill="freeze"/>
+    </polyline>
+    ${dados.map((d,i)=>`<circle cx="${(padL+i*colW+colW/2).toFixed(1)}" cy="${(padT+plotH*(1-d.acum/100)).toFixed(1)}" r="3" fill="var(--accent)" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.4s" begin="${(0.7+i*0.04).toFixed(2)}s" fill="freeze"/></circle>`).join("")}
+  </svg>`;
+
+  holder.querySelectorAll(".pcol").forEach(g=>{
+    const d = dados[+g.dataset.i];
+    g.addEventListener("mousemove", e=> attachTip(holder,
+      `<b>${esc(d.nome)}</b><br>${fmt1(d.horas)} h · ${fmt1(d.horas/tot*100)}% do downtime<br>Acumulado ${fmt1(d.acum)}%`, e));
+    g.addEventListener("mouseleave", ()=> clearTip(holder));
+  });
+})();
+
+/* ============ VIEW: WIP & CARTEIRA ============ */
+(function(){
+  const wipTot = WIP_ETAPAS.reduce((a,w)=>a+w.metros,0);
+  const dcTot  = WIP_ETAPAS.reduce((a,w)=>a+w.dc,0);
+  const carteiraKg = CLASSIFICACOES.reduce((a,c)=>a+c.kg,0);
+  const produzidoKg = Math.round(carteiraKg*0.86);
+  const faturadoKg  = Math.round(carteiraKg*0.79);
+
+  renderKpis(document.getElementById("wip-kpis"), [
+    { label:"WIP total", value: wipTot/1000, suffix:" km", decimals:1, delta:"metros lineares em processo", dir:"flat", spark: wobble(wipTot/1000,60) },
+    { label:"Dentro da carteira", value: dcTot/wipTot*100, suffix:"%", decimals:1, delta:`${fmt(dcTot/1000)} km com pedido firme`, dir:"up", spark: wobble(dcTot/wipTot*100,4) },
+    { label:"Carteira do mês", value: carteiraKg/1000, suffix:" t", decimals:1, delta:"quantidade de entrega prevista", dir:"flat", spark: wobble(carteiraKg/1000,20) },
+    { label:"Produzido", value: produzidoKg/1000, suffix:" t", decimals:1, delta:`${fmt1(produzidoKg/carteiraKg*100)}% da carteira`, dir:"up", spark: wobble(produzidoKg/1000,20) },
+  ]);
+
+  hBarChart(document.getElementById("wip-chart"), WIP_ETAPAS.map(w=>({
+    label:w.nome, value:w.metros, display: fmt1(w.metros/1000)+" km",
+    color:"var(--series-2)", color2:"var(--series-4)",
+    tip:`<b>${esc(w.nome)}</b><br>${fmt(w.metros)} m em processo<br>${fmt1(w.dc/w.metros*100)}% dentro da carteira`
+  })), { idPrefix:"wip", labelW:150, valueW:64, rowH:32, aria:"WIP por etapa" });
+
+  // Carteira x Produzido x Faturado por classificação
+  const holder = document.getElementById("carteira-chart");
+  const legend = document.getElementById("carteira-legend");
+  const cores = ["var(--series-2)","var(--series-4)","var(--good)"];
+  const nomes = ["Carteira","Produzido","Faturado"];
+  const W=460, rowH=46, gap=10, H=CLASSIFICACOES.length*(rowH+gap);
+  const labelW=150, barMax=W-labelW-52;
+  const maxKg = Math.max(...CLASSIFICACOES.map(c=>c.kg));
+
+  holder.innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Carteira, produzido e faturado por classificação">
+    ${CLASSIFICACOES.map((c,i)=>{
+      const y=i*(rowH+gap);
+      const vals=[c.kg, Math.round(c.kg*0.86), Math.round(c.kg*0.79)];
+      return `<g class="crow" data-i="${i}">
+        <rect x="-6" y="${y-3}" width="${W+6}" height="${rowH+6}" rx="6" fill="transparent"/>
+        <text x="0" y="${y+rowH/2+4}" font-size="10.5" fill="var(--text-secondary)" font-family="Public Sans">${esc(c.nome)}</text>
+        ${vals.map((v,vi)=>{
+          const bw=(v/maxKg)*barMax, by=y+vi*13;
+          return `<rect x="${labelW}" y="${by}" width="0" height="10" rx="2.5" fill="${cores[vi]}">
+            <animate attributeName="width" from="0" to="${bw.toFixed(1)}" dur="0.7s" begin="${(i*0.05+vi*0.06).toFixed(2)}s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
+          </rect>`;
+        }).join("")}
+        <text x="${W-2}" y="${y+rowH/2+4}" text-anchor="end" font-size="10.5" font-family="IBM Plex Mono, monospace" fill="var(--text-primary)" font-weight="600">${fmt(c.kg/1000)}t</text>
+      </g>`;
+    }).join("")}
+  </svg>`;
+  legend.innerHTML = nomes.map((n,i)=>`<span class="legend-item" style="cursor:default;"><span class="legend-dot" style="background:${cores[i]}"></span>${n}</span>`).join("");
+  holder.querySelectorAll(".crow").forEach(g=>{
+    const c = CLASSIFICACOES[+g.dataset.i];
+    g.addEventListener("mousemove", e=> attachTip(holder,
+      `<b>${esc(c.nome)}</b><br>Carteira ${fmt(c.kg)} kg<br>Produzido ${fmt(c.kg*0.86)} kg<br>Faturado ${fmt(c.kg*0.79)} kg`, e));
+    g.addEventListener("mouseleave", ()=> clearTip(holder));
+  });
+
+  // tabela WIP
+  const linhas = [];
+  CLIENTES.forEach((cli,ci)=>{
+    WIP_ETAPAS.slice(0,3).forEach((et,ei)=>{
+      if((ci+ei) % 2 === 0 || ci < 2){
+        const metros = Math.round(et.metros / (4+ci) * (1 - ei*0.18));
+        const dc = (ci+ei) % 3 !== 0;
+        linhas.push({
+          cliente: cli,
+          classe: CLASSIFICACOES[(ci+ei) % CLASSIFICACOES.length].nome,
+          etapa: et.nome,
+          carteira: Math.round(metros*0.42),
+          metros, dc
+        });
+      }
     });
-    body.appendChild(wrap);
-    body.scrollTop = body.scrollHeight;
-  }
-
-  const worst = [...LINES].sort((a,b)=>b.scrap-a.scrap)[0];
-  const bestAvail = [...LINES].sort((a,b)=>b.avail-a.avail)[0];
-  const critLine = LINES.find(l=>l.status==="critical");
-  const worstDie = [...FACAS].sort((a,b)=> (b.ciclos/b.vida) - (a.ciclos/a.vida))[0];
-
-  function answerFor(qRaw){
-    const q = qRaw.toLowerCase();
-    if(q.includes("apara")){
-      return `A linha com maior índice de aparas é a <b>${worst.name}</b> (${worst.product}), com <b>${worst.scrap}%</b> — acima da meta de 3,5%. Nas últimas semanas o desvio se concentra no início de turno; vale checar setup e ajuste de faca nessa linha.`;
-    }
-    if(q.includes("facas") || q.includes("faca")){
-      const pct = Math.round((worstDie.ciclos/worstDie.vida)*100);
-      return `A faca <b>${worstDie.id}</b> (${worstDie.tipo}, ${worstDie.linha}) está com <b>${pct}%</b> da vida útil consumida — recomendo agendar troca/afiação antes da próxima OP para evitar parada não programada.`;
-    }
-    if(q.includes("disponib")){
-      return `A disponibilidade média das linhas está em <b>${avgAvail}%</b>. A <b>${bestAvail.name}</b> lidera com ${bestAvail.avail}%, enquanto a <b>${critLine ? critLine.name : "Linha 4"}</b> está mais crítica, puxando a média para baixo.`;
-    }
-    if(q.includes("crític") || q.includes("problema") || q.includes("atenção") || q.includes("atencao")){
-      return `Ponto de atenção principal: <b>${critLine ? critLine.name : "Linha 4"}</b> está com OEE de ${critLine ? critLine.oee : "55"}% e disponibilidade em queda. Sugestão: priorizar manutenção preventiva e revisar a troca de faca (${worstDie.id}) associada a essa linha nesta semana.`;
-    }
-    if(q.includes("oee")){
-      return `O OEE médio das linhas é <b>${avgOEE}%</b>. A <b>Linha 3</b> é a mais eficiente (82%); a <b>Linha 4</b> é a que mais impacta a média para baixo (55%).`;
-    }
-    if(q.includes("produç") || q.includes("producao") || q.includes("produzi")){
-      return `A produção total da semana foi de <b>${totalProd} t</b>, um crescimento de 18,2 t frente à semana anterior — puxado principalmente pela Linha 3 e Linha 1.`;
-    }
-    return `Ainda estou usando uma base de exemplo para esta demonstração — na versão conectada às planilhas reais, eu vou cruzar aparas, facas e disponibilidade automaticamente para responder isso com precisão. Quer ver um exemplo com os dados atuais de <b>aparas</b>, <b>facas</b> ou <b>disponibilidade</b>?`;
-  }
-
-  function ask(text){
-    addMsg("user", text.replace(/</g,"&lt;"));
-    input.value = "";
-    const typing = addMsg("bot", `<div class="typing"><span></span><span></span><span></span></div>`);
-    setTimeout(()=>{
-      typing.remove();
-      addMsg("bot", answerFor(text));
-    }, 650 + Math.random()*400);
-  }
-
-  fab.addEventListener("click", ()=>{
-    panel.hidden = false;
-    requestAnimationFrame(()=> requestAnimationFrame(()=> panel.classList.add("open")));
-    if(!body.dataset.inited){
-      body.dataset.inited = "1";
-      addMsg("bot", `Olá! Sou o assistente do painel de Produção (demo). Posso responder perguntas sobre aparas, facas, disponibilidade e OEE com base nos dados fictícios exibidos aqui.`);
-      addSuggestions(["Qual linha tem mais aparas?", "Alguma faca precisa de troca?", "Onde está o maior problema hoje?"]);
-    }
-    input.focus();
   });
-  closeBtn.addEventListener("click", ()=>{
-    panel.classList.remove("open");
-    setTimeout(()=>{ if(!panel.classList.contains("open")) panel.hidden = true; }, 320);
-  });
-  sendBtn.addEventListener("click", ()=>{ if(input.value.trim()) ask(input.value.trim()); });
-  input.addEventListener("keydown", (e)=>{
-    if(e.key === "Enter" && input.value.trim()) ask(input.value.trim());
+  const tbody = document.querySelector("#wip-table tbody");
+  tbody.innerHTML = linhas.map(l=>`<tr>
+    <td>${esc(l.cliente)}</td>
+    <td>${esc(l.classe)}</td>
+    <td>${esc(l.etapa)}</td>
+    <td class="mono">${fmt(l.carteira)} kg</td>
+    <td class="mono">${fmt(l.metros)} m</td>
+    <td><span class="status-pill status-${l.dc?'good':'warning'}"><span class="dot" style="background:currentColor"></span>${l.dc?'DC — dentro':'FC — fora'}</span></td>
+  </tr>`).join("");
+
+  document.getElementById("wip-export").addEventListener("click", ()=>{
+    const header = "Cliente,Classificacao,Etapa,Carteira_kg,Metros_WIP,Situacao\n";
+    const csv = header + linhas.map(l=>
+      `"${l.cliente}","${l.classe}","${l.etapa}",${l.carteira},${l.metros},${l.dc?'DC':'FC'}`
+    ).join("\n");
+    const blob = new Blob([csv], { type:"text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = `wip-carteira-${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   });
 })();
 
@@ -1427,182 +2073,239 @@ kpis.forEach((k,ki)=>{
   });
 })();
 
-/* ============ view: linhas (detalhe) ============ */
-(function(){
-  const wrap = document.getElementById("lines-detail");
-  wrap.innerHTML = LINES.map(l=>`
-    <div class="line-row" data-line="${l.id}" tabindex="0" role="button">
-      <div>
-        <div class="line-row-name">${l.name}</div>
-        <div class="line-row-sub">${l.product}</div>
-      </div>
-      <div class="line-metric"><div class="v mono">${l.oee}%</div><div class="l">OEE</div></div>
-      <div class="line-metric"><div class="v mono">${l.avail}%</div><div class="l">Disponib.</div></div>
-      <div class="line-metric"><div class="v mono">${l.perf}%</div><div class="l">Perform.</div></div>
-      <div class="line-metric"><div class="v mono">${l.qual}%</div><div class="l">Qualidade</div></div>
-      <span class="status-pill status-${l.status}"><span class="dot" style="background:currentColor"></span>${statusLabel[l.status]}</span>
-      <svg class="line-row-chevron" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 6l6 6-6 6"/></svg>
-    </div>`).join("");
-
-  wrap.querySelectorAll(".line-row").forEach(row=>{
-    function open(){
-      const line = LINES.find(l=>l.id === row.dataset.line);
-      if(line && window.openLineDrawer) window.openLineDrawer(line);
-    }
-    row.addEventListener("click", open);
-    row.addEventListener("keydown", (e)=>{ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); open(); } });
-  });
-})();
-
-/* ============ drawer de detalhe da etapa ============ */
+/* ============ drawer de detalhe da máquina ============ */
 (function(){
   const backdrop = document.getElementById("drawer-backdrop");
-  const drawer = document.getElementById("line-drawer");
+  const drawer   = document.getElementById("line-drawer");
   const closeBtn = document.getElementById("drawer-close");
-  const titleEl = document.getElementById("drawer-title");
-  const productEl = document.getElementById("drawer-product");
-  const bodyEl = document.getElementById("drawer-body");
+  const titleEl  = document.getElementById("drawer-title");
+  const eyebrowEl= document.getElementById("drawer-product");
+  const bodyEl   = document.getElementById("drawer-body");
 
-  function openDrawer(line){
-    titleEl.textContent = line.name;
-    productEl.textContent = line.product;
-
-    const relatedFacas = FACAS.filter(f=>f.linha === line.name);
-    const w = 300, h = 90;
-    const trendPath = sparkPath(line.trend, w, h);
-    const trendArea = trendPath + ` L${w-2},${h-2} L2,${h-2} Z`;
-    const strokeColor = line.status==="good" ? "var(--good)" : line.status==="warning" ? "var(--warning)" : "var(--critical)";
+  function open(m){
+    titleEl.textContent = m.nome;
+    eyebrowEl.textContent = m.processo + (m.rota!=="—" ? " · "+m.rota : "");
+    const trend = wobble(m.tmr, 4, 12);
+    const w=300,h=90;
+    const path = sparkPath(trend, w, h);
+    const st = tmrStatus(m.tmr);
+    const cor = statusCor[st];
+    const perdaMaq = Math.round(perdaTotalKg * (m.aparas/MAQUINAS.reduce((a,x)=>a+x.aparas,0)));
+    const topMotivos = TIPOS_PERDA.slice(0,4);
 
     bodyEl.innerHTML = `
       <div class="drawer-metrics">
-        <div class="drawer-metric"><div class="v mono">${line.oee}%</div><div class="l">OEE</div></div>
-        <div class="drawer-metric"><div class="v mono">${line.avail}%</div><div class="l">Disponib.</div></div>
-        <div class="drawer-metric"><div class="v mono">${line.scrap}%</div><div class="l">Aparas</div></div>
+        <div class="drawer-metric"><div class="v mono">${m.tmr}%</div><div class="l">TMR</div></div>
+        <div class="drawer-metric"><div class="v mono">${m.vel}</div><div class="l">m/min</div></div>
+        <div class="drawer-metric"><div class="v mono">${fmt1(m.aparas)}%</div><div class="l">Apara</div></div>
       </div>
 
-      <div class="drawer-section-title">Tendência de disponibilidade (7 dias)</div>
+      <div class="drawer-section-title">TMR — últimos 12 meses</div>
       <svg width="100%" viewBox="0 0 ${w} ${h}" style="display:block;">
-        <defs><linearGradient id="drawer-grad" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.3"/>
-          <stop offset="100%" stop-color="${strokeColor}" stop-opacity="0"/>
+        <defs><linearGradient id="dg" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${cor}" stop-opacity="0.3"/><stop offset="100%" stop-color="${cor}" stop-opacity="0"/>
         </linearGradient></defs>
-        <path d="${trendArea}" fill="url(#drawer-grad)"/>
-        <path d="${trendPath}" fill="none" stroke="${strokeColor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="${path} L${w-2},${h-2} L2,${h-2} Z" fill="url(#dg)"/>
+        <path d="${path}" fill="none" stroke="${cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>
 
-      <div class="drawer-section-title">OEE decomposto</div>
+      <div class="drawer-section-title">Indicadores do recurso</div>
       <div class="drawer-bars">
-        ${[["Disponib.",line.avail,"var(--series-3)"],["Performance",line.perf,"var(--series-2)"],["Qualidade",line.qual,"var(--good)"]].map(([label,val,color])=>`
+        ${[
+           // [rótulo, largura da barra em %, cor, texto exibido]
+           ["TMR", m.tmr, cor, m.tmr+"%"],
+           ["Velocidade", Math.round(m.vel/m.velRef*100), "var(--series-3)", `${m.vel} m/min`],
+           // Apara numa escala de 0 a 10%, para a barra crescer com o problema
+           ["Apara", Math.min(100, Math.round(m.aparas/10*100)), statusCor[aparasStatus(m.aparas)], fmt1(m.aparas)+"%"]
+          ].map(([label,val,c,txt])=>`
           <div class="drawer-bar-row">
             <div class="drawer-bar-label">${label}</div>
-            <div class="drawer-bar-track"><div class="drawer-bar-fill" style="width:${val}%;background:${color};"></div></div>
-            <div class="drawer-bar-value mono">${val}%</div>
+            <div class="drawer-bar-track"><div class="drawer-bar-fill" style="width:${val}%;background:${c};"></div></div>
+            <div class="drawer-bar-value mono">${txt}</div>
           </div>`).join("")}
       </div>
 
-      <div class="drawer-section-title">Facas associadas (${relatedFacas.length})</div>
-      ${relatedFacas.length ? relatedFacas.map(f=>{
-        const wr = wearInfo(f.ciclos, f.vida);
-        return `<div class="drawer-facas-item">
-          <span>${f.id} &middot; ${f.tipo}</span>
-          <span class="status-pill status-${wr.status}"><span class="dot" style="background:currentColor"></span>${wr.label}</span>
-        </div>`;
-      }).join("") : `<div class="empty-state" style="padding:10px 0;">Nenhuma faca cadastrada para esta etapa.</div>`}
+      <div class="drawer-section-title">Horas do período</div>
+      <div class="drawer-facas-item"><span>Horas produzindo</span><span class="mono">${fmt(m.horasProd)} h</span></div>
+      <div class="drawer-facas-item"><span>Horas totais</span><span class="mono">${fmt(m.horasTot)} h</span></div>
+      <div class="drawer-facas-item"><span>Downtime</span><span class="mono">${fmt(m.horasTot-m.horasProd)} h</span></div>
+
+      <div class="drawer-section-title">Refugo — ${fmt(perdaMaq)} kg no período</div>
+      ${topMotivos.map((t,i)=>`<div class="drawer-facas-item">
+        <span>${t.cod} · ${esc(t.nome)}</span>
+        <span class="mono">${fmt(perdaMaq * [0.34,0.26,0.22,0.18][i])} kg</span>
+      </div>`).join("")}
     `;
 
     document.body.classList.add("no-scroll");
     backdrop.hidden = false;
     requestAnimationFrame(()=> requestAnimationFrame(()=>{
-      backdrop.classList.add("open");
-      drawer.classList.add("open");
+      backdrop.classList.add("open"); drawer.classList.add("open");
     }));
   }
-
-  function closeDrawer(){
-    backdrop.classList.remove("open");
-    drawer.classList.remove("open");
+  function close(){
+    backdrop.classList.remove("open"); drawer.classList.remove("open");
     document.body.classList.remove("no-scroll");
     setTimeout(()=>{ backdrop.hidden = true; }, 380);
   }
-
-  closeBtn.addEventListener("click", closeDrawer);
-  backdrop.addEventListener("click", closeDrawer);
-  document.addEventListener("keydown", (e)=>{ if(e.key === "Escape") closeDrawer(); });
-
-  window.openLineDrawer = openDrawer;
+  closeBtn.addEventListener("click", close);
+  backdrop.addEventListener("click", close);
+  document.addEventListener("keydown", e=>{ if(e.key==="Escape") close(); });
+  window.openMaquinaDrawer = open;
 })();
 
-/* ============ view: relatórios ============ */
+/* ============ assistente sobre os indicadores ============ */
 (function(){
-  const lineSelect = document.getElementById("rep-line");
-  const periodSelect = document.getElementById("rep-period");
-  const form = document.getElementById("report-form");
-  const resultPanel = document.getElementById("report-result");
-  const statsEl = document.getElementById("report-stats");
-  const tbody = document.querySelector("#report-table tbody");
-  const titleEl = document.getElementById("report-title");
-  const subEl = document.getElementById("report-sub");
-  const exportBtn = document.getElementById("report-export");
+  const fab = document.getElementById("assistant-fab");
+  const panel = document.getElementById("assistant-panel");
+  const closeBtn = document.getElementById("assistant-close");
+  const body = document.getElementById("assistant-body");
+  const input = document.getElementById("assistant-input");
+  const sendBtn = document.getElementById("assistant-send");
 
-  LINES.forEach(l=>{
-    const opt = document.createElement("option");
-    opt.value = l.id; opt.textContent = l.name;
-    lineSelect.appendChild(opt);
+  function addMsg(role, html){
+    const el = document.createElement("div");
+    el.className = `msg ${role}`;
+    el.innerHTML = html;
+    body.appendChild(el);
+    body.scrollTop = body.scrollHeight;
+    return el;
+  }
+  function addSuggestions(list){
+    const wrap = document.createElement("div");
+    wrap.className = "msg-suggestions";
+    list.forEach(q=>{
+      const c = document.createElement("button");
+      c.className = "chip"; c.textContent = q;
+      c.addEventListener("click", ()=> ask(q));
+      wrap.appendChild(c);
+    });
+    body.appendChild(wrap);
+    body.scrollTop = body.scrollHeight;
+  }
+
+  const piorTMR   = MAQUINAS.slice().sort((a,b)=>a.tmr-b.tmr)[0];
+  const piorApara = MAQUINAS.slice().sort((a,b)=>b.aparas-a.aparas)[0];
+  const maiorMotivo = TIPOS_PERDA[0];
+  const piorClasse = CLASSIFICACOES.slice().sort((a,b)=>b.aparas-a.aparas)[0];
+  const piorProc  = ADERENCIA_PROCESSO.slice().sort((a,b)=>a.pct-b.pct)[0];
+
+  function answerFor(qRaw){
+    const q = qRaw.toLowerCase();
+    if(q.includes("apara") || q.includes("refugo") || q.includes("perda")){
+      return `A apara apontada fechou em <b>${fmt1(aparasMedia)}%</b> contra <b>${fmt1(confirmMedia)}%</b> confirmado na balança — uma diferença de ${fmt1(confirmMedia-aparasMedia)} p.p. que costuma indicar apontamento incompleto no chão de fábrica.<br><br>O maior ofensor é <b>${esc(maiorMotivo.nome)}</b> (${fmt(maiorMotivo.kg)} kg, ${fmt1(maiorMotivo.kg/perdaTotalKg*100)}% do refugo), e a máquina mais crítica é a <b>${esc(piorApara.nome)}</b> com ${fmt1(piorApara.aparas)}%.`;
+    }
+    if(q.includes("tmr") || q.includes("parada") || q.includes("disponib")){
+      return `O TMR médio das ${MAQUINAS.length} máquinas está em <b>${fmt1(tmrMedio)}%</b>. A <b>${esc(piorTMR.nome)}</b> (${esc(piorTMR.processo)}) é a mais crítica, com ${piorTMR.tmr}% — são ${fmt(piorTMR.horasTot-piorTMR.horasProd)} h de parada no período.<br><br>Olhando o Pareto, as paradas se concentram em <b>Parada Produtiva</b> e <b>Setup</b>; atacar o setup costuma dar o retorno mais rápido.`;
+    }
+    if(q.includes("aderên") || q.includes("aderen") || q.includes("plano") || q.includes("planejad")){
+      return `A aderência ao planejado está em <b>${fmt1(aderMedia)}%</b>. O gargalo é <b>${esc(piorProc.nome)}</b>, com ${fmt1(piorProc.pct)}% (${fmt(piorProc.realizado)} de ${fmt(piorProc.planejado)} km lineares).<br><br>Como corte fica no fim da rota, atraso em impressão e laminação se acumula ali — vale checar o WIP intermediário antes de replanejar.`;
+    }
+    if(q.includes("velocidad") || q.includes("produtiv") || q.includes("vazão") || q.includes("vazao")){
+      return `A produtividade está em <b>${fmt1(produtividade)} m²/h</b>. Nas velocidades, a maior perda contra a referência aparece na <b>${esc(MAQUINAS.slice().sort((a,b)=>(a.vel/a.velRef)-(b.vel/b.velRef))[0].nome)}</b>, rodando bem abaixo do nominal — normalmente é sintoma de material ou acerto, não da máquina em si.`;
+    }
+    if(q.includes("classific") || q.includes("produto") || q.includes("estrutura")){
+      return `Por classificação, a <b>${esc(piorClasse.nome)}</b> tem a maior apara: <b>${fmt1(piorClasse.aparas)}%</b> (meta ${fmt1(META_APARAS)}%). As estruturas laminadas mais simples ficam bem melhor — quanto mais camadas, mais acerto e mais refugo.`;
+    }
+    if(q.includes("wip") || q.includes("carteira") || q.includes("estoque")){
+      const wipTot = WIP_ETAPAS.reduce((a,w)=>a+w.metros,0);
+      return `Há <b>${fmt1(wipTot/1000)} km lineares</b> em WIP, sendo a maior parte em <b>${esc(WIP_ETAPAS[0].nome)}</b> (${fmt1(WIP_ETAPAS[0].metros/1000)} km). Material fora da carteira (FC) é o que mais preocupa: já consumiu capacidade sem pedido firme associado.`;
+    }
+    if(q.includes("máquina") || q.includes("maquina") || q.includes("pior") || q.includes("problema") || q.includes("crític")){
+      return `Os dois pontos que mais pesam agora:<br><br>1. <b>${esc(piorTMR.nome)}</b> — TMR de apenas ${piorTMR.tmr}%, puxando a disponibilidade geral para baixo.<br>2. <b>${esc(piorApara.nome)}</b> — ${fmt1(piorApara.aparas)}% de apara, bem acima da meta de ${fmt1(META_APARAS)}%.<br><br>Se for para priorizar um, comece pela ${esc(piorApara.nome)}: refugo vira perda de material, não só de tempo.`;
+    }
+    return `Posso comentar os indicadores que vieram dos BIs de Produção: <b>aparas</b> (apontado x confirmado, por motivo, máquina e classificação), <b>TMR</b> e paradas, <b>aderência ao planejado</b>, <b>velocidade/produtividade</b> e <b>WIP/carteira</b>. Sobre qual deles você quer olhar?`;
+  }
+
+  function ask(text){
+    addMsg("user", esc(text));
+    input.value = "";
+    const typing = addMsg("bot", `<div class="typing"><span></span><span></span><span></span></div>`);
+    setTimeout(()=>{ typing.remove(); addMsg("bot", answerFor(text)); }, 650 + Math.random()*400);
+  }
+
+  fab.addEventListener("click", ()=>{
+    panel.hidden = false;
+    requestAnimationFrame(()=> requestAnimationFrame(()=> panel.classList.add("open")));
+    if(!body.dataset.inited){
+      body.dataset.inited = "1";
+      addMsg("bot", `Olá! Comento os indicadores do painel — a estrutura vem dos BIs de Produção (aparas, TMR, aderência, velocidade, WIP).`);
+      addSuggestions(["Como está a apara este mês?", "Qual máquina está pior?", "Onde estamos perdendo aderência?"]);
+    }
+    input.focus();
   });
-
-  let lastReport = null;
-
-  form.addEventListener("submit", (e)=>{
-    e.preventDefault();
-    const lineId = lineSelect.value;
-    const days = parseInt(periodSelect.value, 10);
-    const rows = lineId === "all" ? LINES : LINES.filter(l=>l.id === lineId);
-
-    const avgOeeR = Math.round(rows.reduce((a,l)=>a+l.oee,0)/rows.length);
-    const avgAvailR = Math.round(rows.reduce((a,l)=>a+l.avail,0)/rows.length);
-    const avgScrapR = (rows.reduce((a,l)=>a+l.scrap,0)/rows.length).toFixed(1);
-    const totalFacas = FACAS.filter(f=> rows.some(r=>r.name === f.linha)).length;
-
-    const periodLabel = days===7 ? "Últimos 7 dias" : days===30 ? "Este mês" : "Últimos 14 dias";
-    titleEl.textContent = lineId==="all" ? "Resumo geral" : rows[0].name;
-    subEl.textContent = `${periodLabel} · gerado em ${new Date().toLocaleString("pt-BR")}`;
-
-    statsEl.innerHTML = `
-      <div class="report-stat"><div class="l">OEE médio</div><div class="v">${avgOeeR}%</div></div>
-      <div class="report-stat"><div class="l">Disponibilidade média</div><div class="v">${avgAvailR}%</div></div>
-      <div class="report-stat"><div class="l">Aparas médias</div><div class="v">${avgScrapR}%</div></div>
-      <div class="report-stat"><div class="l">Facas monitoradas</div><div class="v">${totalFacas}</div></div>
-    `;
-
-    tbody.innerHTML = rows.map(l=>`
-      <tr>
-        <td>${l.name}</td>
-        <td class="mono">${l.oee}%</td>
-        <td class="mono">${l.avail}%</td>
-        <td class="mono">${l.scrap}%</td>
-        <td><span class="status-pill status-${l.status}"><span class="dot" style="background:currentColor"></span>${statusLabel[l.status]}</span></td>
-      </tr>`).join("");
-
-    lastReport = { periodLabel, rows };
-    resultPanel.hidden = false;
-    resultPanel.scrollIntoView({ behavior:"smooth", block:"nearest" });
+  closeBtn.addEventListener("click", ()=>{
+    panel.classList.remove("open");
+    setTimeout(()=>{ if(!panel.classList.contains("open")) panel.hidden = true; }, 320);
   });
+  sendBtn.addEventListener("click", ()=>{ if(input.value.trim()) ask(input.value.trim()); });
+  input.addEventListener("keydown", e=>{ if(e.key==="Enter" && input.value.trim()) ask(input.value.trim()); });
+})();
 
-  exportBtn.addEventListener("click", ()=>{
-    if(!lastReport) return;
-    const header = "Etapa,OEE,Disponibilidade,Aparas,Status\n";
-    const csv = header + lastReport.rows.map(l=>
-      `${l.name},${l.oee}%,${l.avail}%,${l.scrap}%,${statusLabel[l.status]}`
-    ).join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `relatorio-producao-${new Date().toISOString().slice(0,10)}.csv`;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
+/* ============ troca de tema claro/escuro, com transição em círculo ============ */
+(function(){
+  const btn = document.getElementById("theme-toggle");
+  const sunIcon = document.getElementById("theme-icon-sun");
+  const moonIcon = document.getElementById("theme-icon-moon");
+  const root = document.documentElement;
+  const STORAGE_KEY = "gualapack-theme";
+
+  function systemPrefersDark(){
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  }
+  function effectiveTheme(){
+    const explicit = root.getAttribute("data-theme");
+    if(explicit === "light" || explicit === "dark") return explicit;
+    return systemPrefersDark() ? "dark" : "light";
+  }
+  function updateIcon(theme){
+    // Ícone mostra a AÇÃO (pra onde vai ao clicar), não o estado atual.
+    const showSun = theme === "dark";
+    sunIcon.hidden = !showSun;
+    moonIcon.hidden = showSun;
+    btn.title = showSun ? "Mudar para tema claro" : "Mudar para tema escuro";
+  }
+
+  function applyTheme(theme){
+    root.setAttribute("data-theme", theme);
+    try{ localStorage.setItem(STORAGE_KEY, theme); }catch(e){}
+    updateIcon(theme);
+    // Os status de apontamento têm cores fixas (não são tokens do tema), e
+    // alguns só são legíveis numa das faces — o Gantt precisa ser redesenhado
+    // com a variante certa de cada cor.
+    if(window.renderGanttForTheme) window.renderGanttForTheme();
+  }
+
+  // Estampa o tema explícito assim que a página carrega (a partir do que já
+  // está salvo, ou do sistema) — sem isso, o primeiro clique não teria um
+  // estado "atual" confiável pra alternar.
+  let saved = null;
+  try{ saved = localStorage.getItem(STORAGE_KEY); }catch(e){}
+  applyTheme(saved === "light" || saved === "dark" ? saved : effectiveTheme());
+
+  btn.addEventListener("click", (e)=>{
+    const next = effectiveTheme() === "dark" ? "light" : "dark";
+
+    if(window.matchMedia("(prefers-reduced-motion: reduce)").matches || !document.startViewTransition){
+      applyTheme(next);
+      return;
+    }
+
+    const rect = btn.getBoundingClientRect();
+    const x = rect.left + rect.width/2;
+    const y = rect.top + rect.height/2;
+    const endRadius = Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y)
+    );
+
+    const transition = document.startViewTransition(()=> applyTheme(next));
+    transition.ready.then(()=>{
+      root.animate(
+        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${endRadius}px at ${x}px ${y}px)`] },
+        { duration: 680, easing: "cubic-bezier(.65,0,.35,1)", pseudoElement: "::view-transition-new(root)" }
+      );
+    });
   });
 })();
 
@@ -1615,13 +2318,21 @@ kpis.forEach((k,ki)=>{
   let live = true;
 
   function jitterKpis(){
-    document.querySelectorAll(".kpi").forEach(card=>{
-      card.style.transition = "box-shadow .4s ease";
-      card.style.boxShadow = "var(--glass-shadow), inset 0 1px 0 var(--glass-highlight), 0 0 0 2px var(--accent-soft)";
-      setTimeout(()=>{ card.style.boxShadow = ""; }, 500);
-    });
-    const valEls = document.querySelectorAll(".kpi-value");
-    valEls.forEach(el=>{
+    // Só 1 (às vezes 2) indicador chega "atualizado" a cada tick — como
+    // dados reais, que não mudam todos juntos no mesmo instante. O pulso
+    // vira aviso de verdade: só pisca quem de fato mudou.
+    // Só os KPIs da visão aberta — os das outras views estão fora de tela.
+    const cards = [...document.querySelectorAll(".view.active .kpi")];
+    if(!cards.length) return;
+    const updateCount = Math.random() < 0.7 ? 1 : 2;
+    const chosen = new Set();
+    while(chosen.size < Math.min(updateCount, cards.length)){
+      chosen.add(Math.floor(Math.random() * cards.length));
+    }
+    cards.forEach((card, i)=>{
+      if(!chosen.has(i)) return;
+      const el = card.querySelector(".kpi-value");
+      if(!el) return;
       const m = el.textContent.match(/^(-?\d+(\.\d+)?)(.*)$/);
       if(!m) return;
       const num = parseFloat(m[1]);
@@ -1629,6 +2340,8 @@ kpis.forEach((k,ki)=>{
       const drift = (Math.random()-0.5) * (decimals ? 0.3 : 1);
       const next = Math.max(0, num + drift);
       el.textContent = next.toFixed(decimals) + m[3];
+      card.classList.add("pulse");
+      setTimeout(()=> card.classList.remove("pulse"), 550);
     });
   }
 
@@ -1658,7 +2371,7 @@ kpis.forEach((k,ki)=>{
   const select = document.getElementById("period-select");
   select.addEventListener("change", ()=>{
     const days = parseInt(select.value, 10);
-    if(window.setAvailPeriod) window.setAvailPeriod(days);
+    if(window.setDashboardPeriod) window.setDashboardPeriod(days);
   });
 })();
 
@@ -1672,10 +2385,13 @@ kpis.forEach((k,ki)=>{
     targetX = (e.clientX / window.innerWidth - 0.5) * 2;
     targetY = (e.clientY / window.innerHeight - 0.5) * 2;
   });
+  const root = document.documentElement;
   function loop(){
     curX += (targetX - curX) * 0.04;
     curY += (targetY - curY) * 0.04;
     field.style.transform = `translate(${curX*14}px, ${curY*10}px)`;
+    root.style.setProperty("--mx", curX.toFixed(3));
+    root.style.setProperty("--my", curY.toFixed(3));
     requestAnimationFrame(loop);
   }
   loop();
@@ -1702,6 +2418,7 @@ kpis.forEach((k,ki)=>{
       .then(({ data: profile })=>{
         if(profile?.role === "admin"){
           document.getElementById("admin-link").hidden = false;
+          document.getElementById("upload-link").hidden = false;
         }
       });
   }
