@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600;1,700&family=Archivo:wght@500;600;700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 <script src="./supabase-config.js"></script>
 <style>
 :root{
@@ -168,6 +169,20 @@ h1,h2{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; m
   font-family:inherit; transition: color .2s var(--ease), border-color .2s var(--ease);
 }
 .drop-card .pick-btn:hover{ color:var(--text-primary); border-color:var(--accent); }
+.drop-card .sheet-row{ display:none; flex-direction:column; gap:5px; }
+.drop-card .sheet-row.show{ display:flex; }
+.drop-card .sheet-row label{ font-size:11px; color:var(--text-muted); }
+.drop-card select{
+  border:1px solid var(--glass-border); border-radius:8px; padding:7px 9px; font-size:12.5px;
+  background: var(--surface-1); color:var(--text-primary); font-family:inherit;
+}
+.drop-card .send-btn{
+  background: linear-gradient(155deg, var(--series-3), var(--accent) 65%, var(--series-1));
+  color:var(--accent-ink); border:none; border-radius:8px; padding:8px 14px; font-size:12.5px; font-weight:700;
+  cursor:pointer; font-family:inherit; display:none;
+}
+.drop-card .send-btn.show{ display:inline-flex; align-self:flex-start; }
+.drop-card .send-btn:disabled{ opacity:.6; cursor:not-allowed; }
 .drop-card .file-status{ font-size:12px; min-height:16px; }
 .drop-card .file-status.ok{ color:var(--good); }
 .drop-card .file-status.error{ color:var(--critical); }
@@ -342,15 +357,17 @@ h1,h2{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; m
     `).join("");
   }
 
-  async function handleFile(cardEl, tableCfg, file){
+  async function sendFile(cardEl, tableCfg, file, sheetName){
     const statusEl = cardEl.querySelector(".file-status");
+    const sendBtn = cardEl.querySelector(".send-btn");
+    if(sendBtn) sendBtn.disabled = true;
     statusEl.className = "file-status pending";
-    statusEl.innerHTML = `<span class="spinner"></span>Enviando "${file.name}"...`;
+    statusEl.innerHTML = `<span class="spinner"></span>Enviando "${file.name}"${sheetName ? ` (aba "${sheetName}")` : ""}...`;
 
     try{
       const contentBase64 = await fileToBase64(file);
       const { data, error } = await client.functions.invoke("ingest", {
-        body: { table: tableCfg.table, fileName: file.name, contentBase64 },
+        body: { table: tableCfg.table, fileName: file.name, sheetName, contentBase64 },
       });
 
       if(error || !data?.ok){
@@ -362,12 +379,58 @@ h1,h2{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; m
       }
 
       statusEl.className = "file-status ok";
-      statusEl.textContent = `${data.linhas} linhas gravadas.`;
-      pushLog({ ok:true, text: `${tableCfg.label}: ${file.name} — ${data.linhas} linhas` });
+      statusEl.textContent = `${data.linhas} linhas gravadas (aba "${data.sheet}").`;
+      pushLog({ ok:true, text: `${tableCfg.label}: ${file.name} [${data.sheet}] — ${data.linhas} linhas` });
     }catch(err){
       statusEl.className = "file-status error";
       statusEl.textContent = "Falhou: " + err.message;
       pushLog({ ok:false, text: `${tableCfg.label}: ${file.name} — ${err.message}` });
+    }finally{
+      if(sendBtn) sendBtn.disabled = false;
+    }
+  }
+
+  async function handleFile(cardEl, tableCfg, file){
+    const statusEl = cardEl.querySelector(".file-status");
+    const sheetRow = cardEl.querySelector(".sheet-row");
+    const sheetSelect = cardEl.querySelector("select");
+    const sendBtn = cardEl.querySelector(".send-btn");
+
+    // .csv não tem abas — manda direto.
+    if(/\.csv$/i.test(file.name)){
+      sheetRow.classList.remove("show");
+      sendBtn.classList.remove("show");
+      await sendFile(cardEl, tableCfg, file, undefined);
+      return;
+    }
+
+    statusEl.className = "file-status pending";
+    statusEl.textContent = "Lendo abas da planilha...";
+
+    try{
+      const buffer = await file.arrayBuffer();
+      const workbook = XLSX.read(buffer, { type: "array", bookSheets: true });
+      const sheetNames = workbook.SheetNames;
+
+      statusEl.className = "file-status";
+      statusEl.textContent = "";
+
+      if(sheetNames.length <= 1){
+        sheetRow.classList.remove("show");
+        sendBtn.classList.remove("show");
+        await sendFile(cardEl, tableCfg, file, sheetNames[0]);
+        return;
+      }
+
+      // Várias abas: deixa escolher, em vez de adivinhar.
+      sheetSelect.innerHTML = sheetNames.map(n=> `<option value="${n}">${n}</option>`).join("");
+      sheetRow.classList.add("show");
+      sendBtn.classList.add("show");
+      sendBtn.onclick = ()=> sendFile(cardEl, tableCfg, file, sheetSelect.value);
+      statusEl.textContent = `${sheetNames.length} abas encontradas — escolha a certa e clique em Enviar.`;
+    }catch(err){
+      statusEl.className = "file-status error";
+      statusEl.textContent = "Não consegui ler o arquivo: " + err.message;
     }
   }
 
@@ -379,6 +442,11 @@ h1,h2{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; m
       <div class="table-hint">${tableCfg.hint}</div>
       <input type="file" accept=".xlsx,.xls,.csv" />
       <button class="pick-btn" type="button">Escolher arquivo</button>
+      <div class="sheet-row">
+        <label>Aba com os dados:</label>
+        <select></select>
+      </div>
+      <button class="send-btn" type="button">Enviar</button>
       <div class="file-status"></div>
     `;
     const input = card.querySelector("input[type=file]");
