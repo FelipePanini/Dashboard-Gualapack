@@ -653,6 +653,15 @@ tbody tr:hover{ background: var(--surface-sunken); }
   padding:5px 10px; border-radius:99px;
 }
 .tag-demo .dot{ width:6px; height:6px; border-radius:50%; background:var(--accent); }
+.tag-demo.is-real .dot{ background:var(--good); }
+
+.view-notice{
+  display:flex; align-items:center; gap:8px;
+  font-size:12.5px; color:var(--text-secondary);
+  background: var(--surface-2); border:1px solid var(--border);
+  border-left:3px solid var(--warning);
+  padding:10px 14px; border-radius:8px; margin-bottom:16px;
+}
 
 footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 
@@ -770,9 +779,19 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 (function(){
   const cfg = window.SUPABASE_CONFIG;
   const configured = cfg && !cfg.url.includes("SEU-PROJETO");
+  // "__GUALAPACK_SESSION_READY__" existe pra cobrir uma corrida possível: se
+  // esse evento disparar antes do script principal (lá embaixo, perto do
+  // </body>) terminar de rodar e registrar o listener, o listener nunca
+  // saberia que já passou. O boot() checa essa flag antes de escutar.
+  function sessionReady(){
+    window.__GUALAPACK_SESSION_READY__ = true;
+    document.dispatchEvent(new CustomEvent("gualapack-session-ready"));
+  }
   if(!configured){
-    // Backend ainda não configurado: deixa a demo visível (modo pré-visualização).
-    document.addEventListener("DOMContentLoaded", ()=> document.body.classList.remove("auth-pending"));
+    // Backend ainda não configurado: deixa a demo visível (modo pré-visualização),
+    // com dados de referência. Quem tira o "auth-pending" é o boot() lá embaixo,
+    // só depois que o painel terminar de desenhar — não aqui.
+    document.addEventListener("DOMContentLoaded", sessionReady);
     return;
   }
   window.gualapackAuth = window.supabase.createClient(cfg.url, cfg.anonKey);
@@ -782,7 +801,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
       return;
     }
     window.gualapackSession = data.session;
-    document.body.classList.remove("auth-pending");
+    sessionReady();
   });
 })();
 </script>
@@ -842,7 +861,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
         </div>
       </div>
       <div class="topbar-right">
-        <span class="tag-demo" title="Indicadores, máquinas e motivos de perda vêm dos BIs de Produção. Os valores numéricos são de referência até a conexão com a fonte de dados."><span class="dot"></span>Estrutura dos BIs &middot; valores de referência</span>
+        <span class="tag-demo" id="data-source-tag" title="Indicadores, máquinas e motivos de perda vêm dos BIs de Produção. Os valores numéricos são de referência até a conexão com a fonte de dados."><span class="dot"></span>Estrutura dos BIs &middot; valores de referência</span>
         <select class="pill-select" id="period-select" aria-label="Período">
           <option value="14" selected>Últimos 14 dias</option>
           <option value="7">Últimos 7 dias</option>
@@ -1021,7 +1040,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
           <div class="panel-head">
             <div>
               <h2 class="panel-title">Linha do tempo de apontamentos</h2>
-              <div class="panel-sub">Ocupação das máquinas nas últimas 24 h &middot; passe o mouse para ver a OP</div>
+              <div class="panel-sub" id="gantt-panel-sub">Ocupação das máquinas nas últimas 24 h &middot; passe o mouse para ver a OP</div>
             </div>
             <div class="legend" id="status-legend"></div>
           </div>
@@ -1041,6 +1060,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 
       <!-- ============ WIP & CARTEIRA ============ -->
       <div class="view" id="view-wip">
+        <div class="view-notice">Esta visão ainda não está conectada a uma base real de WIP/Carteira &mdash; os números abaixo são apenas de referência, mantidos aqui até que uma planilha desse tipo entre na carga diária.</div>
         <section class="kpi-row" id="wip-kpis"></section>
 
         <section class="grid-2">
@@ -1087,7 +1107,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
         </section>
       </div>
 
-      <footer>
+      <footer id="footer-note">
         Painel interno de Produção &middot; Gualapack Jaguariúna &middot;
         indicadores, máquinas e motivos de perda espelhados dos BIs de Produção &mdash;
         valores numéricos de referência até a conexão com a fonte de dados.
@@ -1139,104 +1159,148 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 
 <script>
 /* ============================================================================
-   DADOS — estrutura espelhada dos BIs de Produção (Gualapack Jaguariúna)
+   DADOS — carregados do Supabase (banco central), com fallback de referência
    ----------------------------------------------------------------------------
-   Nomes de máquinas, motivos de perda, status de apontamento, classificações
-   e cores vieram dos arquivos .pbix (ver docs/estrutura-bi.md). Os valores
-   numéricos são de referência até a conexão com a fonte de dados — trocar
-   apenas este bloco quando a carga real estiver disponível.
+   As tabelas reais (apontamentos, fardos_aparas, aderência...) têm centenas
+   de milhares de linhas — este arquivo nunca faz select nelas direto. Ele lê
+   views agregadas (backend/schema_views.sql), que já entregam os totais
+   prontos. Se o backend não estiver configurado (preview local) ou a carga
+   real falhar por qualquer motivo, cai automaticamente nos dados de
+   referência abaixo — o painel nunca fica com uma tela quebrada ou metade
+   real/metade fictícia.
+
+   Nomes de status de apontamento e suas cores oficiais vieram dos .pbix
+   (ver docs/estrutura-bi.md) — são metadado de exibição, não dado
+   variável, por isso continuam fixos aqui independente da fonte.
    ========================================================================== */
 
-/* Ordem oficial das máquinas (eixo do Gantt no BI "Linha do Tempo") */
-const MAQUINAS = [
-  { id:"COATING01", nome:"COATING 01", processo:"Coating",   rota:"—",     tmr:71, vel:186, velRef:210, aparas:4.1, horasProd:412, horasTot:580 },
-  { id:"R12",       nome:"R12",        processo:"Impressão", rota:"ROTO",  tmr:64, vel:214, velRef:280, aparas:6.8, horasProd:371, horasTot:580 },
-  { id:"R18",       nome:"R18",        processo:"Impressão", rota:"ROTO",  tmr:76, vel:262, velRef:290, aparas:5.2, horasProd:441, horasTot:580 },
-  { id:"R20",       nome:"R20",        processo:"Impressão", rota:"ROTO",  tmr:73, vel:248, velRef:290, aparas:5.9, horasProd:423, horasTot:580 },
-  { id:"RT01",      nome:"RT01",       processo:"Impressão", rota:"FLEXO", tmr:58, vel:171, velRef:240, aparas:8.4, horasProd:336, horasTot:580 },
-  { id:"L02",       nome:"L02",        processo:"Laminação", rota:"—",     tmr:79, vel:318, velRef:350, aparas:2.4, horasProd:458, horasTot:580 },
-  { id:"L03",       nome:"L03",        processo:"Laminação", rota:"—",     tmr:82, vel:341, velRef:360, aparas:2.1, horasProd:476, horasTot:580 },
-  { id:"L04",       nome:"L04",        processo:"Laminação", rota:"—",     tmr:68, vel:274, velRef:350, aparas:3.6, horasProd:394, horasTot:580 },
-  { id:"REB01",     nome:"REB 01",     processo:"Corte / Refile", rota:"—", tmr:74, vel:392, velRef:450, aparas:3.2, horasProd:429, horasTot:580 },
-  { id:"REB04",     nome:"REB 04",     processo:"Corte / Refile", rota:"—", tmr:61, vel:307, velRef:430, aparas:4.7, horasProd:354, horasTot:580 },
-  { id:"REB05",     nome:"REB 05",     processo:"Corte / Refile", rota:"—", tmr:55, vel:286, velRef:430, aparas:7.3, horasProd:319, horasTot:580 },
-  { id:"REB09",     nome:"REB 09",     processo:"Corte / Refile", rota:"—", tmr:77, vel:418, velRef:460, aparas:2.8, horasProd:447, horasTot:580 },
-  { id:"REB10",     nome:"REB 10",     processo:"Corte / Refile", rota:"—", tmr:70, vel:365, velRef:450, aparas:3.9, horasProd:406, horasTot:580 },
+const STATUS_APONTAMENTO = [
+  { nome:"Produzindo",          cor:"#2E7D32", corDark:"#3FA046" },
+  { nome:"Parada Produtiva",    cor:"#C62828", corDark:"#E05252" },
+  { nome:"Setup",               cor:"#CD853F", corDark:"#D79A5F" },
+  { nome:"Acerto de Cores",     cor:"#FFA500", corDark:"#FFB733" },
+  { nome:"Fim de Turno",        cor:"#BDBDBD", corDark:"#8A8A8A" },
+  { nome:"Manutenção",          cor:"#000000", corDark:"#6C757D" },
+  { nome:"Logística",           cor:"#00BFFF", corDark:"#33CCFF" },
+  { nome:"PCP",                 cor:"#9400D3", corDark:"#B44BE8" },
+  { nome:"Refeição Autorizada", cor:"#FA8072", corDark:"#FA9385" },
+  { nome:"Casa de Tintas",      cor:"#000080", corDark:"#4F6BD8" },
+  { nome:"Informar Parada",     cor:"#E6C200", corDark:"#F2D633" },
 ];
+/* Paleta pra classificações de parada reais (códigos granulares demais pra
+   ter cor oficial individual) — determinística por código, então a mesma
+   parada sempre pinta igual entre o Gantt, o downtime e o Pareto. */
+const PALETA_PARADA = [
+  { cor:"#C62828", corDark:"#E05252" }, { cor:"#CD853F", corDark:"#D79A5F" },
+  { cor:"#9400D3", corDark:"#B44BE8" }, { cor:"#00BFFF", corDark:"#33CCFF" },
+  { cor:"#FFA500", corDark:"#FFB733" }, { cor:"#000080", corDark:"#4F6BD8" },
+  { cor:"#FA8072", corDark:"#FA9385" }, { cor:"#6C757D", corDark:"#9AA5B1" },
+];
+function corParada(codApont){
+  if(codApont === "20") return STATUS_APONTAMENTO[0]; // Produzindo — sempre verde oficial
+  let h = 0;
+  for(const c of String(codApont)) h = (h*31 + c.charCodeAt(0)) >>> 0;
+  return PALETA_PARADA[h % PALETA_PARADA.length];
+}
 
+const META_APARAS = 5.0;
+
+/* Grupo físico (Machine Card) -> processo/rota exibidos no painel. O Machine
+   Card mistura máquinas de verdade com categorias administrativas (GERAL,
+   MANUTENÇÃO, CQ...) — só os grupos abaixo entram no painel. */
+const GRUPO_PROCESSO = {
+  COATING:"Coating", FLEXOGRAFIA:"Impressão", ROTOGRAVURA:"Impressão",
+  LAMINADORAS:"Laminação", FUNGICIDA:"Laminação", "HOT MELT":"Laminação",
+  CORTADEIRAS:"Corte / Refile",
+};
+const GRUPO_ROTA = { FLEXOGRAFIA:"FLEXO", ROTOGRAVURA:"ROTO" };
 const PROCESSOS = ["Coating", "Impressão", "Laminação", "Corte / Refile"];
 
-/* Motivos de perda — códigos reais do campo usr_tipodaperda */
-const TIPOS_PERDA = [
-  { cod:"08", nome:"Refile",             kg: 41280 },
-  { cod:"15", nome:"Ajuste de Máquina",  kg: 28640 },
-  { cod:"01", nome:"Falha de Impressão", kg: 21470 },
-  { cod:"05", nome:"Acerto de Cor",      kg: 18930 },
-  { cod:"02", nome:"Acerto de Máquina",  kg: 16250 },
-  { cod:"06", nome:"Falha de Laminação", kg: 12880 },
-  { cod:"03", nome:"Cor Fora do Padrão", kg:  9740 },
-  { cod:"04", nome:"Marcas de Emenda",   kg:  7310 },
-  { cod:"16", nome:"Borra Extrusora",    kg:  5920 },
-  { cod:"12", nome:"Falha de Fungicida", kg:  4680 },
-  { cod:"11", nome:"Capa",               kg:  3850 },
-  { cod:"10", nome:"Manta",              kg:  3120 },
-  { cod:"18", nome:"Material de Acerto", kg:  2640 },
-  { cod:"09", nome:"Roda de Carroça",    kg:  1780 },
-  { cod:"19", nome:"Movimentação MP",    kg:  1240 },
-];
+function prettyCodigo(raw){
+  // "06_Falha_de_Laminaca" -> "Falha de Laminaca" (tira prefixo numérico,
+  // troca "_" por espaço) — mostra o motivo real sem inventar nome bonito.
+  return String(raw || "").replace(/^\d+_/, "").replace(/_/g, " ").trim() || "—";
+}
 
-/* Status de apontamento — cores oficiais do BI Linha do Tempo.
-   corDark: variação usada no tema escuro para os tons que ficariam ilegíveis. */
-const STATUS_APONTAMENTO = [
-  { nome:"Produzindo",          cor:"#2E7D32", corDark:"#3FA046", peso: 46 },
-  { nome:"Parada Produtiva",    cor:"#C62828", corDark:"#E05252", peso: 13 },
-  { nome:"Setup",               cor:"#CD853F", corDark:"#D79A5F", peso: 10 },
-  { nome:"Acerto de Cores",     cor:"#FFA500", corDark:"#FFB733", peso:  8 },
-  { nome:"Fim de Turno",        cor:"#BDBDBD", corDark:"#8A8A8A", peso:  6 },
-  { nome:"Manutenção",          cor:"#000000", corDark:"#6C757D", peso:  5 },
-  { nome:"Logística",           cor:"#00BFFF", corDark:"#33CCFF", peso:  4 },
-  { nome:"PCP",                 cor:"#9400D3", corDark:"#B44BE8", peso:  3 },
-  { nome:"Refeição Autorizada", cor:"#FA8072", corDark:"#FA9385", peso:  2 },
-  { nome:"Casa de Tintas",      cor:"#000080", corDark:"#4F6BD8", peso:  2 },
-  { nome:"Informar Parada",     cor:"#E6C200", corDark:"#F2D633", peso:  1 },
-];
-
-/* Classificações de produto — páginas do BI Indicadores de Produção */
-const CLASSIFICACOES = [
-  { nome:"Bi/Tri Laminated",           aparas: 6.4, kg: 184300 },
-  { nome:"Simple Laminated",           aparas: 4.1, kg: 246800 },
-  { nome:"Sylvamo Bopp & Paper",       aparas: 5.7, kg: 132500 },
-  { nome:"Soap Wrappen and Multipack", aparas: 3.8, kg:  98400 },
-  { nome:"Bula & Paper",               aparas: 7.2, kg:  61200 },
-];
-
-/* Aderência ao planejado — derivada de uma única base por máquina, para que
-   o KPI consolidado, as barras por recurso e os anéis por processo sempre
-   contem a mesma história (km lineares planejados x realizados). */
-const FATOR_KM = 8; // converte horas × m/min de referência em km lineares do período
-MAQUINAS.forEach(m=>{
-  m.planKm = Math.round(m.horasTot * m.velRef * 60 / 1e6 * FATOR_KM);
-  m.realKm = Math.round(m.planKm * (0.55 + m.tmr/100 * 0.45));
-  m.aderencia = m.realKm / m.planKm * 100;
-});
-
-/* Medidas % IMPRESSAO / % LAMINAÇAO / % CORTE do BI, agregando as máquinas
-   de cada etapa da rota (Coating entra só no consolidado, como no BI). */
-const ADERENCIA_PROCESSO = ["Impressão","Laminação","Corte / Refile"].map(p=>{
-  const ms = MAQUINAS.filter(m=>m.processo===p);
-  const planejado = ms.reduce((a,m)=>a+m.planKm,0);
-  const realizado = ms.reduce((a,m)=>a+m.realKm,0);
-  return { nome:p, planejado, realizado, pct: realizado/planejado*100 };
-});
-
-/* Etapas de WIP — campo WIP_Etapa do BI Carteira x Produção */
+/* Dados de referência — usados só se o backend não estiver configurado ou a
+   carga real falhar. Mesma estrutura dos BIs (ver docs/estrutura-bi.md). */
+const FALLBACK = {
+  MAQUINAS: [
+    { id:"COATING01", nome:"COATING 01", processo:"Coating",   rota:"—",     tmr:71, vel:186, velRef:210, aparas:4.1, horasProd:412, horasTot:580 },
+    { id:"R12",       nome:"R12",        processo:"Impressão", rota:"ROTO",  tmr:64, vel:214, velRef:280, aparas:6.8, horasProd:371, horasTot:580 },
+    { id:"R18",       nome:"R18",        processo:"Impressão", rota:"ROTO",  tmr:76, vel:262, velRef:290, aparas:5.2, horasProd:441, horasTot:580 },
+    { id:"R20",       nome:"R20",        processo:"Impressão", rota:"ROTO",  tmr:73, vel:248, velRef:290, aparas:5.9, horasProd:423, horasTot:580 },
+    { id:"RT01",      nome:"RT01",       processo:"Impressão", rota:"FLEXO", tmr:58, vel:171, velRef:240, aparas:8.4, horasProd:336, horasTot:580 },
+    { id:"L02",       nome:"L02",        processo:"Laminação", rota:"—",     tmr:79, vel:318, velRef:350, aparas:2.4, horasProd:458, horasTot:580 },
+    { id:"L03",       nome:"L03",        processo:"Laminação", rota:"—",     tmr:82, vel:341, velRef:360, aparas:2.1, horasProd:476, horasTot:580 },
+    { id:"L04",       nome:"L04",        processo:"Laminação", rota:"—",     tmr:68, vel:274, velRef:350, aparas:3.6, horasProd:394, horasTot:580 },
+    { id:"REB01",     nome:"REB 01",     processo:"Corte / Refile", rota:"—", tmr:74, vel:392, velRef:450, aparas:3.2, horasProd:429, horasTot:580 },
+    { id:"REB04",     nome:"REB 04",     processo:"Corte / Refile", rota:"—", tmr:61, vel:307, velRef:430, aparas:4.7, horasProd:354, horasTot:580 },
+    { id:"REB05",     nome:"REB 05",     processo:"Corte / Refile", rota:"—", tmr:55, vel:286, velRef:430, aparas:7.3, horasProd:319, horasTot:580 },
+    { id:"REB09",     nome:"REB 09",     processo:"Corte / Refile", rota:"—", tmr:77, vel:418, velRef:460, aparas:2.8, horasProd:447, horasTot:580 },
+    { id:"REB10",     nome:"REB 10",     processo:"Corte / Refile", rota:"—", tmr:70, vel:365, velRef:450, aparas:3.9, horasProd:406, horasTot:580 },
+  ],
+  TIPOS_PERDA: [
+    { cod:"08", nome:"Refile",             kg: 41280 },
+    { cod:"15", nome:"Ajuste de Máquina",  kg: 28640 },
+    { cod:"01", nome:"Falha de Impressão", kg: 21470 },
+    { cod:"05", nome:"Acerto de Cor",      kg: 18930 },
+    { cod:"02", nome:"Acerto de Máquina",  kg: 16250 },
+    { cod:"06", nome:"Falha de Laminação", kg: 12880 },
+    { cod:"03", nome:"Cor Fora do Padrão", kg:  9740 },
+    { cod:"04", nome:"Marcas de Emenda",   kg:  7310 },
+    { cod:"16", nome:"Borra Extrusora",    kg:  5920 },
+    { cod:"12", nome:"Falha de Fungicida", kg:  4680 },
+    { cod:"11", nome:"Capa",               kg:  3850 },
+    { cod:"10", nome:"Manta",              kg:  3120 },
+    { cod:"18", nome:"Material de Acerto", kg:  2640 },
+    { cod:"09", nome:"Roda de Carroça",    kg:  1780 },
+    { cod:"19", nome:"Movimentação MP",    kg:  1240 },
+  ],
+  CLASSIFICACOES: [
+    { nome:"Bi/Tri Laminated",           aparas: 6.4, kg: 184300 },
+    { nome:"Simple Laminated",           aparas: 4.1, kg: 246800 },
+    { nome:"Sylvamo Bopp & Paper",       aparas: 5.7, kg: 132500 },
+    { nome:"Soap Wrappen and Multipack", aparas: 3.8, kg:  98400 },
+    { nome:"Bula & Paper",               aparas: 7.2, kg:  61200 },
+  ],
+  MESES: ["set","out","nov","dez","jan","fev","mar","abr","mai","jun","jul","ago"],
+  APARAS_MENSAL: {
+    apontado:   [5.9, 6.2, 5.4, 5.8, 6.4, 6.1, 5.6, 5.2, 5.5, 4.9, 5.1, 4.8],
+    confirmado: [7.1, 7.4, 6.6, 7.0, 7.8, 7.2, 6.9, 6.3, 6.5, 6.0, 6.2, 5.9],
+  },
+  OPS: [
+    { op:"OP-248713", maq:"RT01",   desc:"Sachê Stand-up 180 ml — Cristalina",  peso: 12480, refugo: 1184, motivo:"Falha de Impressão" },
+    { op:"OP-248566", maq:"REB 05", desc:"Bobina laminada 620 mm — Unilever",   peso:  9860, refugo:  742, motivo:"Refile" },
+    { op:"OP-248901", maq:"R12",    desc:"Filme impresso BOPP 40 µ",            peso: 18240, refugo: 1204, motivo:"Acerto de Cor" },
+    { op:"OP-248322", maq:"REB 04", desc:"Pouch pré-formado 250 ml",            peso:  7420, refugo:  468, motivo:"Ajuste de Máquina" },
+    { op:"OP-249104", maq:"R20",    desc:"Bula & Paper — inserto farma",        peso: 11060, refugo:  652, motivo:"Marcas de Emenda" },
+    { op:"OP-248745", maq:"L04",    desc:"Estrutura tri-laminada alta barreira", peso: 15320, refugo:  598, motivo:"Falha de Laminação" },
+    { op:"OP-249217", maq:"REB 10", desc:"Multipack sabonete 5×90 g",           peso:  8940, refugo:  322, motivo:"Refile" },
+  ],
+  DOWNTIME: [
+    { nome:"Parada Produtiva",    horas: 96.2, cor:"#C62828" },
+    { nome:"Setup",               horas: 74.0, cor:"#CD853F" },
+    { nome:"Acerto de Cores",     horas: 59.2, cor:"#FFA500" },
+    { nome:"Fim de Turno",        horas: 44.4, cor:"#BDBDBD" },
+    { nome:"Manutenção",          horas: 37.0, cor:"#000000" },
+    { nome:"Logística",           horas: 29.6, cor:"#00BFFF" },
+    { nome:"PCP",                 horas: 22.2, cor:"#9400D3" },
+    { nome:"Refeição Autorizada", horas: 14.8, cor:"#FA8072" },
+  ],
+  GANTT_SEGMENTS_RANDOM: true, // sem base real — o Gantt sorteia segmentos plausíveis, como sempre fez
+};
+/* Etapas de WIP e carteira — nenhuma tabela real disso foi conectada ainda
+   (não veio nenhum BI de WIP/Carteira na carga). Fica isolado da view
+   "Aparas & Refugo" de propósito, pra não misturar classificação real com
+   proporção fictícia — ver aviso na própria aba WIP & Carteira. */
+const WIP_CLASSIFICACOES_DEMO = FALLBACK.CLASSIFICACOES;
 const WIP_ETAPAS = [
   { nome:"IMPRESSO",           metros: 486200, dc: 318400 },
   { nome:"WIP INTERMEDIÁRIO",  metros: 312700, dc: 224900 },
   { nome:"CORTE",              metros: 198400, dc: 161300 },
   { nome:"PAPEL",              metros:  87600, dc:  52100 },
 ];
-
 const CLIENTES = [
   "CRISTALINA ALIMENTOS LTDA",
   "UNILEVER BRASIL INDUSTRIAL LTDA",
@@ -1245,24 +1309,151 @@ const CLIENTES = [
   "INTERCOMPANY",
 ];
 
-/* Série mensal de aparas: apontado (operador) x confirmado (balança) */
-const MESES = ["set","out","nov","dez","jan","fev","mar","abr","mai","jun","jul","ago"];
-const APARAS_MENSAL = {
-  apontado:   [5.9, 6.2, 5.4, 5.8, 6.4, 6.1, 5.6, 5.2, 5.5, 4.9, 5.1, 4.8],
-  confirmado: [7.1, 7.4, 6.6, 7.0, 7.8, 7.2, 6.9, 6.3, 6.5, 6.0, 6.2, 5.9],
-};
-const META_APARAS = 5.0;
+/* Preenchidos por loadRealData() (real) ou applyFallback() (referência) —
+   todo o resto do arquivo só lê estas variáveis, nunca sabe qual das duas
+   fontes alimentou elas. */
+let MAQUINAS, TIPOS_PERDA, CLASSIFICACOES, ADERENCIA_PROCESSO, MESES, APARAS_MENSAL, OPS, DOWNTIME, GANTT_POR_MAQUINA, PRODUTIVIDADE;
+let USANDO_DADOS_REAIS = false;
 
-/* OPs com maior refugo */
-const OPS = [
-  { op:"OP-248713", maq:"RT01",   desc:"Sachê Stand-up 180 ml — Cristalina",  peso: 12480, refugo: 1184, motivo:"Falha de Impressão" },
-  { op:"OP-248566", maq:"REB 05", desc:"Bobina laminada 620 mm — Unilever",   peso:  9860, refugo:  742, motivo:"Refile" },
-  { op:"OP-248901", maq:"R12",    desc:"Filme impresso BOPP 40 µ",            peso: 18240, refugo: 1204, motivo:"Acerto de Cor" },
-  { op:"OP-248322", maq:"REB 04", desc:"Pouch pré-formado 250 ml",            peso:  7420, refugo:  468, motivo:"Ajuste de Máquina" },
-  { op:"OP-249104", maq:"R20",    desc:"Bula & Paper — inserto farma",        peso: 11060, refugo:  652, motivo:"Marcas de Emenda" },
-  { op:"OP-248745", maq:"L04",    desc:"Estrutura tri-laminada alta barreira", peso: 15320, refugo:  598, motivo:"Falha de Laminação" },
-  { op:"OP-249217", maq:"REB 10", desc:"Multipack sabonete 5×90 g",           peso:  8940, refugo:  322, motivo:"Refile" },
-];
+/* Aderência ao planejado agregada por processo (Coating entra só no
+   consolidado, nunca sozinho — mesma regra usada nos dois modos). */
+function calcAderenciaProcesso(maquinas){
+  return ["Impressão","Laminação","Corte / Refile"].map(p=>{
+    const ms = maquinas.filter(m=>m.processo===p);
+    const planejado = ms.reduce((a,m)=>a+m.planKm,0);
+    const realizado = ms.reduce((a,m)=>a+m.realKm,0);
+    return { nome:p, planejado, realizado, pct: planejado>0 ? realizado/planejado*100 : 0 };
+  });
+}
+
+function applyFallback(){
+  USANDO_DADOS_REAIS = false;
+  MAQUINAS = FALLBACK.MAQUINAS.map(m=>({...m}));
+  const FATOR_KM = 8; // converte horas × m/min de referência em km lineares do período
+  MAQUINAS.forEach(m=>{
+    m.planKm = Math.round(m.horasTot * m.velRef * 60 / 1e6 * FATOR_KM);
+    m.realKm = Math.round(m.planKm * (0.55 + m.tmr/100 * 0.45));
+    m.aderencia = m.realKm / m.planKm * 100;
+  });
+  TIPOS_PERDA = FALLBACK.TIPOS_PERDA.map(t=>({...t}));
+  CLASSIFICACOES = FALLBACK.CLASSIFICACOES.map(c=>({...c}));
+  ADERENCIA_PROCESSO = calcAderenciaProcesso(MAQUINAS);
+  MESES = FALLBACK.MESES.slice();
+  APARAS_MENSAL = { apontado: FALLBACK.APARAS_MENSAL.apontado.slice(), confirmado: FALLBACK.APARAS_MENSAL.confirmado.slice() };
+  OPS = FALLBACK.OPS.map(o=>({...o}));
+  DOWNTIME = FALLBACK.DOWNTIME.map(d=>({...d, corDark:d.cor}));
+  GANTT_POR_MAQUINA = null; // sinaliza pro Gantt sortear (comportamento antigo)
+  PRODUTIVIDADE = 214.6; // m²/h — referência, nenhuma base real traz essa métrica ainda
+}
+
+/* Carrega as views reais do Supabase. Se der qualquer problema (rede, view
+   ainda não criada, tabela vazia), cai no fallback inteiro — nunca mistura
+   as duas fontes numa mesma tela. */
+async function loadRealData(){
+  const cfg = window.SUPABASE_CONFIG;
+  const configured = cfg && !cfg.url.includes("SEU-PROJETO") && window.gualapackAuth;
+  if(!configured){ applyFallback(); return; }
+
+  const client = window.gualapackAuth;
+  try{
+    const [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, refugoRes, opsRes, ganttRes] = await Promise.all([
+      client.from("v_maquinas_resumo").select("*"),
+      client.from("v_perda_por_motivo").select("*"),
+      client.from("v_perda_por_classificacao").select("*"),
+      client.from("v_downtime_por_status").select("*"),
+      client.from("v_fardos_mensal").select("*"),
+      client.from("v_refugo_mensal").select("*"),
+      client.from("v_ops_refugo").select("*"),
+      client.from("v_apontamentos_ultimo_dia").select("*"),
+    ]);
+    const erro = [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, refugoRes, opsRes, ganttRes].find(r=>r.error);
+    if(erro) throw erro.error;
+    if(!maqRes.data || maqRes.data.length === 0) throw new Error("v_maquinas_resumo veio vazia");
+
+    MAQUINAS = maqRes.data.map(r=>{
+      const processo = GRUPO_PROCESSO[r.grupo] || "Outro";
+      const horasTot = Number(r.horas_totais) || 0;
+      const horasProd = Number(r.horas_produzindo) || 0;
+      const pesoBruto = Number(r.peso_bruto_total) || 0;
+      const kgPerda = Number(r.kg_perda_total) || 0;
+      const planKm = Number(r.km_planejado) || 0;
+      const realKm = Number(r.km_realizado) || 0;
+      return {
+        id: r.id, nome: r.id, processo, rota: GRUPO_ROTA[r.grupo] || "—",
+        tmr: horasTot>0 ? Math.round(horasProd/horasTot*100) : 0,
+        vel: null, velRef: null, // sem coluna de velocidade em nenhuma base carregada
+        aparas: pesoBruto>0 ? kgPerda/pesoBruto*100 : 0,
+        horasProd: Math.round(horasProd), horasTot: Math.round(horasTot),
+        planKm: Math.round(planKm), realKm: Math.round(realKm),
+        aderencia: planKm>0 ? realKm/planKm*100 : 0,
+      };
+    }).filter(m=> PROCESSOS.includes(m.processo));
+    if(MAQUINAS.length === 0) throw new Error("Nenhuma máquina com grupo físico reconhecido");
+
+    // Sem código curto separado do nome nos dados reais (isso existia só na
+    // taxonomia fictícia do fallback) — cod:null sinaliza pros templates não
+    // duplicarem "Refile · Refile".
+    TIPOS_PERDA = (motivoRes.data||[]).map(r=>({ cod: null, nome: prettyCodigo(r.tipo_perda), kg: Number(r.kg)||0 }))
+      .sort((a,b)=>b.kg-a.kg);
+
+    CLASSIFICACOES = (classeRes.data||[]).map(r=>({ nome: r.classificacao, aparas: Number(r.apara_pct)||0, kg: Number(r.peso_bruto)||0 }));
+
+    DOWNTIME = (downtimeRes.data||[]).slice(0,8).map(r=>{
+      const c = corParada(r.cod_apont);
+      return { nome: prettyCodigo(r.cod_desc).replace(/^\d+\s*-\s*/, ""), horas: Number(r.horas)||0, cor: c.cor, corDark: c.corDark };
+    });
+
+    // Série mensal: junta fardos (apontado) e refugo/JGR (confirmado) pelo mês.
+    const porMes = new Map();
+    (fardosRes.data||[]).forEach(r=>{
+      porMes.set(r.mes, { ...(porMes.get(r.mes)||{}), apontado: Number(r.apara_pct)||0 });
+    });
+    (refugoRes.data||[]).forEach(r=>{
+      porMes.set(r.mes, { ...(porMes.get(r.mes)||{}), confirmado: Number(r.scrap_pct)||0 });
+    });
+    const mesesOrdenados = Array.from(porMes.keys()).sort().slice(-12);
+    const fmtMes = iso => new Date(iso+"T00:00:00").toLocaleDateString("pt-BR",{ month:"short" }).replace(".","");
+    if(mesesOrdenados.length >= 2){
+      MESES = mesesOrdenados.map(fmtMes);
+      APARAS_MENSAL = {
+        apontado: mesesOrdenados.map(m=> porMes.get(m).apontado ?? 0),
+        confirmado: mesesOrdenados.map(m=> porMes.get(m).confirmado ?? porMes.get(m).apontado ?? 0),
+      };
+    }else{
+      // histórico real curto demais pra formar uma série — usa a referência
+      // só nesse gráfico, sem afetar o resto do painel real.
+      MESES = FALLBACK.MESES.slice();
+      APARAS_MENSAL = { apontado: FALLBACK.APARAS_MENSAL.apontado.slice(), confirmado: FALLBACK.APARAS_MENSAL.confirmado.slice() };
+    }
+
+    OPS = (opsRes.data||[]).slice(0,12).map(r=>({
+      op: r.num_ordem, maq: r.cod_recurso || "—", desc: r.descricao || "—",
+      peso: Math.round(Number(r.peso_bruto)||0), refugo: Math.round(Number(r.kg_perda)||0),
+      motivo: prettyCodigo(r.motivo_principal),
+    }));
+
+    // Segmentos reais do Gantt: agrupa por máquina, hora do dia como float.
+    const idsValidos = new Set(MAQUINAS.map(m=>m.id));
+    const porMaquina = new Map();
+    (ganttRes.data||[]).forEach(r=>{
+      if(!idsValidos.has(r.cod_recurso)) return;
+      const ini = new Date(r.hora_inicio), fim = new Date(r.hora_fim);
+      const dayStart = new Date(ini); dayStart.setHours(0,0,0,0);
+      const h = d => Math.max(0, Math.min(24, (d-dayStart)/3600000));
+      const list = porMaquina.get(r.cod_recurso) || [];
+      list.push({ st: corParada(r.cod_apont), nome: prettyCodigo(r.cod_desc).replace(/^\d+\s*-\s*/, ""), ini:h(ini), fim:h(fim) });
+      porMaquina.set(r.cod_recurso, list);
+    });
+    GANTT_POR_MAQUINA = porMaquina.size > 0 ? porMaquina : null;
+
+    ADERENCIA_PROCESSO = calcAderenciaProcesso(MAQUINAS);
+    PRODUTIVIDADE = null; // m²/h — sem coluna equivalente em nenhuma base carregada
+    USANDO_DADOS_REAIS = true;
+  }catch(err){
+    console.error("Falha ao carregar dados reais do painel — usando referência:", err);
+    applyFallback();
+  }
+}
 
 /* ============ helpers ============ */
 const fmt   = n => Math.round(n).toLocaleString("pt-BR");
@@ -1512,25 +1703,34 @@ function wobble(base, amp, n=12){
   return out;
 }
 
+/* Tudo abaixo lê MAQUINAS/TIPOS_PERDA/etc — só pode rodar depois que
+   loadRealData()/applyFallback() já preencheram essas variáveis. Por isso
+   vira uma função, chamada uma única vez pelo boot() lá no fim do arquivo,
+   em vez de código solto executado no meio do parse da página. */
+function renderDashboard(){
+
 /* ============ VISÃO GERAL ============ */
 const aparasMedia   = APARAS_MENSAL.apontado[APARAS_MENSAL.apontado.length-1];
 const confirmMedia  = APARAS_MENSAL.confirmado[APARAS_MENSAL.confirmado.length-1];
 const tmrMedio      = MAQUINAS.reduce((a,m)=>a+m.tmr,0)/MAQUINAS.length;
 const aderMedia     = ADERENCIA_PROCESSO.reduce((a,p)=>a+p.pct,0)/ADERENCIA_PROCESSO.length;
-const produtividade = 214.6; // m²/h
+const produtividade = PRODUTIVIDADE; // m²/h — null quando nenhuma base carregada traz essa métrica
 const perdaTotalKg  = TIPOS_PERDA.reduce((a,t)=>a+t.kg,0);
 
-renderKpis(document.getElementById("kpi-row"), [
+const kpisGerais = [
   { label:"Apara apontada", value:aparasMedia, suffix:"%", decimals:1,
     delta:`meta ${fmt1(META_APARAS)}% · confirmado ${fmt1(confirmMedia)}%`,
     dir: aparasMedia <= META_APARAS ? "up" : "down", spark: APARAS_MENSAL.apontado.slice() },
   { label:"TMR médio", value:tmrMedio, suffix:"%", decimals:1,
     delta:"tempo de máquina rodando", dir:"up", spark: wobble(tmrMedio, 3) },
-  { label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:1,
-    delta:"+6,2 m²/h vs. mês anterior", dir:"up", spark: wobble(produtividade, 8) },
-  { label:"Aderência ao plano", value:aderMedia, suffix:"%", decimals:1,
-    delta:"km lineares realizados ÷ planejados", dir: aderMedia>=90?"up":"down", spark: wobble(aderMedia, 4) },
-]);
+];
+if(produtividade != null){
+  kpisGerais.push({ label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:1,
+    delta:"+6,2 m²/h vs. mês anterior", dir:"up", spark: wobble(produtividade, 8) });
+}
+kpisGerais.push({ label:"Aderência ao plano", value:aderMedia, suffix:"%", decimals:1,
+    delta:"km lineares realizados ÷ planejados", dir: aderMedia>=90?"up":"down", spark: wobble(aderMedia, 4) });
+renderKpis(document.getElementById("kpi-row"), kpisGerais);
 
 /* Gráfico principal: apara apontada x confirmada */
 (function(){
@@ -1587,7 +1787,7 @@ function renderMotivoChart(){
     value: t.kg,
     display: fmt(t.kg/1000)+"t",
     color:"var(--series-2)", color2:"var(--series-4)",
-    tip:`<b>${t.cod} — ${esc(t.nome)}</b><br>${fmt(t.kg)} kg · ${fmt1(t.kg/perdaTotalKg*100)}% do refugo`
+    tip:`<b>${t.cod ? t.cod+" — " : ""}${esc(t.nome)}</b><br>${fmt(t.kg)} kg · ${fmt1(t.kg/perdaTotalKg*100)}% do refugo`
   })), { idPrefix:"mot", labelW:126, valueW:56, aria:"Perda por motivo em quilos" });
 }
 renderMotivoChart();
@@ -1668,7 +1868,7 @@ renderKpis(document.getElementById("aparas-kpis"), [
 ]);
 
 hBarChart(document.getElementById("perda-tipo-chart"), TIPOS_PERDA.map(t=>({
-  label:`${t.cod} · ${t.nome}`,
+  label: t.cod ? `${t.cod} · ${t.nome}` : t.nome,
   value:t.kg, display: fmt(t.kg)+" kg",
   color:"var(--series-2)", color2:"var(--series-4)",
   tip:`<b>${esc(t.nome)}</b><br>${fmt(t.kg)} kg · ${fmt1(t.kg/perdaTotalKg*100)}% do total`
@@ -1716,13 +1916,22 @@ hBarChart(document.getElementById("classe-chart"), CLASSIFICACOES.map(c=>({
 (function(){
   const horasProd = MAQUINAS.reduce((a,m)=>a+m.horasProd,0);
   const horasTot  = MAQUINAS.reduce((a,m)=>a+m.horasTot,0);
-  const velMedia  = MAQUINAS.reduce((a,m)=>a+m.vel,0)/MAQUINAS.length;
-  renderKpis(document.getElementById("prod-kpis"), [
+  // Nenhuma base carregada até agora traz velocidade de máquina — quando
+  // isso mudar, essas duas linhas passam a achar dado de verdade sozinhas.
+  const velDisponivel = MAQUINAS.length>0 && MAQUINAS.every(m=>m.vel!=null && m.velRef!=null);
+  const velMedia = velDisponivel ? MAQUINAS.reduce((a,m)=>a+m.vel,0)/MAQUINAS.length : null;
+
+  const kpisProd = [
     { label:"TMR médio", value:tmrMedio, suffix:"%", decimals:1, delta:"horas produzindo ÷ horas totais", dir:"up", spark: wobble(tmrMedio,3) },
-    { label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:1, delta:"m² por hora trabalhada", dir:"up", spark: wobble(produtividade,8) },
-    { label:"Velocidade média", value:velMedia, suffix:" m/min", decimals:0, delta:"média ponderada das máquinas", dir:"flat", spark: wobble(velMedia,14) },
-    { label:"Horas produzindo", value:horasProd, suffix:" h", decimals:0, delta:`de ${fmt(horasTot)} h totais`, dir:"up", spark: wobble(horasProd/12,20) },
-  ]);
+  ];
+  if(produtividade != null){
+    kpisProd.push({ label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:1, delta:"m² por hora trabalhada", dir:"up", spark: wobble(produtividade,8) });
+  }
+  if(velDisponivel){
+    kpisProd.push({ label:"Velocidade média", value:velMedia, suffix:" m/min", decimals:0, delta:"média ponderada das máquinas", dir:"flat", spark: wobble(velMedia,14) });
+  }
+  kpisProd.push({ label:"Horas produzindo", value:horasProd, suffix:" h", decimals:0, delta:`de ${fmt(horasTot)} h totais`, dir:"up", spark: wobble(horasProd/12,20) });
+  renderKpis(document.getElementById("prod-kpis"), kpisProd);
 
   hBarChart(document.getElementById("tmr-chart"), MAQUINAS.slice().sort((a,b)=>b.tmr-a.tmr).map(m=>({
     label:m.nome, value:m.tmr, display: m.tmr+"%",
@@ -1731,44 +1940,45 @@ hBarChart(document.getElementById("classe-chart"), CLASSIFICACOES.map(c=>({
     tip:`<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br>TMR ${m.tmr}% · ${fmt(m.horasProd)} h de ${fmt(m.horasTot)} h`
   })), { idPrefix:"tmr", labelW:92, valueW:52, rowH:26, min:100, aria:"TMR por máquina" });
 
-  const downtime = STATUS_APONTAMENTO.filter(s=>s.nome!=="Produzindo")
-    .map(s=>({ nome:s.nome, horas: Math.round((horasTot-horasProd) * s.peso/54), cor: statusColor(s) }))
-    .sort((a,b)=>b.horas-a.horas);
-  hBarChart(document.getElementById("downtime-chart"), downtime.map(d=>({
+  hBarChart(document.getElementById("downtime-chart"), DOWNTIME.map(d=>({
     label:d.nome, value:d.horas, display: fmt(d.horas)+" h",
-    color:d.cor, color2:d.cor,
+    color: isDark()?d.corDark:d.cor, color2: isDark()?d.corDark:d.cor,
     tip:`<b>${esc(d.nome)}</b><br>${fmt(d.horas)} h de parada`
   })), { idPrefix:"dt", labelW:140, valueW:60, rowH:24, aria:"Horas por classificação de parada" });
 
   const holder = document.getElementById("velocidade-chart");
-  const W=1120, rowH=30, gap=8, H=MAQUINAS.length*(rowH+gap);
-  const labelW=110, valW=104, barMax=W-labelW-valW;
-  const maxVel = Math.max(...MAQUINAS.map(m=>m.velRef));
-  holder.innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Velocidade média por máquina contra a referência">
-    <style>.vrow:hover .vfill{ filter:brightness(1.12); } .vrow:hover .vbg{ fill:var(--glass-bg-strong); }</style>
-    ${MAQUINAS.map((m,i)=>{
-      const y=i*(rowH+gap);
-      const wRef=(m.velRef/maxVel)*barMax, wVel=(m.vel/maxVel)*barMax;
-      const ating = m.vel/m.velRef*100;
-      const cor = ating>=90 ? "var(--good)" : ating>=75 ? "var(--warning)" : "var(--critical)";
-      return `<g class="vrow" data-i="${i}">
-        <rect class="vbg" x="-6" y="${y-2}" width="${W+6}" height="${rowH+4}" rx="6" fill="transparent"/>
-        <text x="0" y="${y+rowH/2+4}" font-size="11" fill="var(--text-secondary)" font-family="Public Sans">${esc(m.nome)}</text>
-        <rect x="${labelW}" y="${y+6}" width="${wRef}" height="${rowH-12}" rx="4" fill="var(--surface-sunken)"/>
-        <rect class="vfill" x="${labelW}" y="${y+6}" width="0" height="${rowH-12}" rx="4" fill="${cor}">
-          <animate attributeName="width" from="0" to="${wVel.toFixed(1)}" dur="0.7s" begin="${(i*0.04).toFixed(2)}s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
-        </rect>
-        <line x1="${labelW+wRef}" y1="${y+3}" x2="${labelW+wRef}" y2="${y+rowH-3}" stroke="var(--text-muted)" stroke-width="1.5" stroke-dasharray="2,2"/>
-        <text x="${W-6}" y="${y+rowH/2+4}" font-size="11" text-anchor="end" font-family="IBM Plex Mono, monospace" fill="var(--text-primary)" font-weight="600">${m.vel} <tspan fill="var(--text-muted)" font-weight="400">/ ${m.velRef}</tspan></text>
-      </g>`;
-    }).join("")}
-  </svg>`;
-  holder.querySelectorAll(".vrow").forEach(g=>{
-    const m = MAQUINAS[+g.dataset.i];
-    g.addEventListener("mousemove", e=> attachTip(holder,
-      `<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br>${m.vel} m/min de ${m.velRef} m/min<br>${fmt1(m.vel/m.velRef*100)}% da referência`, e));
-    g.addEventListener("mouseleave", ()=> clearTip(holder));
-  });
+  if(!velDisponivel){
+    holder.innerHTML = `<div class="empty-state">Nenhuma das bases carregadas traz velocidade de máquina (m/min) ainda.</div>`;
+  }else{
+    const W=1120, rowH=30, gap=8, H=MAQUINAS.length*(rowH+gap);
+    const labelW=110, valW=104, barMax=W-labelW-valW;
+    const maxVel = Math.max(...MAQUINAS.map(m=>m.velRef));
+    holder.innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Velocidade média por máquina contra a referência">
+      <style>.vrow:hover .vfill{ filter:brightness(1.12); } .vrow:hover .vbg{ fill:var(--glass-bg-strong); }</style>
+      ${MAQUINAS.map((m,i)=>{
+        const y=i*(rowH+gap);
+        const wRef=(m.velRef/maxVel)*barMax, wVel=(m.vel/maxVel)*barMax;
+        const ating = m.vel/m.velRef*100;
+        const cor = ating>=90 ? "var(--good)" : ating>=75 ? "var(--warning)" : "var(--critical)";
+        return `<g class="vrow" data-i="${i}">
+          <rect class="vbg" x="-6" y="${y-2}" width="${W+6}" height="${rowH+4}" rx="6" fill="transparent"/>
+          <text x="0" y="${y+rowH/2+4}" font-size="11" fill="var(--text-secondary)" font-family="Public Sans">${esc(m.nome)}</text>
+          <rect x="${labelW}" y="${y+6}" width="${wRef}" height="${rowH-12}" rx="4" fill="var(--surface-sunken)"/>
+          <rect class="vfill" x="${labelW}" y="${y+6}" width="0" height="${rowH-12}" rx="4" fill="${cor}">
+            <animate attributeName="width" from="0" to="${wVel.toFixed(1)}" dur="0.7s" begin="${(i*0.04).toFixed(2)}s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
+          </rect>
+          <line x1="${labelW+wRef}" y1="${y+3}" x2="${labelW+wRef}" y2="${y+rowH-3}" stroke="var(--text-muted)" stroke-width="1.5" stroke-dasharray="2,2"/>
+          <text x="${W-6}" y="${y+rowH/2+4}" font-size="11" text-anchor="end" font-family="IBM Plex Mono, monospace" fill="var(--text-primary)" font-weight="600">${m.vel} <tspan fill="var(--text-muted)" font-weight="400">/ ${m.velRef}</tspan></text>
+        </g>`;
+      }).join("")}
+    </svg>`;
+    holder.querySelectorAll(".vrow").forEach(g=>{
+      const m = MAQUINAS[+g.dataset.i];
+      g.addEventListener("mousemove", e=> attachTip(holder,
+        `<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br>${m.vel} m/min de ${m.velRef} m/min<br>${fmt1(m.vel/m.velRef*100)}% da referência`, e));
+      g.addEventListener("mouseleave", ()=> clearTip(holder));
+    });
+  }
 })();
 
 /* ============ VIEW: ADERÊNCIA ============ */
@@ -1845,8 +2055,14 @@ function renderGantt(){
   const H = MAQUINAS.length*(rowH+gap) + padB;
   const plotW = W - padL - 8;
 
-  // segmentos por máquina (peso do status reflete o TMR de cada recurso)
   const segsPorMaq = MAQUINAS.map(m=>{
+    // Máquina com segmentos reais carregados (último dia com apontamento) —
+    // usa eles. Sem isso pra essa máquina (ex: parada o dia todo, sem
+    // apontamento nenhum), sorteia uma linha plausível — mesmo comportamento
+    // de sempre, só como fallback por máquina em vez de tudo ou nada.
+    const real = GANTT_POR_MAQUINA && GANTT_POR_MAQUINA.get(m.id);
+    if(real && real.length) return real;
+
     const segs = [];
     let t = 0;
     let guard = 0;
@@ -1857,7 +2073,7 @@ function renderGantt(){
         : STATUS_APONTAMENTO[1 + Math.floor(Math.random()*(STATUS_APONTAMENTO.length-1))];
       const dur = produzindo ? 1.2 + Math.random()*3.4 : 0.4 + Math.random()*1.3;
       const end = Math.min(HOURS, t+dur);
-      segs.push({ st, ini:t, fim:end });
+      segs.push({ st, nome: st.nome, ini:t, fim:end });
       t = end;
     }
     return segs;
@@ -1898,14 +2114,27 @@ function renderGantt(){
     const s = segsPorMaq[+r.dataset.m][+r.dataset.s];
     const hh = h => String(Math.floor(h)).padStart(2,"0")+":"+String(Math.round((h%1)*60)).padStart(2,"0");
     r.addEventListener("mousemove", e=> attachTip(holder,
-      `<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br><span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:2px;background:${statusColor(s.st)};display:inline-block;"></span>${esc(s.st.nome)}</span><br>${hh(s.ini)} → ${hh(s.fim)} · ${fmt1(s.fim-s.ini)} h`, e));
+      `<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br><span style="display:inline-flex;align-items:center;gap:5px;"><span style="width:8px;height:8px;border-radius:2px;background:${statusColor(s.st)};display:inline-block;"></span>${esc(s.nome)}</span><br>${hh(s.ini)} → ${hh(s.fim)} · ${fmt1(s.fim-s.ini)} h`, e));
     r.addEventListener("mouseleave", ()=> clearTip(holder));
   });
 
   if(legend){
-    legend.innerHTML = STATUS_APONTAMENTO.map(s=>
-      `<span class="legend-item" style="cursor:default;"><span class="legend-dot" style="background:${statusColor(s)}"></span>${esc(s.nome)}</span>`
+    // Com dado real, a legenda usa as mesmas cores do gráfico de downtime
+    // (paleta por código) em vez da lista fixa de 11 status oficiais —
+    // assim as duas visões falam a mesma linguagem de cor.
+    const itens = GANTT_POR_MAQUINA
+      ? [{ nome:STATUS_APONTAMENTO[0].nome, cor:statusColor(STATUS_APONTAMENTO[0]) }, ...DOWNTIME.map(d=>({ nome:d.nome, cor: isDark()?d.corDark:d.cor }))]
+      : STATUS_APONTAMENTO.map(s=>({ nome:s.nome, cor:statusColor(s) }));
+    legend.innerHTML = itens.map(it=>
+      `<span class="legend-item" style="cursor:default;"><span class="legend-dot" style="background:${it.cor}"></span>${esc(it.nome)}</span>`
     ).join("");
+  }
+
+  const sub = document.getElementById("gantt-panel-sub");
+  if(sub){
+    sub.textContent = GANTT_POR_MAQUINA
+      ? "Ocupação das máquinas no último dia com apontamento carregado · passe o mouse para ver a OP"
+      : "Ocupação das máquinas nas últimas 24 h · passe o mouse para ver a OP";
   }
 }
 renderGantt();
@@ -1915,9 +2144,7 @@ window.renderGanttForTheme = renderGantt;
 (function(){
   const holder = document.getElementById("pareto-chart");
   if(!holder) return;
-  const dados = STATUS_APONTAMENTO.filter(s=>s.nome!=="Produzindo")
-    .map(s=>({ nome:s.nome, horas: s.peso*7.4, cor: statusColor(s) }))
-    .sort((a,b)=>b.horas-a.horas);
+  const dados = DOWNTIME.map(d=>({ nome:d.nome, horas:d.horas, cor: isDark()?d.corDark:d.cor }));
   const tot = dados.reduce((a,d)=>a+d.horas,0);
   let acc = 0;
   dados.forEach(d=>{ acc += d.horas; d.acum = acc/tot*100; });
@@ -2096,7 +2323,7 @@ window.renderGanttForTheme = renderGantt;
     bodyEl.innerHTML = `
       <div class="drawer-metrics">
         <div class="drawer-metric"><div class="v mono">${m.tmr}%</div><div class="l">TMR</div></div>
-        <div class="drawer-metric"><div class="v mono">${m.vel}</div><div class="l">m/min</div></div>
+        <div class="drawer-metric"><div class="v mono">${m.vel!=null ? m.vel : "—"}</div><div class="l">m/min</div></div>
         <div class="drawer-metric"><div class="v mono">${fmt1(m.aparas)}%</div><div class="l">Apara</div></div>
       </div>
 
@@ -2114,7 +2341,9 @@ window.renderGanttForTheme = renderGantt;
         ${[
            // [rótulo, largura da barra em %, cor, texto exibido]
            ["TMR", m.tmr, cor, m.tmr+"%"],
-           ["Velocidade", Math.round(m.vel/m.velRef*100), "var(--series-3)", `${m.vel} m/min`],
+           ...(m.vel!=null && m.velRef!=null
+             ? [["Velocidade", Math.round(m.vel/m.velRef*100), "var(--series-3)", `${m.vel} m/min`]]
+             : []),
            // Apara numa escala de 0 a 10%, para a barra crescer com o problema
            ["Apara", Math.min(100, Math.round(m.aparas/10*100)), statusCor[aparasStatus(m.aparas)], fmt1(m.aparas)+"%"]
           ].map(([label,val,c,txt])=>`
@@ -2132,7 +2361,7 @@ window.renderGanttForTheme = renderGantt;
 
       <div class="drawer-section-title">Refugo — ${fmt(perdaMaq)} kg no período</div>
       ${topMotivos.map((t,i)=>`<div class="drawer-facas-item">
-        <span>${t.cod} · ${esc(t.nome)}</span>
+        <span>${t.cod ? `${t.cod} · ${esc(t.nome)}` : esc(t.nome)}</span>
         <span class="mono">${fmt(perdaMaq * [0.34,0.26,0.22,0.18][i])} kg</span>
       </div>`).join("")}
     `;
@@ -2202,7 +2431,14 @@ window.renderGanttForTheme = renderGantt;
       return `A aderência ao planejado está em <b>${fmt1(aderMedia)}%</b>. O gargalo é <b>${esc(piorProc.nome)}</b>, com ${fmt1(piorProc.pct)}% (${fmt(piorProc.realizado)} de ${fmt(piorProc.planejado)} km lineares).<br><br>Como corte fica no fim da rota, atraso em impressão e laminação se acumula ali — vale checar o WIP intermediário antes de replanejar.`;
     }
     if(q.includes("velocidad") || q.includes("produtiv") || q.includes("vazão") || q.includes("vazao")){
-      return `A produtividade está em <b>${fmt1(produtividade)} m²/h</b>. Nas velocidades, a maior perda contra a referência aparece na <b>${esc(MAQUINAS.slice().sort((a,b)=>(a.vel/a.velRef)-(b.vel/b.velRef))[0].nome)}</b>, rodando bem abaixo do nominal — normalmente é sintoma de material ou acerto, não da máquina em si.`;
+      const semVelocidade = MAQUINAS.some(m=>m.vel==null || m.velRef==null);
+      const partProdutividade = produtividade != null
+        ? `A produtividade está em <b>${fmt1(produtividade)} m²/h</b>. `
+        : `Ainda não tenho produtividade (m²/h) — nenhuma base carregada traz essa métrica. `;
+      const partVelocidade = semVelocidade
+        ? `Também não tenho velocidade (m/min) por máquina ainda.`
+        : `Nas velocidades, a maior perda contra a referência aparece na <b>${esc(MAQUINAS.slice().sort((a,b)=>(a.vel/a.velRef)-(b.vel/b.velRef))[0].nome)}</b>, rodando bem abaixo do nominal — normalmente é sintoma de material ou acerto, não da máquina em si.`;
+      return partProdutividade + partVelocidade;
     }
     if(q.includes("classific") || q.includes("produto") || q.includes("estrutura")){
       return `Por classificação, a <b>${esc(piorClasse.nome)}</b> tem a maior apara: <b>${fmt1(piorClasse.aparas)}%</b> (meta ${fmt1(META_APARAS)}%). As estruturas laminadas mais simples ficam bem melhor — quanto mais camadas, mais acerto e mais refugo.`;
@@ -2241,6 +2477,25 @@ window.renderGanttForTheme = renderGantt;
   sendBtn.addEventListener("click", ()=>{ if(input.value.trim()) ask(input.value.trim()); });
   input.addEventListener("keydown", e=>{ if(e.key==="Enter" && input.value.trim()) ask(input.value.trim()); });
 })();
+
+const dataTag = document.getElementById("data-source-tag");
+if(dataTag){
+  dataTag.classList.toggle("is-real", USANDO_DADOS_REAIS);
+  dataTag.title = USANDO_DADOS_REAIS
+    ? "Indicadores, máquinas e motivos de perda vêm das bases reais de Produção, sincronizadas diariamente."
+    : "Indicadores, máquinas e motivos de perda vêm dos BIs de Produção. Os valores numéricos são de referência até a conexão com a fonte de dados.";
+  dataTag.innerHTML = USANDO_DADOS_REAIS
+    ? `<span class="dot"></span>Dados reais &middot; sincronizado diariamente`
+    : `<span class="dot"></span>Estrutura dos BIs &middot; valores de referência`;
+}
+const footerNote = document.getElementById("footer-note");
+if(footerNote){
+  footerNote.innerHTML = USANDO_DADOS_REAIS
+    ? `Painel interno de Produção &middot; Gualapack Jaguariúna &middot; indicadores, máquinas e motivos de perda vêm das bases reais de Produção, sincronizadas diariamente &mdash; WIP &amp; Carteira ainda usa dados de referência (ver aviso na própria aba).`
+    : `Painel interno de Produção &middot; Gualapack Jaguariúna &middot; indicadores, máquinas e motivos de perda espelhados dos BIs de Produção &mdash; valores numéricos de referência até a conexão com a fonte de dados.`;
+}
+
+} // fim de renderDashboard()
 
 /* ============ troca de tema claro/escuro, com transição em círculo ============ */
 (function(){
@@ -2428,6 +2683,26 @@ window.renderGanttForTheme = renderGantt;
     window.location.replace("./login.html");
   });
 })();
+
+/* ============ carga inicial ============ */
+function whenSessionReady(cb){
+  if(window.__GUALAPACK_SESSION_READY__){ cb(); return; }
+  document.addEventListener("gualapack-session-ready", cb, { once:true });
+}
+async function boot(){
+  try{
+    await loadRealData();
+    renderDashboard();
+  }catch(err){
+    // Erro aqui não pode deixar a página presa atrás do "auth-pending" pra
+    // sempre — melhor mostrar o painel (mesmo que incompleto) do que uma
+    // tela em branco.
+    console.error("Falha ao iniciar o painel:", err);
+  }finally{
+    document.body.classList.remove("auth-pending");
+  }
+}
+whenSessionReady(boot);
 </script>
 </body>
 </html>
