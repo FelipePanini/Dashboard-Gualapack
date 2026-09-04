@@ -228,6 +228,15 @@ async function main() {
         continue;
       }
 
+      // DEBUG TEMPORÁRIO: mostra o cabeçalho cru de "maquinas" pra investigar
+      // por que "grupo" está vindo NULL mesmo com "id"/"considerar" ok.
+      // TODO: remover depois de diagnosticar.
+      if (def.table === "maquinas") {
+        console.log(`[debug headers] ${file.name} [${sheetName}]:`, JSON.stringify(Object.keys(rawRows[0])));
+        console.log(`[debug row0]`, JSON.stringify(rawRows[0]));
+        console.log(`[debug row1]`, JSON.stringify(rawRows[1]));
+      }
+
       const rows = rawRows.map((r) => coerceRow(r, def.numeric, def.date, def.allowed));
 
       if (rows.every((r) => Object.keys(r).length === 0)) {
