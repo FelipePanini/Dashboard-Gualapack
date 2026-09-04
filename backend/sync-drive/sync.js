@@ -253,14 +253,6 @@ async function main() {
         continue;
       }
 
-      // DEBUG TEMPORÁRIO: confirma que o cabeçalho de "tendencia_mensal"
-      // (que tinha o mesmo problema de linha de título mesclada) veio certo
-      // depois do sheetToRows(). TODO: remover depois de confirmar.
-      if (def.table === "tendencia_mensal") {
-        console.log(`[debug headers] ${file.name} [${sheetName}]:`, JSON.stringify(Object.keys(rawRows[0])));
-        console.log(`[debug row0]`, JSON.stringify(rawRows[0]));
-      }
-
       const rows = rawRows.map((r) => coerceRow(r, def.numeric, def.date, def.allowed));
 
       if (rows.every((r) => Object.keys(r).length === 0)) {
