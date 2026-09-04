@@ -85,6 +85,8 @@ const HEADER_ALIASES: Record<string, string> = {
   usr_tipodaperda: "tipo_perda",
   usr_kgdaperda: "kg_perda",
   usr_peso_bruto_bobina: "peso_bruto_bobina",
+  dp_ou_fp: "dp_fp",   // "DP ou FP" na planilha de fardos
+  n: "numero",         // "Nº" na planilha de fardos
 };
 
 // O Excel guarda datas como número de série (dias desde 30/12/1899) — o

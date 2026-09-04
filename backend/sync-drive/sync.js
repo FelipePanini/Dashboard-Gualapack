@@ -59,6 +59,8 @@ const HEADER_ALIASES = {
   usr_tipodaperda: "tipo_perda",
   usr_kgdaperda: "kg_perda",
   usr_peso_bruto_bobina: "peso_bruto_bobina",
+  dp_ou_fp: "dp_fp",   // "DP ou FP" na planilha de fardos
+  n: "numero",         // "Nº" na planilha de fardos
 };
 
 function detectTable(fileName) {
