@@ -25,7 +25,7 @@ create table if not exists public.maquinas (
 create table if not exists public.apontamentos (
   id                  bigint generated always as identity primary key,
   num_ordem           text,
-  cod_recurso         text references public.maquinas(id),
+  cod_recurso         text,
   cod_apont           text,          -- código do tipo de apontamento (ex: '20', '40')
   cod_desc            text,          -- descrição do apontamento (ex: '20 - Produzindo')
   dt_producao         date,
@@ -82,7 +82,7 @@ create table if not exists public.aderencia_maquinas_diaria (
   num_ordem      text,
   dt_producao    date,
   qtd_produzida  numeric,
-  cod_recurso    text references public.maquinas(id),
+  cod_recurso    text,
   qtd_horas      numeric,
   classificacao  text,
   descricao      text,
@@ -101,7 +101,7 @@ create table if not exists public.aderencia_programacao (
   id                bigint generated always as identity primary key,
   cod_cliente       text,
   cod_estrutura     text,
-  recurso_ctr       text references public.maquinas(id),
+  recurso_ctr       text,
   tipo_produto      text,
   num_ordem         text,
   dt_saida_maquina  timestamptz,
