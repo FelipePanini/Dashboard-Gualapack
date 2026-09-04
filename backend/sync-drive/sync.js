@@ -115,7 +115,11 @@ const HEADER_ALIASES = {
   mini_set_real: "min_set_real", // "Mini_Set_Real" (typo na planilha de origem)
   date: "data",                  // "DATE" no Refugo Aparas
   type_of_machine: "id",         // "Type of Machine" no Machine Card
-  machine_group: "grupo",        // "Machine Group" no Machine Card
+  machine_group: "grupo",        // caso um dia o cabeçalho venha limpo
+  machine_group_considerar: "grupo", // "Machine Group Considerar ?" — como o cabeçalho
+                                      // realmente vem no Machine Card (texto quebrado em
+                                      // duas linhas numa célula só); confirmado via log em
+                                      // 2026-09-04, ver commit que adicionou esta linha.
 };
 
 function detectTable(fileName) {
@@ -141,6 +145,27 @@ function excelValueToIso(value, kind) {
   }
   if (Number.isNaN(date.getTime())) return null;
   return kind === "date" ? date.toISOString().slice(0, 10) : date.toISOString();
+}
+
+// Algumas planilhas (ex: "Graficos Tendência") têm uma linha de título
+// mesclada acima do cabeçalho de verdade (célula A preenchida, o resto
+// vazio) — sheet_to_json trata essa linha como cabeçalho e gera chaves
+// "__EMPTY_N" pro resto, jogando os nomes de coluna reais pra dentro dos
+// dados. Lê cru (header:1) e usa a primeira linha com mais de 1 célula
+// preenchida como cabeçalho de verdade — pra planilhas sem linha de título
+// (a maioria), isso já é a linha 1, então não muda nada.
+function sheetToRows(sheet) {
+  const raw = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+  let headerIdx = raw.findIndex((row) => row.filter((c) => String(c).trim() !== "").length > 1);
+  if (headerIdx === -1) headerIdx = 0;
+  const headers = raw[headerIdx].map((h) => String(h ?? "").trim());
+  return raw.slice(headerIdx + 1)
+    .filter((row) => row.some((c) => String(c).trim() !== ""))
+    .map((row) => {
+      const obj = {};
+      headers.forEach((h, i) => { if (h) obj[h] = row[i] ?? ""; });
+      return obj;
+    });
 }
 
 function coerceRow(row, numericCols, dateCols, allowedCols) {
@@ -222,19 +247,18 @@ async function main() {
       const sheetNames = XLSX.read(bytes, { type: "array", bookSheets: true }).SheetNames;
       const sheetName = detectSheet(def, sheetNames);
       const workbook = XLSX.read(bytes, { type: "array", sheets: [sheetName] });
-      const rawRows = XLSX.utils.sheet_to_json(workbook.Sheets[sheetName], { defval: "" });
+      const rawRows = sheetToRows(workbook.Sheets[sheetName]);
       if (rawRows.length === 0) {
         console.log(`[skip] "${file.name}" [${sheetName}] está vazia.`);
         continue;
       }
 
-      // DEBUG TEMPORÁRIO: mostra o cabeçalho cru de "maquinas" pra investigar
-      // por que "grupo" está vindo NULL mesmo com "id"/"considerar" ok.
-      // TODO: remover depois de diagnosticar.
-      if (def.table === "maquinas") {
+      // DEBUG TEMPORÁRIO: confirma que o cabeçalho de "tendencia_mensal"
+      // (que tinha o mesmo problema de linha de título mesclada) veio certo
+      // depois do sheetToRows(). TODO: remover depois de confirmar.
+      if (def.table === "tendencia_mensal") {
         console.log(`[debug headers] ${file.name} [${sheetName}]:`, JSON.stringify(Object.keys(rawRows[0])));
         console.log(`[debug row0]`, JSON.stringify(rawRows[0]));
-        console.log(`[debug row1]`, JSON.stringify(rawRows[1]));
       }
 
       const rows = rawRows.map((r) => coerceRow(r, def.numeric, def.date, def.allowed));

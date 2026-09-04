@@ -144,7 +144,12 @@ const HEADER_ALIASES: Record<string, string> = {
   mini_set_real: "min_set_real", // "Mini_Set_Real" (typo na planilha de origem)
   date: "data",                 // "DATE" no Refugo Aparas
   type_of_machine: "id",        // "Type of Machine" no Machine Card
-  machine_group: "grupo",       // "Machine Group" no Machine Card
+  machine_group: "grupo",       // caso um dia o cabeçalho venha limpo
+  machine_group_considerar: "grupo", // "Machine Group Considerar ?" — como o
+                                      // cabeçalho realmente vem no Machine Card
+                                      // (texto quebrado em duas linhas numa
+                                      // célula só); confirmado via log em
+                                      // 2026-09-04.
 };
 
 // O Excel guarda datas como número de série (dias desde 30/12/1899) — o
@@ -165,6 +170,27 @@ function excelValueToIso(value: unknown, kind: "date" | "timestamp"): string | n
   }
   if (Number.isNaN(date.getTime())) return null;
   return kind === "date" ? date.toISOString().slice(0, 10) : date.toISOString();
+}
+
+// Algumas planilhas (ex: "Graficos Tendência") têm uma linha de título
+// mesclada acima do cabeçalho de verdade (célula A preenchida, o resto
+// vazio) — sheet_to_json trata essa linha como cabeçalho e joga os nomes de
+// coluna reais pra dentro dos dados. Lê cru (header:1) e usa a primeira
+// linha com mais de 1 célula preenchida como cabeçalho de verdade — pra
+// planilhas sem linha de título (a maioria), isso já é a linha 1.
+// deno-lint-ignore no-explicit-any
+function sheetToRows(sheet: any): Record<string, unknown>[] {
+  const raw: unknown[][] = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" });
+  let headerIdx = raw.findIndex((row) => row.filter((c) => String(c).trim() !== "").length > 1);
+  if (headerIdx === -1) headerIdx = 0;
+  const headers = raw[headerIdx].map((h) => String(h ?? "").trim());
+  return raw.slice(headerIdx + 1)
+    .filter((row) => row.some((c) => String(c).trim() !== ""))
+    .map((row) => {
+      const obj: Record<string, unknown> = {};
+      headers.forEach((h, i) => { if (h) obj[h] = row[i] ?? ""; });
+      return obj;
+    });
 }
 
 function coerceRow(
@@ -243,7 +269,7 @@ Deno.serve(async (req) => {
     const workbook = XLSX.read(bytes, { type: "array" });
     const targetSheet = sheetName && workbook.SheetNames.includes(sheetName) ? sheetName : workbook.SheetNames[0];
     const sheet = workbook.Sheets[targetSheet];
-    const rawRows: Record<string, unknown>[] = XLSX.utils.sheet_to_json(sheet, { defval: "" });
+    const rawRows: Record<string, unknown>[] = sheetToRows(sheet);
 
     if (rawRows.length === 0) throw new Error(`"${fileName}" (aba "${targetSheet}") está vazia.`);
 
