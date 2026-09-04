@@ -35,6 +35,17 @@ const NUMERIC_COLUMNS: Record<string, string[]> = {
   tendencia_mensal: ["ano", "volume_prod_corte_km", "lote_medio_km", "volume_prod_kg", "aparas_kg", "aparas_pct"],
 };
 
+// Tabela -> colunas de data/hora (o Excel entrega essas como número de série,
+// não como texto — precisam de conversão especial, não só Number()).
+// "date" -> vira "AAAA-MM-DD"; "timestamp" -> vira ISO completo.
+const DATE_COLUMNS: Record<string, Record<string, "date" | "timestamp">> = {
+  apontamentos: { dt_producao: "date", hora_inicio: "timestamp", hora_fim: "timestamp" },
+  fardos_aparas: { data: "date" },
+  aderencia_maquinas_diaria: { dt_producao: "date" },
+  aderencia_programacao: { dt_saida_maquina: "timestamp" },
+  refugo_aparas_historico: { data: "date" },
+};
+
 // Tabelas com chave natural (não a "id" gerada) usam onConflict pra virar
 // upsert de verdade — sem isso, reenviar o mesmo mês/dia duplicaria linhas.
 const CONFLICT_COLUMNS: Record<string, string> = {
@@ -76,13 +87,35 @@ const HEADER_ALIASES: Record<string, string> = {
   usr_peso_bruto_bobina: "peso_bruto_bobina",
 };
 
-function coerceRow(row: Record<string, unknown>, numericCols: string[]) {
+// O Excel guarda datas como número de série (dias desde 30/12/1899) — o
+// SheetJS só converte pra objeto Date sozinho se a célula tiver formatação
+// de data nos metadados, o que nem sempre vem preservado. Por isso qualquer
+// coluna marcada em DATE_COLUMNS passa por aqui, aceitando os três formatos
+// possíveis que podem chegar: já um Date, um número de série, ou texto.
+function excelValueToIso(value: unknown, kind: "date" | "timestamp"): string | null {
+  let date: Date;
+  if (value instanceof Date) {
+    date = value;
+  } else if (typeof value === "number") {
+    date = new Date(Math.round((value - 25569) * 86400 * 1000));
+  } else {
+    const parsed = new Date(String(value));
+    if (Number.isNaN(parsed.getTime())) return null;
+    date = parsed;
+  }
+  if (Number.isNaN(date.getTime())) return null;
+  return kind === "date" ? date.toISOString().slice(0, 10) : date.toISOString();
+}
+
+function coerceRow(row: Record<string, unknown>, numericCols: string[], dateCols: Record<string, "date" | "timestamp">) {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(row)) {
     const normalized = normalizeHeader(key);
     const col = HEADER_ALIASES[normalized] ?? normalized;
     if (value === "" || value === undefined || value === null) {
       out[col] = null;
+    } else if (dateCols[col]) {
+      out[col] = excelValueToIso(value, dateCols[col]);
     } else if (numericCols.includes(col)) {
       const n = Number(String(value).replace(/\./g, "").replace(",", "."));
       out[col] = Number.isNaN(n) ? Number(value) : n;
@@ -149,7 +182,8 @@ Deno.serve(async (req) => {
     if (rawRows.length === 0) throw new Error(`"${fileName}" (aba "${targetSheet}") está vazia.`);
 
     const numericCols = NUMERIC_COLUMNS[table] ?? [];
-    const rows = rawRows.map((r) => coerceRow(r, numericCols));
+    const dateCols = DATE_COLUMNS[table] ?? {};
+    const rows = rawRows.map((r) => coerceRow(r, numericCols, dateCols));
     const conflictCols = CONFLICT_COLUMNS[table];
 
     let gravadas = 0;

@@ -29,13 +29,13 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 // Tabela -> palavras-chave no nome do arquivo, palavras-chave na aba, e
 // colunas numéricas. Espelha TABLES em demo/upload.html.
 const TABLE_DEFS = [
-  { table: "fardos_aparas", fileKeywords: ["sequenciamento"], sheetKeywords: ["completos", "base_aparas_total"], numeric: ["numero", "qtd_bruta_kg", "qtd_liquida_kg"] },
-  { table: "aderencia_maquinas_diaria", fileKeywords: ["aderencia_maquinas", "aderenciamaquinas"], sheetKeywords: ["apontamentos_producao"], numeric: ["qtd_produzida", "qtd_horas"] },
-  { table: "aderencia_programacao", fileKeywords: ["historico_aderencia", "aderencia_programacao"], sheetKeywords: ["programacao_passado"], numeric: ["qtd_produzido", "qtd_planejado", "meta_qtd_acerto", "qtd_acerto_real", "min_set_prog", "min_set_real", "qtd_prod_kg", "meta_mts_hora", "qtd_hor_p"] },
-  { table: "refugo_aparas_historico", fileKeywords: ["refugo_aparas"], sheetKeywords: ["historico_refugo"], numeric: ["volume_jgr", "scrap_jgr", "volume_orf", "scrap_orf"] },
-  { table: "tendencia_mensal", fileKeywords: ["tendencia", "grafico"], sheetKeywords: ["dados_prod"], numeric: ["ano", "volume_prod_corte_km", "lote_medio_km", "volume_prod_kg", "aparas_kg", "aparas_pct"] },
-  { table: "maquinas", fileKeywords: ["machine_card"], sheetKeywords: ["dim_eqtos"], numeric: [] },
-  { table: "apontamentos", fileKeywords: ["indicadores", "base_aparas"], sheetKeywords: ["base_maquina", "base_detalhe"], numeric: ["qtd_horas", "qtd_produzida", "desperdicio_acerto", "desperdicio_virando", "peso_bruto_bobina", "kg_perda"] },
+  { table: "fardos_aparas", fileKeywords: ["sequenciamento"], sheetKeywords: ["completos", "base_aparas_total"], numeric: ["numero", "qtd_bruta_kg", "qtd_liquida_kg"], date: { data: "date" } },
+  { table: "aderencia_maquinas_diaria", fileKeywords: ["aderencia_maquinas", "aderenciamaquinas"], sheetKeywords: ["apontamentos_producao"], numeric: ["qtd_produzida", "qtd_horas"], date: { dt_producao: "date" } },
+  { table: "aderencia_programacao", fileKeywords: ["historico_aderencia", "aderencia_programacao"], sheetKeywords: ["programacao_passado"], numeric: ["qtd_produzido", "qtd_planejado", "meta_qtd_acerto", "qtd_acerto_real", "min_set_prog", "min_set_real", "qtd_prod_kg", "meta_mts_hora", "qtd_hor_p"], date: { dt_saida_maquina: "timestamp" } },
+  { table: "refugo_aparas_historico", fileKeywords: ["refugo_aparas"], sheetKeywords: ["historico_refugo"], numeric: ["volume_jgr", "scrap_jgr", "volume_orf", "scrap_orf"], date: { data: "date" } },
+  { table: "tendencia_mensal", fileKeywords: ["tendencia", "grafico"], sheetKeywords: ["dados_prod"], numeric: ["ano", "volume_prod_corte_km", "lote_medio_km", "volume_prod_kg", "aparas_kg", "aparas_pct"], date: {} },
+  { table: "maquinas", fileKeywords: ["machine_card"], sheetKeywords: ["dim_eqtos"], numeric: [], date: {} },
+  { table: "apontamentos", fileKeywords: ["indicadores", "base_aparas"], sheetKeywords: ["base_maquina", "base_detalhe"], numeric: ["qtd_horas", "qtd_produzida", "desperdicio_acerto", "desperdicio_virando", "peso_bruto_bobina", "kg_perda"], date: { dt_producao: "date", hora_inicio: "timestamp", hora_fim: "timestamp" } },
 ];
 
 const CONFLICT_COLUMNS = { refugo_aparas_historico: "data", tendencia_mensal: "mes,ano" };
@@ -70,12 +70,29 @@ function detectSheet(def, sheetNames) {
   return sheetNames.find((n) => def.sheetKeywords.some((k) => normalize(n).includes(k))) ?? sheetNames[0];
 }
 
-function coerceRow(row, numericCols) {
+// O Excel guarda datas como número de série (dias desde 30/12/1899) — o
+// SheetJS só converte pra objeto Date sozinho se a célula tiver formatação
+// de data nos metadados, o que nem sempre vem preservado.
+function excelValueToIso(value, kind) {
+  let date;
+  if (value instanceof Date) date = value;
+  else if (typeof value === "number") date = new Date(Math.round((value - 25569) * 86400 * 1000));
+  else {
+    const parsed = new Date(String(value));
+    if (Number.isNaN(parsed.getTime())) return null;
+    date = parsed;
+  }
+  if (Number.isNaN(date.getTime())) return null;
+  return kind === "date" ? date.toISOString().slice(0, 10) : date.toISOString();
+}
+
+function coerceRow(row, numericCols, dateCols) {
   const out = {};
   for (const [key, value] of Object.entries(row)) {
     const normalized = normalize(key);
     const col = HEADER_ALIASES[normalized] ?? normalized;
     if (value === "" || value === undefined || value === null) out[col] = null;
+    else if (dateCols[col]) out[col] = excelValueToIso(value, dateCols[col]);
     else if (numericCols.includes(col)) out[col] = Number(value);
     else out[col] = value;
   }
@@ -153,7 +170,7 @@ async function main() {
         continue;
       }
 
-      const rows = rawRows.map((r) => coerceRow(r, def.numeric));
+      const rows = rawRows.map((r) => coerceRow(r, def.numeric, def.date));
       const conflictCols = CONFLICT_COLUMNS[def.table];
 
       let gravadas = 0;
