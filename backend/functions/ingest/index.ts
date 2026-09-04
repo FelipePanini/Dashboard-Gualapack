@@ -79,10 +79,33 @@ const DATE_COLUMNS: Record<string, Record<string, "date" | "timestamp">> = {
 
 // Tabelas com chave natural (não a "id" gerada) usam onConflict pra virar
 // upsert de verdade — sem isso, reenviar o mesmo mês/dia duplicaria linhas.
+// "maquinas" não está aqui porque sua chave (id) já é a primary key da
+// tabela — o Supabase usa ela como conflito por padrão, sem precisar dizer.
 const CONFLICT_COLUMNS: Record<string, string> = {
   refugo_aparas_historico: "data",
   tendencia_mensal: "mes,ano",
 };
+
+// Mesma ideia, mas usada pra DEDUPLICAR a lista de linhas antes de gravar —
+// mesmo com onConflict certo, o Postgres rejeita um upsert que tenta
+// atualizar a MESMA chave duas vezes dentro do mesmo lote ("ON CONFLICT DO
+// UPDATE command cannot affect row a second time"), e planilhas reais têm
+// linhas repetidas (ex: máquina cadastrada duas vezes no Machine Card).
+const DEDUPE_KEY: Record<string, string> = {
+  ...CONFLICT_COLUMNS,
+  maquinas: "id",
+};
+
+function dedupeRows(rows: Record<string, unknown>[], keyCols: string | undefined): Record<string, unknown>[] {
+  if (!keyCols) return rows;
+  const cols = keyCols.split(",");
+  const map = new Map<string, Record<string, unknown>>();
+  for (const row of rows) {
+    const key = cols.map((c) => String(row[c] ?? "")).join("|");
+    map.set(key, row); // a última ocorrência da chave vence
+  }
+  return Array.from(map.values());
+}
 
 const ALLOWED_TABLES = new Set(Object.keys(NUMERIC_COLUMNS));
 
@@ -239,10 +262,11 @@ Deno.serve(async (req) => {
     }
 
     const conflictCols = CONFLICT_COLUMNS[table];
+    const dedupedRows = dedupeRows(rows, DEDUPE_KEY[table]);
 
     let gravadas = 0;
-    for (let i = 0; i < rows.length; i += 500) {
-      const chunk = rows.slice(i, i + 500);
+    for (let i = 0; i < dedupedRows.length; i += 500) {
+      const chunk = dedupedRows.slice(i, i + 500);
       const { error } = conflictCols
         ? await supabase.from(table).upsert(chunk, { onConflict: conflictCols })
         : await supabase.from(table).upsert(chunk);

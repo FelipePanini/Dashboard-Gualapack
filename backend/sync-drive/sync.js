@@ -74,6 +74,23 @@ const TABLE_DEFS = [
 
 const CONFLICT_COLUMNS = { refugo_aparas_historico: "data", tendencia_mensal: "mes,ano" };
 
+// Mesma chave, mas usada pra DEDUPLICAR a lista de linhas antes de gravar —
+// o Postgres rejeita um upsert que tenta atualizar a MESMA chave duas vezes
+// dentro do mesmo lote, e planilhas reais têm linhas repetidas (ex: máquina
+// cadastrada duas vezes no Machine Card).
+const DEDUPE_KEY = { ...CONFLICT_COLUMNS, maquinas: "id" };
+
+function dedupeRows(rows, keyCols) {
+  if (!keyCols) return rows;
+  const cols = keyCols.split(",");
+  const map = new Map();
+  for (const row of rows) {
+    const key = cols.map((c) => String(row[c] ?? "")).join("|");
+    map.set(key, row); // a última ocorrência da chave vence
+  }
+  return Array.from(map.values());
+}
+
 function normalize(s) {
   return String(s || "")
     .normalize("NFD").replace(/[̀-ͯ]/g, "")
@@ -222,10 +239,11 @@ async function main() {
       }
 
       const conflictCols = CONFLICT_COLUMNS[def.table];
+      const dedupedRows = dedupeRows(rows, DEDUPE_KEY[def.table]);
 
       let gravadas = 0;
-      for (let i = 0; i < rows.length; i += 500) {
-        const chunk = rows.slice(i, i + 500);
+      for (let i = 0; i < dedupedRows.length; i += 500) {
+        const chunk = dedupedRows.slice(i, i + 500);
         const { error } = conflictCols
           ? await supabase.from(def.table).upsert(chunk, { onConflict: conflictCols })
           : await supabase.from(def.table).upsert(chunk);
