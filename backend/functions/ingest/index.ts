@@ -54,18 +54,33 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Cabeçalhos reais vêm em "CamelCase" grudado (ex: "CodApont", "NumOrdem"),
+// sem espaço nem underscore separando as palavras — por isso insere "_"
+// entre uma letra minúscula/número e a maiúscula seguinte ANTES de baixar
+// pra minúsculo, senão "CodApont" viraria "codapont" em vez de "cod_apont".
 function normalizeHeader(name: string): string {
   return String(name)
     .normalize("NFD").replace(/[̀-ͯ]/g, "") // remove acentos
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
 }
 
+// Colunas cujo nome real na planilha não bate nem depois de normalizar
+// (prefixo "usr_" do sistema de origem, abreviações diferentes etc.) —
+// mapeadas manualmente pro nome que usamos no banco.
+const HEADER_ALIASES: Record<string, string> = {
+  usr_tipodaperda: "tipo_perda",
+  usr_kgdaperda: "kg_perda",
+  usr_peso_bruto_bobina: "peso_bruto_bobina",
+};
+
 function coerceRow(row: Record<string, unknown>, numericCols: string[]) {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(row)) {
-    const col = normalizeHeader(key);
+    const normalized = normalizeHeader(key);
+    const col = HEADER_ALIASES[normalized] ?? normalized;
     if (value === "" || value === undefined || value === null) {
       out[col] = null;
     } else if (numericCols.includes(col)) {

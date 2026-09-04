@@ -43,11 +43,23 @@ const CONFLICT_COLUMNS = { refugo_aparas_historico: "data", tendencia_mensal: "m
 function normalize(s) {
   return String(s || "")
     .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    // cabeçalhos reais vêm em "CamelCase" grudado (ex: "CodApont") — insere
+    // "_" entre minúscula/número e a maiúscula seguinte antes de baixar pra
+    // minúsculo, senão "CodApont" viraria "codapont" em vez de "cod_apont".
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
     .toLowerCase()
     .replace(/\.(xlsx|xls|csv)$/i, "")
     .replace(/[^a-z0-9]+/g, "_")
     .replace(/^_+|_+$/g, "");
 }
+
+// Colunas cujo nome real não bate nem depois de normalizar (prefixo "usr_"
+// do sistema de origem, abreviações diferentes etc.) — mapeadas manualmente.
+const HEADER_ALIASES = {
+  usr_tipodaperda: "tipo_perda",
+  usr_kgdaperda: "kg_perda",
+  usr_peso_bruto_bobina: "peso_bruto_bobina",
+};
 
 function detectTable(fileName) {
   const norm = normalize(fileName);
@@ -61,7 +73,8 @@ function detectSheet(def, sheetNames) {
 function coerceRow(row, numericCols) {
   const out = {};
   for (const [key, value] of Object.entries(row)) {
-    const col = normalize(key);
+    const normalized = normalize(key);
+    const col = HEADER_ALIASES[normalized] ?? normalized;
     if (value === "" || value === undefined || value === null) out[col] = null;
     else if (numericCols.includes(col)) out[col] = Number(value);
     else out[col] = value;
