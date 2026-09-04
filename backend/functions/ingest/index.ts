@@ -35,6 +35,37 @@ const NUMERIC_COLUMNS: Record<string, string[]> = {
   tendencia_mensal: ["ano", "volume_prod_corte_km", "lote_medio_km", "volume_prod_kg", "aparas_kg", "aparas_pct"],
 };
 
+// Tabela -> TODAS as colunas de verdade (id gerada automaticamente não
+// entra aqui). Qualquer coluna da planilha que, depois de normalizada e
+// verificado o alias, não estiver nesta lista é IGNORADA em vez de travar
+// a carga inteira — as planilhas reais sempre trazem colunas extras
+// (rótulos de pivot, campos que não usamos) que não têm por que derrubar
+// o resto da linha.
+const ALLOWED_COLUMNS: Record<string, string[]> = {
+  maquinas: ["id", "grupo", "considerar"],
+  apontamentos: [
+    "num_ordem", "cod_recurso", "cod_apont", "cod_desc", "dt_producao", "hora_inicio", "hora_fim",
+    "qtd_horas", "qtd_produzida", "turno", "desperdicio_acerto", "desperdicio_virando", "peso_bruto_bobina",
+    "tipo_perda", "kg_perda", "nome_operador", "tipo_produto", "cod_estrutura", "des_num_ordem", "cod_est",
+    "processo", "classificacao", "nome_cliente",
+  ],
+  fardos_aparas: [
+    "codigo", "dp_fp", "refugo", "refile", "data", "numero", "qtd_bruta_kg", "qtd_liquida_kg",
+    "nome", "classificacao", "tipo",
+  ],
+  aderencia_maquinas_diaria: [
+    "num_ordem", "dt_producao", "qtd_produzida", "cod_recurso", "qtd_horas", "classificacao",
+    "descricao", "cod_estrutura", "turno", "cod_desc", "cod_apont",
+  ],
+  aderencia_programacao: [
+    "cod_cliente", "cod_estrutura", "recurso_ctr", "tipo_produto", "num_ordem", "dt_saida_maquina",
+    "descricao", "cliente", "atividade", "qtd_produzido", "qtd_planejado", "meta_qtd_acerto",
+    "qtd_acerto_real", "min_set_prog", "min_set_real", "qtd_prod_kg", "meta_mts_hora", "qtd_hor_p", "cilindro",
+  ],
+  refugo_aparas_historico: ["data", "volume_jgr", "scrap_jgr", "volume_orf", "scrap_orf"],
+  tendencia_mensal: ["mes", "ano", "volume_prod_corte_km", "lote_medio_km", "volume_prod_kg", "aparas_kg", "aparas_pct"],
+};
+
 // Tabela -> colunas de data/hora (o Excel entrega essas como número de série,
 // não como texto — precisam de conversão especial, não só Number()).
 // "date" -> vira "AAAA-MM-DD"; "timestamp" -> vira ISO completo.
@@ -85,8 +116,12 @@ const HEADER_ALIASES: Record<string, string> = {
   usr_tipodaperda: "tipo_perda",
   usr_kgdaperda: "kg_perda",
   usr_peso_bruto_bobina: "peso_bruto_bobina",
-  dp_ou_fp: "dp_fp",   // "DP ou FP" na planilha de fardos
-  n: "numero",         // "Nº" na planilha de fardos
+  dp_ou_fp: "dp_fp",           // "DP ou FP" na planilha de fardos
+  n: "numero",                 // "Nº" na planilha de fardos
+  mini_set_real: "min_set_real", // "Mini_Set_Real" (typo na planilha de origem)
+  date: "data",                 // "DATE" no Refugo Aparas
+  type_of_machine: "id",        // "Type of Machine" no Machine Card
+  machine_group: "grupo",       // "Machine Group" no Machine Card
 };
 
 // O Excel guarda datas como número de série (dias desde 30/12/1899) — o
@@ -109,11 +144,17 @@ function excelValueToIso(value: unknown, kind: "date" | "timestamp"): string | n
   return kind === "date" ? date.toISOString().slice(0, 10) : date.toISOString();
 }
 
-function coerceRow(row: Record<string, unknown>, numericCols: string[], dateCols: Record<string, "date" | "timestamp">) {
+function coerceRow(
+  row: Record<string, unknown>,
+  numericCols: string[],
+  dateCols: Record<string, "date" | "timestamp">,
+  allowedCols: string[],
+) {
   const out: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(row)) {
     const normalized = normalizeHeader(key);
     const col = HEADER_ALIASES[normalized] ?? normalized;
+    if (!allowedCols.includes(col)) continue; // coluna que não existe na tabela — ignora, não trava a carga
     if (value === "" || value === undefined || value === null) {
       out[col] = null;
     } else if (dateCols[col]) {
@@ -185,7 +226,18 @@ Deno.serve(async (req) => {
 
     const numericCols = NUMERIC_COLUMNS[table] ?? [];
     const dateCols = DATE_COLUMNS[table] ?? {};
-    const rows = rawRows.map((r) => coerceRow(r, numericCols, dateCols));
+    const allowedCols = ALLOWED_COLUMNS[table] ?? [];
+    const rows = rawRows.map((r) => coerceRow(r, numericCols, dateCols, allowedCols));
+
+    // Se nenhuma coluna da planilha bateu com a tabela, é sinal de aba/arquivo
+    // errado — melhor avisar claro do que gravar centenas de linhas vazias.
+    if (rows.every((r) => Object.keys(r).length === 0)) {
+      throw new Error(
+        `Nenhuma coluna de "${fileName}" [${targetSheet}] bate com a tabela "${table}". ` +
+        `Cabeçalhos recebidos: ${Object.keys(rawRows[0]).join(", ")}`
+      );
+    }
+
     const conflictCols = CONFLICT_COLUMNS[table];
 
     let gravadas = 0;

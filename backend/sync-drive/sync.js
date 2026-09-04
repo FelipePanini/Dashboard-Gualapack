@@ -29,13 +29,47 @@ const supabase = createClient(process.env.SUPABASE_URL, process.env.SUPABASE_SER
 // Tabela -> palavras-chave no nome do arquivo, palavras-chave na aba, e
 // colunas numéricas. Espelha TABLES em demo/upload.html.
 const TABLE_DEFS = [
-  { table: "fardos_aparas", fileKeywords: ["sequenciamento"], sheetKeywords: ["completos", "base_aparas_total"], numeric: ["numero", "qtd_bruta_kg", "qtd_liquida_kg"], date: { data: "date" } },
-  { table: "aderencia_maquinas_diaria", fileKeywords: ["aderencia_maquinas", "aderenciamaquinas"], sheetKeywords: ["apontamentos_producao"], numeric: ["qtd_produzida", "qtd_horas"], date: { dt_producao: "date" } },
-  { table: "aderencia_programacao", fileKeywords: ["historico_aderencia", "aderencia_programacao"], sheetKeywords: ["programacao_passado"], numeric: ["qtd_produzido", "qtd_planejado", "meta_qtd_acerto", "qtd_acerto_real", "min_set_prog", "min_set_real", "qtd_prod_kg", "meta_mts_hora", "qtd_hor_p"], date: { dt_saida_maquina: "timestamp" } },
-  { table: "refugo_aparas_historico", fileKeywords: ["refugo_aparas"], sheetKeywords: ["historico_refugo"], numeric: ["volume_jgr", "scrap_jgr", "volume_orf", "scrap_orf"], date: { data: "date" } },
-  { table: "tendencia_mensal", fileKeywords: ["tendencia", "grafico"], sheetKeywords: ["dados_prod"], numeric: ["ano", "volume_prod_corte_km", "lote_medio_km", "volume_prod_kg", "aparas_kg", "aparas_pct"], date: {} },
-  { table: "maquinas", fileKeywords: ["machine_card"], sheetKeywords: ["dim_eqtos"], numeric: [], date: {} },
-  { table: "apontamentos", fileKeywords: ["indicadores", "base_aparas"], sheetKeywords: ["base_maquina", "base_detalhe"], numeric: ["qtd_horas", "qtd_produzida", "desperdicio_acerto", "desperdicio_virando", "peso_bruto_bobina", "kg_perda"], date: { dt_producao: "date", hora_inicio: "timestamp", hora_fim: "timestamp" } },
+  {
+    table: "fardos_aparas", fileKeywords: ["sequenciamento"], sheetKeywords: ["completos", "base_aparas_total"],
+    numeric: ["numero", "qtd_bruta_kg", "qtd_liquida_kg"], date: { data: "date" },
+    allowed: ["codigo", "dp_fp", "refugo", "refile", "data", "numero", "qtd_bruta_kg", "qtd_liquida_kg", "nome", "classificacao", "tipo"],
+  },
+  {
+    table: "aderencia_maquinas_diaria", fileKeywords: ["aderencia_maquinas", "aderenciamaquinas"], sheetKeywords: ["apontamentos_producao"],
+    numeric: ["qtd_produzida", "qtd_horas"], date: { dt_producao: "date" },
+    allowed: ["num_ordem", "dt_producao", "qtd_produzida", "cod_recurso", "qtd_horas", "classificacao", "descricao", "cod_estrutura", "turno", "cod_desc", "cod_apont"],
+  },
+  {
+    table: "aderencia_programacao", fileKeywords: ["historico_aderencia", "aderencia_programacao"], sheetKeywords: ["programacao_passado"],
+    numeric: ["qtd_produzido", "qtd_planejado", "meta_qtd_acerto", "qtd_acerto_real", "min_set_prog", "min_set_real", "qtd_prod_kg", "meta_mts_hora", "qtd_hor_p"],
+    date: { dt_saida_maquina: "timestamp" },
+    allowed: ["cod_cliente", "cod_estrutura", "recurso_ctr", "tipo_produto", "num_ordem", "dt_saida_maquina", "descricao", "cliente", "atividade", "qtd_produzido", "qtd_planejado", "meta_qtd_acerto", "qtd_acerto_real", "min_set_prog", "min_set_real", "qtd_prod_kg", "meta_mts_hora", "qtd_hor_p", "cilindro"],
+  },
+  {
+    table: "refugo_aparas_historico", fileKeywords: ["refugo_aparas"], sheetKeywords: ["historico_refugo"],
+    numeric: ["volume_jgr", "scrap_jgr", "volume_orf", "scrap_orf"], date: { data: "date" },
+    allowed: ["data", "volume_jgr", "scrap_jgr", "volume_orf", "scrap_orf"],
+  },
+  {
+    table: "tendencia_mensal", fileKeywords: ["tendencia", "grafico"], sheetKeywords: ["dados_prod"],
+    numeric: ["ano", "volume_prod_corte_km", "lote_medio_km", "volume_prod_kg", "aparas_kg", "aparas_pct"], date: {},
+    allowed: ["mes", "ano", "volume_prod_corte_km", "lote_medio_km", "volume_prod_kg", "aparas_kg", "aparas_pct"],
+  },
+  {
+    table: "maquinas", fileKeywords: ["machine_card"], sheetKeywords: ["dim_eqtos"], numeric: [], date: {},
+    allowed: ["id", "grupo", "considerar"],
+  },
+  {
+    table: "apontamentos", fileKeywords: ["indicadores", "base_aparas"], sheetKeywords: ["base_maquina", "base_detalhe"],
+    numeric: ["qtd_horas", "qtd_produzida", "desperdicio_acerto", "desperdicio_virando", "peso_bruto_bobina", "kg_perda"],
+    date: { dt_producao: "date", hora_inicio: "timestamp", hora_fim: "timestamp" },
+    allowed: [
+      "num_ordem", "cod_recurso", "cod_apont", "cod_desc", "dt_producao", "hora_inicio", "hora_fim", "qtd_horas",
+      "qtd_produzida", "turno", "desperdicio_acerto", "desperdicio_virando", "peso_bruto_bobina", "tipo_perda",
+      "kg_perda", "nome_operador", "tipo_produto", "cod_estrutura", "des_num_ordem", "cod_est", "processo",
+      "classificacao", "nome_cliente",
+    ],
+  },
 ];
 
 const CONFLICT_COLUMNS = { refugo_aparas_historico: "data", tendencia_mensal: "mes,ano" };
@@ -59,8 +93,12 @@ const HEADER_ALIASES = {
   usr_tipodaperda: "tipo_perda",
   usr_kgdaperda: "kg_perda",
   usr_peso_bruto_bobina: "peso_bruto_bobina",
-  dp_ou_fp: "dp_fp",   // "DP ou FP" na planilha de fardos
-  n: "numero",         // "Nº" na planilha de fardos
+  dp_ou_fp: "dp_fp",             // "DP ou FP" na planilha de fardos
+  n: "numero",                   // "Nº" na planilha de fardos
+  mini_set_real: "min_set_real", // "Mini_Set_Real" (typo na planilha de origem)
+  date: "data",                  // "DATE" no Refugo Aparas
+  type_of_machine: "id",         // "Type of Machine" no Machine Card
+  machine_group: "grupo",        // "Machine Group" no Machine Card
 };
 
 function detectTable(fileName) {
@@ -88,11 +126,12 @@ function excelValueToIso(value, kind) {
   return kind === "date" ? date.toISOString().slice(0, 10) : date.toISOString();
 }
 
-function coerceRow(row, numericCols, dateCols) {
+function coerceRow(row, numericCols, dateCols, allowedCols) {
   const out = {};
   for (const [key, value] of Object.entries(row)) {
     const normalized = normalize(key);
     const col = HEADER_ALIASES[normalized] ?? normalized;
+    if (!allowedCols.includes(col)) continue; // coluna que não existe na tabela — ignora, não trava a carga
     if (value === "" || value === undefined || value === null) out[col] = null;
     else if (dateCols[col]) out[col] = excelValueToIso(value, dateCols[col]);
     else if (numericCols.includes(col)) out[col] = Number(value);
@@ -172,7 +211,16 @@ async function main() {
         continue;
       }
 
-      const rows = rawRows.map((r) => coerceRow(r, def.numeric, def.date));
+      const rows = rawRows.map((r) => coerceRow(r, def.numeric, def.date, def.allowed));
+
+      if (rows.every((r) => Object.keys(r).length === 0)) {
+        console.log(
+          `[skip] "${file.name}" [${sheetName}] -> ${def.table}: nenhuma coluna bateu. ` +
+          `Cabeçalhos recebidos: ${Object.keys(rawRows[0]).join(", ")}`
+        );
+        continue;
+      }
+
       const conflictCols = CONFLICT_COLUMNS[def.table];
 
       let gravadas = 0;
