@@ -170,6 +170,9 @@ begin
     'aderencia_programacao','refugo_aparas_historico','tendencia_mensal'
   ]
   loop
+    -- drop antes de criar pra esse script poder ser rodado de novo sem
+    -- erro de "policy already exists" (create policy não tem IF NOT EXISTS)
+    execute format('drop policy if exists "%1$s: leitura por usuário autenticado" on public.%1$s;', t);
     execute format(
       'create policy "%1$s: leitura por usuário autenticado" on public.%1$s for select to authenticated using (true);',
       t
@@ -190,6 +193,8 @@ create table if not exists public.sync_log (
 );
 
 alter table public.sync_log enable row level security;
+
+drop policy if exists "sync_log: admin lê o histórico de carga" on public.sync_log;
 
 create policy "sync_log: admin lê o histórico de carga"
   on public.sync_log for select
