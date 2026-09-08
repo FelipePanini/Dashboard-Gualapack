@@ -307,7 +307,7 @@ Deno.serve(async (req) => {
     const numericCols = NUMERIC_COLUMNS[table] ?? [];
     const dateCols = DATE_COLUMNS[table] ?? {};
     const allowedCols = ALLOWED_COLUMNS[table] ?? [];
-    const rows = rawRows.map((r) => coerceRow(r, numericCols, dateCols, allowedCols));
+    let rows = rawRows.map((r) => coerceRow(r, numericCols, dateCols, allowedCols));
 
     // Se nenhuma coluna da planilha bateu com a tabela, é sinal de aba/arquivo
     // errado — melhor avisar claro do que gravar centenas de linhas vazias.
@@ -316,6 +316,17 @@ Deno.serve(async (req) => {
         `Nenhuma coluna de "${fileName}" [${targetSheet}] bate com a tabela "${table}". ` +
         `Cabeçalhos recebidos: ${Object.keys(rawRows[0]).join(", ")}`
       );
+    }
+
+    // Linhas de rodapé/resumo sem a chave da tabela (ex: linha de total no
+    // fim de uma planilha) quebrariam o insert inteiro — descarta só elas.
+    const keyCols = DEDUPE_KEY[table];
+    if (keyCols) {
+      const cols = keyCols.split(",");
+      rows = rows.filter((r) => cols.every((c) => r[c] !== null && r[c] !== undefined));
+    }
+    if (rows.length === 0) {
+      throw new Error(`Nenhuma linha de "${fileName}" [${targetSheet}] tem a chave exigida por "${table}".`);
     }
 
     const retentionCol = RETENTION_DATE_COL[table];

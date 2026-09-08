@@ -309,13 +309,32 @@ async function main() {
           continue;
         }
 
-        const rows = rawRows.map((r) => coerceRow(r, def.numeric, def.date, def.allowed));
+        let rows = rawRows.map((r) => coerceRow(r, def.numeric, def.date, def.allowed));
 
         if (rows.every((r) => Object.keys(r).length === 0)) {
           console.log(
             `[skip] "${file.name}" [${sheetName}] -> ${def.table}: nenhuma coluna bateu. ` +
             `Cabeçalhos recebidos: ${Object.keys(rawRows[0]).join(", ")}`
           );
+          continue;
+        }
+
+        // Linhas de rodapé/resumo (comuns no fim de planilhas com pivot ou
+        // total) passam pelo filtro de "linha vazia" porque alguma outra
+        // coluna não mapeada tem valor, mas ficam sem a chave da tabela —
+        // isso quebrava o insert inteiro (ex: "Conta Refugo" tem uma linha
+        // final sem DATE). Descarta só essas linhas, não a carga toda.
+        const keyCols = DEDUPE_KEY[def.table];
+        if (keyCols) {
+          const cols = keyCols.split(",");
+          const before = rows.length;
+          rows = rows.filter((r) => cols.every((c) => r[c] !== null && r[c] !== undefined));
+          if (rows.length < before) {
+            console.log(`[aviso] "${file.name}" [${sheetName}] -> ${def.table}: ${before - rows.length} linha(s) sem chave (${keyCols}) descartada(s).`);
+          }
+        }
+        if (rows.length === 0) {
+          console.log(`[skip] "${file.name}" [${sheetName}] -> ${def.table}: nenhuma linha com chave válida.`);
           continue;
         }
 
