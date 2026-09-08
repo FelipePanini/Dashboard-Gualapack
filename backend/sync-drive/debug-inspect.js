@@ -6,10 +6,8 @@ import { google } from "googleapis";
 import * as XLSX from "xlsx";
 
 const TARGETS = [
-  { fileMatch: "aderencia semanal", sheets: ["ADERENCIA DIARIA", "ADERENCIA SEMANAL"] },
-  { fileMatch: "base aparas - generico", sheets: ["Dinamica"] },
-  { fileMatch: "indicadores diario - 2025", sheets: ["Base Apontamentos"] },
-  { fileMatch: "indicadores diario - 2026", sheets: ["Base Apontamentos"] },
+  { fileMatch: "indicadores diario - 2025", sheets: ["Base Apontamentos (kg)"] },
+  { fileMatch: "indicadores diario - 2026", sheets: ["Base Apontamentos (kg)"] },
   { fileMatch: "machine card oficial - generico", sheets: ["Hours Description"] },
   { fileMatch: "refugo producao", sheets: ["Consulta Perda"] },
   { fileMatch: "graficos tendencia", sheets: ["Dados Prod"] },
@@ -70,7 +68,14 @@ async function main() {
       console.log("Abas:", JSON.stringify(sheetNames));
 
       if (!target.sheets) continue;
-      const targetSheets = sheetNames.filter((n) => target.sheets.some((want) => normalize(n).includes(normalize(want)) || normalize(want).includes(normalize(n))));
+      // Prefere igualdade exata (normalizada) — substring colide fácil (ex:
+      // "Base Apontamento" vs "Base Apontamentos (kg)" são abas DIFERENTES,
+      // uma gigante e sem relação com a que eu queria).
+      const wantNorm = target.sheets.map(normalize);
+      let targetSheets = sheetNames.filter((n) => wantNorm.includes(normalize(n)));
+      if (targetSheets.length === 0) {
+        targetSheets = sheetNames.filter((n) => wantNorm.some((want) => normalize(n).includes(want)));
+      }
 
       for (const sheetName of targetSheets) {
         console.log(`--- lendo aba "${sheetName}"...`);
