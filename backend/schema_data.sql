@@ -26,9 +26,17 @@ create table if not exists public.maquinas (
 --    últimos 12 meses (RETENTION_MONTHS) — planilhas antigas (ex: "Base
 --    Aparas - 2024.xlsx") são lidas mas descartadas na carga, pra não
 --    estourar o limite de armazenamento do plano free do Supabase de novo.
+--
+--    Sem chave natural nas linhas (é um log de eventos), então a carga
+--    troca por arquivo: antes de inserir as linhas de um arquivo, apaga as
+--    linhas que aquele MESMO arquivo gravou da vez anterior (por
+--    _source_file) e insere as novas. Sem isso, rodar o sync todo dia sem
+--    nenhuma chave de conflito faz cada linha ser inserida de novo do zero
+--    a cada execução — foi exatamente isso que estourou o banco.
 -- ----------------------------------------------------------------------------
 create table if not exists public.apontamentos (
   id                  bigint generated always as identity primary key,
+  _source_file        text,          -- nome do arquivo que gravou a linha (ver comentário acima)
   num_ordem           text,
   cod_recurso         text,
   cod_apont           text,          -- código do tipo de apontamento (ex: '20', '40')
@@ -56,13 +64,16 @@ create table if not exists public.apontamentos (
 
 create index if not exists idx_apontamentos_data on public.apontamentos (dt_producao desc);
 create index if not exists idx_apontamentos_recurso on public.apontamentos (cod_recurso, dt_producao desc);
+create index if not exists idx_apontamentos_source on public.apontamentos (_source_file);
 
 -- ----------------------------------------------------------------------------
 -- 3. Fardos de aparas — um por fardo (de "SEQUENCIAMENTO DOS FARDOS DE
 --    APARAS JGR" mensal e "Sequenciamento Acumulado")
+--    Mesma troca-por-arquivo da tabela apontamentos (ver comentário lá).
 -- ----------------------------------------------------------------------------
 create table if not exists public.fardos_aparas (
   id              bigint generated always as identity primary key,
+  _source_file    text,          -- nome do arquivo que gravou a linha
   codigo          text,          -- código da classificação (numérico, ex: '1', '11')
   dp_fp           text,          -- 'DP' ou 'FP'
   refugo          text,          -- 'X' ou vazio
@@ -77,13 +88,16 @@ create table if not exists public.fardos_aparas (
 );
 
 create index if not exists idx_fardos_aparas_data on public.fardos_aparas (data desc);
+create index if not exists idx_fardos_aparas_source on public.fardos_aparas (_source_file);
 
 -- ----------------------------------------------------------------------------
 -- 4. Aderência — apontamentos de produção por máquina/dia (de "Aderência
 --    Máquinas - Diária", aba "Apontamentos_produção")
+--    Mesma troca-por-arquivo e retenção de 12 meses da tabela apontamentos.
 -- ----------------------------------------------------------------------------
 create table if not exists public.aderencia_maquinas_diaria (
   id             bigint generated always as identity primary key,
+  _source_file   text,          -- nome do arquivo que gravou a linha
   num_ordem      text,
   dt_producao    date,
   qtd_produzida  numeric,
@@ -98,13 +112,16 @@ create table if not exists public.aderencia_maquinas_diaria (
 );
 
 create index if not exists idx_aderencia_maq_data on public.aderencia_maquinas_diaria (dt_producao desc);
+create index if not exists idx_aderencia_maq_source on public.aderencia_maquinas_diaria (_source_file);
 
 -- ----------------------------------------------------------------------------
 -- 5. Aderência à programação (de "Histórico Aderência Programação")
---    Mesma retenção de 12 meses da tabela apontamentos (por dt_saida_maquina).
+--    Mesma retenção de 12 meses e troca-por-arquivo da tabela apontamentos
+--    (por dt_saida_maquina / _source_file).
 -- ----------------------------------------------------------------------------
 create table if not exists public.aderencia_programacao (
   id                bigint generated always as identity primary key,
+  _source_file      text,          -- nome do arquivo que gravou a linha
   cod_cliente       text,
   cod_estrutura     text,
   recurso_ctr       text,
@@ -127,6 +144,7 @@ create table if not exists public.aderencia_programacao (
 );
 
 create index if not exists idx_aderencia_prog_data on public.aderencia_programacao (dt_saida_maquina desc);
+create index if not exists idx_aderencia_prog_source on public.aderencia_programacao (_source_file);
 
 -- ----------------------------------------------------------------------------
 -- 6. Refugo/aparas — série histórica mensal (de "Refugo Aparas")

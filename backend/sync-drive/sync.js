@@ -90,6 +90,16 @@ const RETENTION_DATE_COL = {
   aderencia_programacao: "dt_saida_maquina",
 };
 
+// Essas 4 tabelas não têm chave natural nas linhas (são log de eventos, não
+// cadastro) — sem onConflict, upsert() vira INSERT puro, e como a carga lê o
+// arquivo inteiro toda vez, cada execução duplicava tudo de novo (foi isso
+// que estourou o banco: apontamentos tinha 2,48 milhões de linhas pra um
+// total real de ~600 mil). A correção é trocar por arquivo: antes de
+// inserir as linhas de um arquivo, apaga o que aquele MESMO arquivo gravou
+// da vez anterior (_source_file) e insere puro — sem upsert, sem
+// necessidade de chave natural.
+const REPLACE_BY_SOURCE = new Set(["apontamentos", "aderencia_maquinas_diaria", "aderencia_programacao", "fardos_aparas"]);
+
 // Mesma chave, mas usada pra DEDUPLICAR a lista de linhas antes de gravar —
 // o Postgres rejeita um upsert que tenta atualizar a MESMA chave duas vezes
 // dentro do mesmo lote, e planilhas reais têm linhas repetidas (ex: máquina
@@ -290,15 +300,25 @@ async function main() {
         continue;
       }
 
+      const replaceBySource = REPLACE_BY_SOURCE.has(def.table);
+      let toInsert;
+      if (replaceBySource) {
+        toInsert = keptRows.map((r) => ({ ...r, _source_file: file.name }));
+        const { error: delErr } = await supabase.from(def.table).delete().eq("_source_file", file.name);
+        if (delErr) throw new Error(`Erro limpando ${def.table} antes de recarregar "${file.name}": ${delErr.message}`);
+      } else {
+        toInsert = dedupeRows(keptRows, DEDUPE_KEY[def.table]);
+      }
       const conflictCols = CONFLICT_COLUMNS[def.table];
-      const dedupedRows = dedupeRows(keptRows, DEDUPE_KEY[def.table]);
 
       let gravadas = 0;
-      for (let i = 0; i < dedupedRows.length; i += 500) {
-        const chunk = dedupedRows.slice(i, i + 500);
-        const { error } = conflictCols
-          ? await supabase.from(def.table).upsert(chunk, { onConflict: conflictCols })
-          : await supabase.from(def.table).upsert(chunk);
+      for (let i = 0; i < toInsert.length; i += 500) {
+        const chunk = toInsert.slice(i, i + 500);
+        const { error } = replaceBySource
+          ? await supabase.from(def.table).insert(chunk)
+          : conflictCols
+            ? await supabase.from(def.table).upsert(chunk, { onConflict: conflictCols })
+            : await supabase.from(def.table).upsert(chunk);
         if (error) throw new Error(`Erro gravando em ${def.table} (${file.name}): ${error.message}`);
         gravadas += chunk.length;
       }

@@ -109,6 +109,13 @@ const RETENTION_DATE_COL: Record<string, string> = {
   aderencia_programacao: "dt_saida_maquina",
 };
 
+// Essas 4 tabelas não têm chave natural nas linhas (log de eventos, não
+// cadastro) — sem onConflict, upsert() vira INSERT puro, e reenviar o mesmo
+// arquivo duplica tudo de novo. A correção é trocar por arquivo: antes de
+// inserir, apaga o que aquele MESMO arquivo gravou da vez anterior
+// (_source_file) e insere puro. Espelha backend/sync-drive/sync.js.
+const REPLACE_BY_SOURCE = new Set(["apontamentos", "aderencia_maquinas_diaria", "aderencia_programacao", "fardos_aparas"]);
+
 function dedupeRows(rows: Record<string, unknown>[], keyCols: string | undefined): Record<string, unknown>[] {
   if (!keyCols) return rows;
   const cols = keyCols.split(",");
@@ -313,15 +320,25 @@ Deno.serve(async (req) => {
       );
     }
 
+    const replaceBySource = REPLACE_BY_SOURCE.has(table);
+    let toInsert: Record<string, unknown>[];
+    if (replaceBySource) {
+      toInsert = keptRows.map((r) => ({ ...r, _source_file: fileName }));
+      const { error: delErr } = await supabase.from(table).delete().eq("_source_file", fileName);
+      if (delErr) throw new Error(`Erro limpando ${table} antes de recarregar "${fileName}": ${delErr.message}`);
+    } else {
+      toInsert = dedupeRows(keptRows, DEDUPE_KEY[table]);
+    }
     const conflictCols = CONFLICT_COLUMNS[table];
-    const dedupedRows = dedupeRows(keptRows, DEDUPE_KEY[table]);
 
     let gravadas = 0;
-    for (let i = 0; i < dedupedRows.length; i += 500) {
-      const chunk = dedupedRows.slice(i, i + 500);
-      const { error } = conflictCols
-        ? await supabase.from(table).upsert(chunk, { onConflict: conflictCols })
-        : await supabase.from(table).upsert(chunk);
+    for (let i = 0; i < toInsert.length; i += 500) {
+      const chunk = toInsert.slice(i, i + 500);
+      const { error } = replaceBySource
+        ? await supabase.from(table).insert(chunk)
+        : conflictCols
+          ? await supabase.from(table).upsert(chunk, { onConflict: conflictCols })
+          : await supabase.from(table).upsert(chunk);
       if (error) throw new Error(`Erro gravando em ${table}: ${error.message}`);
       gravadas += chunk.length;
     }
