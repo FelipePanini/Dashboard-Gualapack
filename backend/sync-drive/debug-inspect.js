@@ -6,17 +6,13 @@ import { google } from "googleapis";
 import * as XLSX from "xlsx";
 
 const TARGETS = [
-  { fileMatch: "aderência semanal", sheets: null }, // lista todas as abas + dump da que bater com o nome dado
-  { fileMatch: "base aparas -  2024", sheets: ["DIM"] },
-  { fileMatch: "base aparas - 2025", sheets: ["DIM"] },
-  { fileMatch: "base aparas - 2026", sheets: ["DIM"] },
-  { fileMatch: "base aparas - genérico", sheets: ["Dinamica"] },
-  { fileMatch: "indicadores diário - 2025", sheets: ["Base Apontamentos (kg)"] },
-  { fileMatch: "indicadores diário - 2026", sheets: ["Base Apontamentos (kg)"] },
-  { fileMatch: "machine card oficial - genérico", sheets: ["Hours Description"] },
-  { fileMatch: "refugo aparas", sheets: ["Conta Refugo"] },
-  { fileMatch: "refugo produção", sheets: ["Consulta Perda"] },
-  { fileMatch: "graficos tendência", sheets: null }, // relista todas as abas pra confirmar se só tem "Dados Prod"
+  { fileMatch: "aderencia semanal", sheets: null }, // lista todas as abas + dump da que bater com o nome dado
+  { fileMatch: "base aparas - generico", sheets: ["Dinamica"] },
+  { fileMatch: "indicadores diario - 2025", sheets: ["Base Apontamentos (kg)"] },
+  { fileMatch: "indicadores diario - 2026", sheets: ["Base Apontamentos (kg)"] },
+  { fileMatch: "machine card oficial - generico", sheets: ["Hours Description"] },
+  { fileMatch: "refugo producao", sheets: null },
+  { fileMatch: "graficos tendencia", sheets: null }, // relista todas as abas pra confirmar se só tem "Dados Prod"
 ];
 
 function normalize(s) {
@@ -58,9 +54,10 @@ async function downloadFile(drive, file) {
 async function main() {
   const drive = driveClient();
   const files = await listFolderFiles(drive);
+  console.log("Arquivos na pasta:", JSON.stringify(files.map((f) => f.name)));
 
   for (const target of TARGETS) {
-    const file = files.find((f) => normalize(f.name).includes(target.fileMatch));
+    const file = files.find((f) => normalize(f.name).includes(normalize(target.fileMatch)));
     if (!file) {
       console.log(`\n=== "${target.fileMatch}" -> ARQUIVO NÃO ENCONTRADO na pasta ===`);
       continue;
