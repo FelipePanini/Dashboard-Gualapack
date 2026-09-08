@@ -175,6 +175,59 @@ create table if not exists public.tendencia_mensal (
 );
 
 -- ----------------------------------------------------------------------------
+-- 6b. Refugo por evento/máquina/motivo (de "Refugo Produção.xlsx", aba
+--     "Consulta Perda") — log de evento, sem chave natural, mesma troca-
+--     por-arquivo e retenção de 12 meses da tabela apontamentos.
+-- ----------------------------------------------------------------------------
+create table if not exists public.refugo_producao (
+  id            bigint generated always as identity primary key,
+  _source_file  text,
+  op            text,
+  maquina       text,
+  turno         numeric,
+  dt_producao   date,
+  cod_apont     text,
+  operador      text,
+  processo      text,
+  tipo          text,     -- motivo do refugo, ex: '05_Acerto_de_Cor'
+  kg_perda      numeric,
+  dia           numeric,
+  chave_1       text,
+  mes           numeric
+);
+
+create index if not exists idx_refugo_producao_data on public.refugo_producao (dt_producao desc);
+create index if not exists idx_refugo_producao_source on public.refugo_producao (_source_file);
+
+-- ----------------------------------------------------------------------------
+-- 6c. Produção/refugo em kg por ordem (de "Indicadores Diário - AAAA.xlsx",
+--     aba "Base Apontamentos (kg)") — separado de "apontamentos" (que vem
+--     da aba "Base Máquina_Embalagem" e tem os campos de TMR/Gantt/parada).
+--     Mesma troca-por-arquivo e retenção de 12 meses.
+-- ----------------------------------------------------------------------------
+create table if not exists public.producao_kg (
+  id            bigint generated always as identity primary key,
+  _source_file  text,
+  num_ordem     text,
+  cod_recurso   text,
+  dt_producao   date,
+  turno         text,
+  peso_bruto    numeric,
+  refugo        numeric,
+  descricao     text,
+  estrutura     text,
+  processo      text,
+  tipo_produto  text,
+  considerar    text,
+  planta        text,
+  maquina_real  text,
+  chave         text
+);
+
+create index if not exists idx_producao_kg_data on public.producao_kg (dt_producao desc);
+create index if not exists idx_producao_kg_source on public.producao_kg (_source_file);
+
+-- ----------------------------------------------------------------------------
 -- 8. RLS — leitura para qualquer usuário autenticado, escrita só via
 --    service_role (a função "ingest", nunca o navegador direto).
 -- ----------------------------------------------------------------------------
@@ -185,13 +238,16 @@ alter table public.aderencia_maquinas_diaria  enable row level security;
 alter table public.aderencia_programacao      enable row level security;
 alter table public.refugo_aparas_historico    enable row level security;
 alter table public.tendencia_mensal           enable row level security;
+alter table public.refugo_producao            enable row level security;
+alter table public.producao_kg                enable row level security;
 
 do $$
 declare t text;
 begin
   foreach t in array array[
     'maquinas','apontamentos','fardos_aparas','aderencia_maquinas_diaria',
-    'aderencia_programacao','refugo_aparas_historico','tendencia_mensal'
+    'aderencia_programacao','refugo_aparas_historico','tendencia_mensal',
+    'refugo_producao','producao_kg'
   ]
   loop
     -- drop antes de criar pra esse script poder ser rodado de novo sem

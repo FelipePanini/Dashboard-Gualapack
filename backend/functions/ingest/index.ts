@@ -33,6 +33,8 @@ const NUMERIC_COLUMNS: Record<string, string[]> = {
   ],
   refugo_aparas_historico: ["volume_jgr", "scrap_jgr", "volume_orf", "scrap_orf"],
   tendencia_mensal: ["ano", "volume_prod_corte_km", "lote_medio_km", "volume_prod_kg", "aparas_kg", "aparas_pct"],
+  refugo_producao: ["kg_perda", "dia", "mes", "turno"],
+  producao_kg: ["peso_bruto", "refugo"],
 };
 
 // Tabela -> TODAS as colunas de verdade (id gerada automaticamente não
@@ -64,6 +66,8 @@ const ALLOWED_COLUMNS: Record<string, string[]> = {
   ],
   refugo_aparas_historico: ["data", "volume_jgr", "scrap_jgr", "volume_orf", "scrap_orf"],
   tendencia_mensal: ["mes", "ano", "volume_prod_corte_km", "lote_medio_km", "volume_prod_kg", "aparas_kg", "aparas_pct"],
+  refugo_producao: ["op", "maquina", "turno", "dt_producao", "cod_apont", "operador", "processo", "tipo", "kg_perda", "dia", "chave_1", "mes"],
+  producao_kg: ["num_ordem", "cod_recurso", "dt_producao", "turno", "peso_bruto", "refugo", "descricao", "estrutura", "processo", "tipo_produto", "considerar", "planta", "maquina_real", "chave"],
 };
 
 // Tabela -> colunas de data/hora (o Excel entrega essas como número de série,
@@ -75,6 +79,8 @@ const DATE_COLUMNS: Record<string, Record<string, "date" | "timestamp">> = {
   aderencia_maquinas_diaria: { dt_producao: "date" },
   aderencia_programacao: { dt_saida_maquina: "timestamp" },
   refugo_aparas_historico: { data: "date" },
+  refugo_producao: { dt_producao: "date" },
+  producao_kg: { dt_producao: "date" },
 };
 
 // Tabelas com chave natural (não a "id" gerada) usam onConflict pra virar
@@ -107,14 +113,19 @@ const RETENTION_DATE_COL: Record<string, string> = {
   apontamentos: "dt_producao",
   aderencia_maquinas_diaria: "dt_producao",
   aderencia_programacao: "dt_saida_maquina",
+  refugo_producao: "dt_producao",
+  producao_kg: "dt_producao",
 };
 
-// Essas 4 tabelas não têm chave natural nas linhas (log de eventos, não
+// Essas tabelas não têm chave natural nas linhas (log de eventos, não
 // cadastro) — sem onConflict, upsert() vira INSERT puro, e reenviar o mesmo
 // arquivo duplica tudo de novo. A correção é trocar por arquivo: antes de
 // inserir, apaga o que aquele MESMO arquivo gravou da vez anterior
 // (_source_file) e insere puro. Espelha backend/sync-drive/sync.js.
-const REPLACE_BY_SOURCE = new Set(["apontamentos", "aderencia_maquinas_diaria", "aderencia_programacao", "fardos_aparas"]);
+const REPLACE_BY_SOURCE = new Set([
+  "apontamentos", "aderencia_maquinas_diaria", "aderencia_programacao", "fardos_aparas",
+  "refugo_producao", "producao_kg",
+]);
 
 function dedupeRows(rows: Record<string, unknown>[], keyCols: string | undefined): Record<string, unknown>[] {
   if (!keyCols) return rows;

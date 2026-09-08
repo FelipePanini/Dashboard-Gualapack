@@ -322,10 +322,17 @@ h1,h2{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; m
     { table: "fardos_aparas", label: "Fardos de aparas", fileKeywords: ["sequenciamento"], sheetKeywords: ["completos", "base_aparas_total"] },
     { table: "aderencia_maquinas_diaria", label: "Aderência — máquinas (diário)", fileKeywords: ["aderencia_maquinas", "aderenciamaquinas"], sheetKeywords: ["apontamentos_producao"] },
     { table: "aderencia_programacao", label: "Aderência — programação", fileKeywords: ["historico_aderencia", "aderencia_programacao"], sheetKeywords: ["programacao_passado"] },
-    { table: "refugo_aparas_historico", label: "Refugo/aparas — histórico", fileKeywords: ["refugo_aparas"], sheetKeywords: ["historico_refugo"] },
+    { table: "refugo_aparas_historico", label: "Refugo/aparas — histórico", fileKeywords: ["refugo_aparas"], sheetKeywords: ["conta_refugo"] },
     { table: "tendencia_mensal", label: "Tendência mensal", fileKeywords: ["tendencia", "grafico"], sheetKeywords: ["dados_prod"] },
     { table: "maquinas", label: "Catálogo de máquinas", fileKeywords: ["machine_card"], sheetKeywords: ["dim_eqtos"] },
     { table: "apontamentos", label: "Apontamentos", fileKeywords: ["indicadores", "base_aparas"], sheetKeywords: ["base_maquina", "base_detalhe"] },
+    { table: "refugo_producao", label: "Refugo por máquina (Produção)", fileKeywords: ["refugo_producao"], sheetKeywords: ["consulta_perda"] },
+    // "producao_kg" fica por último de propósito: compartilha o fileKeyword
+    // "indicadores" com "apontamentos" (mesmo arquivo alimenta as duas), e o
+    // detectTable() daqui é first-match — "apontamentos" continua sendo o
+    // default sugerido, o usuário troca manualmente pra "producao_kg" quando
+    // for o caso.
+    { table: "producao_kg", label: "Produção/refugo em kg", fileKeywords: ["indicadores"], sheetKeywords: ["base_apontamentos_kg"] },
   ];
   const TABLE_BY_KEY = Object.fromEntries(TABLES.map(t=> [t.table, t]));
 

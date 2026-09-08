@@ -46,9 +46,29 @@ const TABLE_DEFS = [
     allowed: ["cod_cliente", "cod_estrutura", "recurso_ctr", "tipo_produto", "num_ordem", "dt_saida_maquina", "descricao", "cliente", "atividade", "qtd_produzido", "qtd_planejado", "meta_qtd_acerto", "qtd_acerto_real", "min_set_prog", "min_set_real", "qtd_prod_kg", "meta_mts_hora", "qtd_hor_p", "cilindro"],
   },
   {
-    table: "refugo_aparas_historico", fileKeywords: ["refugo_aparas"], sheetKeywords: ["historico_refugo"],
+    // A aba certa é "Conta Refugo " (com espaço no fim) — "Histórico Refugo"
+    // existe no arquivo mas é outra coisa; confirmado com o usuário em 2026-09-08.
+    table: "refugo_aparas_historico", fileKeywords: ["refugo_aparas"], sheetKeywords: ["conta_refugo"],
     numeric: ["volume_jgr", "scrap_jgr", "volume_orf", "scrap_orf"], date: { data: "date" },
     allowed: ["data", "volume_jgr", "scrap_jgr", "volume_orf", "scrap_orf"],
+  },
+  {
+    // "Refugo Produção.xlsx" [Consulta Perda] — refugo por evento/máquina/
+    // motivo, não tinha nenhuma tabela ainda (sempre caía em "não bate com
+    // nenhuma tabela conhecida"). ~68 mil linhas, cresce todo dia.
+    table: "refugo_producao", fileKeywords: ["refugo_producao"], sheetKeywords: ["consulta_perda"],
+    numeric: ["kg_perda", "dia", "mes", "turno"], date: { dt_producao: "date" },
+    allowed: ["op", "maquina", "turno", "dt_producao", "cod_apont", "operador", "processo", "tipo", "kg_perda", "dia", "chave_1", "mes"],
+  },
+  {
+    // "Indicadores Diário - AAAA.xlsx" [Base Apontamentos (kg)] — produção e
+    // refugo em kg por ordem/máquina/dia, separado de "apontamentos" (que
+    // vem de [Base Máquina_Embalagem] e tem os campos de TMR/Gantt/parada).
+    // Mesmo fileKeywords do def "apontamentos" abaixo — um arquivo agora
+    // pode alimentar mais de uma tabela (ver detectTables()).
+    table: "producao_kg", fileKeywords: ["indicadores"], sheetKeywords: ["base_apontamentos_kg"],
+    numeric: ["peso_bruto", "refugo"], date: { dt_producao: "date" },
+    allowed: ["num_ordem", "cod_recurso", "dt_producao", "turno", "peso_bruto", "refugo", "descricao", "estrutura", "processo", "tipo_produto", "considerar", "planta", "maquina_real", "chave"],
   },
   {
     table: "tendencia_mensal", fileKeywords: ["tendencia", "grafico"], sheetKeywords: ["dados_prod"],
@@ -88,6 +108,8 @@ const RETENTION_DATE_COL = {
   apontamentos: "dt_producao",
   aderencia_maquinas_diaria: "dt_producao",
   aderencia_programacao: "dt_saida_maquina",
+  refugo_producao: "dt_producao",
+  producao_kg: "dt_producao",
 };
 
 // Essas 4 tabelas não têm chave natural nas linhas (são log de eventos, não
@@ -98,7 +120,10 @@ const RETENTION_DATE_COL = {
 // inserir as linhas de um arquivo, apaga o que aquele MESMO arquivo gravou
 // da vez anterior (_source_file) e insere puro — sem upsert, sem
 // necessidade de chave natural.
-const REPLACE_BY_SOURCE = new Set(["apontamentos", "aderencia_maquinas_diaria", "aderencia_programacao", "fardos_aparas"]);
+const REPLACE_BY_SOURCE = new Set([
+  "apontamentos", "aderencia_maquinas_diaria", "aderencia_programacao", "fardos_aparas",
+  "refugo_producao", "producao_kg",
+]);
 
 // Mesma chave, mas usada pra DEDUPLICAR a lista de linhas antes de gravar —
 // o Postgres rejeita um upsert que tenta atualizar a MESMA chave duas vezes
@@ -148,9 +173,12 @@ const HEADER_ALIASES = {
                                       // 2026-09-04, ver commit que adicionou esta linha.
 };
 
-function detectTable(fileName) {
+// Um arquivo pode alimentar mais de uma tabela (ex: "Indicadores Diário"
+// tem uma aba pra apontamentos com TMR/Gantt e outra só de produção em kg)
+// — por isso retorna TODOS os defs que baterem, não só o primeiro.
+function detectTables(fileName) {
   const norm = normalize(fileName);
-  return TABLE_DEFS.find((t) => t.fileKeywords.some((k) => norm.includes(k))) ?? null;
+  return TABLE_DEFS.filter((t) => t.fileKeywords.some((k) => norm.includes(k)));
 }
 
 function detectSheet(def, sheetNames) {
@@ -259,8 +287,8 @@ async function main() {
     const files = await listFolderFiles(drive);
 
     for (const file of files) {
-      const def = detectTable(file.name);
-      if (!def) {
+      const defs = detectTables(file.name);
+      if (defs.length === 0) {
         console.log(`[skip] "${file.name}" não bate com nenhuma tabela conhecida.`);
         continue;
       }
@@ -271,61 +299,64 @@ async function main() {
       // arquivos de 50-100MB), depois relê já filtrando só a aba certa —
       // evita gastar tempo/memória processando abas que não vão ser usadas.
       const sheetNames = XLSX.read(bytes, { type: "array", bookSheets: true }).SheetNames;
-      const sheetName = detectSheet(def, sheetNames);
-      const workbook = XLSX.read(bytes, { type: "array", sheets: [sheetName] });
-      const rawRows = sheetToRows(workbook.Sheets[sheetName]);
-      if (rawRows.length === 0) {
-        console.log(`[skip] "${file.name}" [${sheetName}] está vazia.`);
-        continue;
+
+      for (const def of defs) {
+        const sheetName = detectSheet(def, sheetNames);
+        const workbook = XLSX.read(bytes, { type: "array", sheets: [sheetName] });
+        const rawRows = sheetToRows(workbook.Sheets[sheetName]);
+        if (rawRows.length === 0) {
+          console.log(`[skip] "${file.name}" [${sheetName}] -> ${def.table}: aba vazia.`);
+          continue;
+        }
+
+        const rows = rawRows.map((r) => coerceRow(r, def.numeric, def.date, def.allowed));
+
+        if (rows.every((r) => Object.keys(r).length === 0)) {
+          console.log(
+            `[skip] "${file.name}" [${sheetName}] -> ${def.table}: nenhuma coluna bateu. ` +
+            `Cabeçalhos recebidos: ${Object.keys(rawRows[0]).join(", ")}`
+          );
+          continue;
+        }
+
+        const retentionCol = RETENTION_DATE_COL[def.table];
+        const cutoff = new Date();
+        cutoff.setMonth(cutoff.getMonth() - RETENTION_MONTHS);
+        const keptRows = retentionCol
+          ? rows.filter((r) => r[retentionCol] && new Date(r[retentionCol]) >= cutoff)
+          : rows;
+        if (retentionCol && keptRows.length === 0) {
+          console.log(`[skip] "${file.name}" [${sheetName}] -> ${def.table}: todas as linhas fora da janela de retenção (${RETENTION_MONTHS} meses).`);
+          continue;
+        }
+
+        const replaceBySource = REPLACE_BY_SOURCE.has(def.table);
+        let toInsert;
+        if (replaceBySource) {
+          toInsert = keptRows.map((r) => ({ ...r, _source_file: file.name }));
+          const { error: delErr } = await supabase.from(def.table).delete().eq("_source_file", file.name);
+          if (delErr) throw new Error(`Erro limpando ${def.table} antes de recarregar "${file.name}": ${delErr.message}`);
+        } else {
+          toInsert = dedupeRows(keptRows, DEDUPE_KEY[def.table]);
+        }
+        const conflictCols = CONFLICT_COLUMNS[def.table];
+
+        let gravadas = 0;
+        for (let i = 0; i < toInsert.length; i += 500) {
+          const chunk = toInsert.slice(i, i + 500);
+          const { error } = replaceBySource
+            ? await supabase.from(def.table).insert(chunk)
+            : conflictCols
+              ? await supabase.from(def.table).upsert(chunk, { onConflict: conflictCols })
+              : await supabase.from(def.table).upsert(chunk);
+          if (error) throw new Error(`Erro gravando em ${def.table} (${file.name}): ${error.message}`);
+          gravadas += chunk.length;
+        }
+
+        console.log(`[ok] "${file.name}" [${sheetName}] -> ${def.table}: ${gravadas} linhas`);
+        resumo.push(`${file.name} -> ${def.table}: ${gravadas}`);
+        totalLinhas += gravadas;
       }
-
-      const rows = rawRows.map((r) => coerceRow(r, def.numeric, def.date, def.allowed));
-
-      if (rows.every((r) => Object.keys(r).length === 0)) {
-        console.log(
-          `[skip] "${file.name}" [${sheetName}] -> ${def.table}: nenhuma coluna bateu. ` +
-          `Cabeçalhos recebidos: ${Object.keys(rawRows[0]).join(", ")}`
-        );
-        continue;
-      }
-
-      const retentionCol = RETENTION_DATE_COL[def.table];
-      const cutoff = new Date();
-      cutoff.setMonth(cutoff.getMonth() - RETENTION_MONTHS);
-      const keptRows = retentionCol
-        ? rows.filter((r) => r[retentionCol] && new Date(r[retentionCol]) >= cutoff)
-        : rows;
-      if (retentionCol && keptRows.length === 0) {
-        console.log(`[skip] "${file.name}" [${sheetName}] -> ${def.table}: todas as linhas fora da janela de retenção (${RETENTION_MONTHS} meses).`);
-        continue;
-      }
-
-      const replaceBySource = REPLACE_BY_SOURCE.has(def.table);
-      let toInsert;
-      if (replaceBySource) {
-        toInsert = keptRows.map((r) => ({ ...r, _source_file: file.name }));
-        const { error: delErr } = await supabase.from(def.table).delete().eq("_source_file", file.name);
-        if (delErr) throw new Error(`Erro limpando ${def.table} antes de recarregar "${file.name}": ${delErr.message}`);
-      } else {
-        toInsert = dedupeRows(keptRows, DEDUPE_KEY[def.table]);
-      }
-      const conflictCols = CONFLICT_COLUMNS[def.table];
-
-      let gravadas = 0;
-      for (let i = 0; i < toInsert.length; i += 500) {
-        const chunk = toInsert.slice(i, i + 500);
-        const { error } = replaceBySource
-          ? await supabase.from(def.table).insert(chunk)
-          : conflictCols
-            ? await supabase.from(def.table).upsert(chunk, { onConflict: conflictCols })
-            : await supabase.from(def.table).upsert(chunk);
-        if (error) throw new Error(`Erro gravando em ${def.table} (${file.name}): ${error.message}`);
-        gravadas += chunk.length;
-      }
-
-      console.log(`[ok] "${file.name}" [${sheetName}] -> ${def.table}: ${gravadas} linhas`);
-      resumo.push(`${file.name} -> ${def.table}: ${gravadas}`);
-      totalLinhas += gravadas;
     }
 
     await logFinish(logId, "ok", resumo.join(" | ") || "nenhum arquivo reconhecido", totalLinhas);
