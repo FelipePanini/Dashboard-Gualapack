@@ -74,6 +74,22 @@ const TABLE_DEFS = [
 
 const CONFLICT_COLUMNS = { refugo_aparas_historico: "data", tendencia_mensal: "mes,ano" };
 
+// Retenção: as tabelas de apontamento bruto (uma linha por evento de
+// máquina) crescem rápido e estouraram os 500 MB do plano free do
+// Supabase somando anos de histórico. As views do painel (TMR, perda,
+// aderência) sempre agregaram TUDO desde o início — o que também diluía
+// os indicadores "atuais" com anos de dado antigo. Limitar a carga bruta
+// aos últimos 12 meses resolve as duas coisas de uma vez: nenhuma
+// planilha histórica antiga (ex: "Base Aparas - 2024.xlsx") volta a
+// crescer o banco em cargas futuras, e os KPIs passam a refletir um
+// período que faz sentido em vez de uma média diluída de anos.
+const RETENTION_MONTHS = 12;
+const RETENTION_DATE_COL = {
+  apontamentos: "dt_producao",
+  aderencia_maquinas_diaria: "dt_producao",
+  aderencia_programacao: "dt_saida_maquina",
+};
+
 // Mesma chave, mas usada pra DEDUPLICAR a lista de linhas antes de gravar —
 // o Postgres rejeita um upsert que tenta atualizar a MESMA chave duas vezes
 // dentro do mesmo lote, e planilhas reais têm linhas repetidas (ex: máquina
@@ -263,8 +279,19 @@ async function main() {
         continue;
       }
 
+      const retentionCol = RETENTION_DATE_COL[def.table];
+      const cutoff = new Date();
+      cutoff.setMonth(cutoff.getMonth() - RETENTION_MONTHS);
+      const keptRows = retentionCol
+        ? rows.filter((r) => r[retentionCol] && new Date(r[retentionCol]) >= cutoff)
+        : rows;
+      if (retentionCol && keptRows.length === 0) {
+        console.log(`[skip] "${file.name}" [${sheetName}] -> ${def.table}: todas as linhas fora da janela de retenção (${RETENTION_MONTHS} meses).`);
+        continue;
+      }
+
       const conflictCols = CONFLICT_COLUMNS[def.table];
-      const dedupedRows = dedupeRows(rows, DEDUPE_KEY[def.table]);
+      const dedupedRows = dedupeRows(keptRows, DEDUPE_KEY[def.table]);
 
       let gravadas = 0;
       for (let i = 0; i < dedupedRows.length; i += 500) {

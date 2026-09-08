@@ -96,6 +96,19 @@ const DEDUPE_KEY: Record<string, string> = {
   maquinas: "id",
 };
 
+// Retenção: as tabelas de apontamento bruto (uma linha por evento de
+// máquina) crescem rápido e estouraram os 500 MB do plano free do
+// Supabase somando anos de histórico. Limitar a carga bruta aos últimos
+// 12 meses evita que reenviar uma planilha antiga (ex: "Base Aparas -
+// 2024.xlsx") continue inflando o banco pra sempre. Espelha a mesma regra
+// em backend/sync-drive/sync.js.
+const RETENTION_MONTHS = 12;
+const RETENTION_DATE_COL: Record<string, string> = {
+  apontamentos: "dt_producao",
+  aderencia_maquinas_diaria: "dt_producao",
+  aderencia_programacao: "dt_saida_maquina",
+};
+
 function dedupeRows(rows: Record<string, unknown>[], keyCols: string | undefined): Record<string, unknown>[] {
   if (!keyCols) return rows;
   const cols = keyCols.split(",");
@@ -287,8 +300,21 @@ Deno.serve(async (req) => {
       );
     }
 
+    const retentionCol = RETENTION_DATE_COL[table];
+    const cutoff = new Date();
+    cutoff.setMonth(cutoff.getMonth() - RETENTION_MONTHS);
+    const keptRows = retentionCol
+      ? rows.filter((r) => r[retentionCol] && new Date(r[retentionCol] as string) >= cutoff)
+      : rows;
+    if (retentionCol && keptRows.length === 0) {
+      throw new Error(
+        `Todas as linhas de "${fileName}" [${targetSheet}] estão fora da janela de retenção ` +
+        `de ${RETENTION_MONTHS} meses — nada foi gravado.`
+      );
+    }
+
     const conflictCols = CONFLICT_COLUMNS[table];
-    const dedupedRows = dedupeRows(rows, DEDUPE_KEY[table]);
+    const dedupedRows = dedupeRows(keptRows, DEDUPE_KEY[table]);
 
     let gravadas = 0;
     for (let i = 0; i < dedupedRows.length; i += 500) {

@@ -21,6 +21,11 @@ create table if not exists public.maquinas (
 -- 2. Apontamentos — eventos brutos de produção (de "Indicadores Diário" /
 --    "Base Aparas"). É a maior e mais importante tabela — cada linha é um
 --    evento de máquina (produzindo, parada, refugo, setup...).
+--
+--    Retenção: sync.js/ingest só gravam linhas com dt_producao dentro dos
+--    últimos 12 meses (RETENTION_MONTHS) — planilhas antigas (ex: "Base
+--    Aparas - 2024.xlsx") são lidas mas descartadas na carga, pra não
+--    estourar o limite de armazenamento do plano free do Supabase de novo.
 -- ----------------------------------------------------------------------------
 create table if not exists public.apontamentos (
   id                  bigint generated always as identity primary key,
@@ -96,6 +101,7 @@ create index if not exists idx_aderencia_maq_data on public.aderencia_maquinas_d
 
 -- ----------------------------------------------------------------------------
 -- 5. Aderência à programação (de "Histórico Aderência Programação")
+--    Mesma retenção de 12 meses da tabela apontamentos (por dt_saida_maquina).
 -- ----------------------------------------------------------------------------
 create table if not exists public.aderencia_programacao (
   id                bigint generated always as identity primary key,
