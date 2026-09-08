@@ -6,11 +6,8 @@ import { google } from "googleapis";
 import * as XLSX from "xlsx";
 
 const TARGETS = [
-  { fileMatch: "indicadores diario - 2025", sheets: ["Base Apontamentos (kg)"] },
-  { fileMatch: "indicadores diario - 2026", sheets: ["Base Apontamentos (kg)"] },
-  { fileMatch: "machine card oficial - generico", sheets: ["Hours Description"] },
-  { fileMatch: "refugo producao", sheets: ["Consulta Perda"] },
-  { fileMatch: "graficos tendencia", sheets: ["Dados Prod"] },
+  { fileMatch: "graficos tendencia", sheets: ["TMR - Flexo", "TMR - R18", "Volume (ton)", "Volume (km)", "Scrap", "Lote Médio", "Borra de Tinta"] },
+  { fileMatch: "refugo aparas", sheets: ["Conta Refugo"] },
 ];
 
 function normalize(s) {
