@@ -6,6 +6,7 @@ on:
 jobs:
   inspect:
     runs-on: ubuntu-latest
+    timeout-minutes: 8
     defaults:
       run:
         working-directory: backend/sync-drive
