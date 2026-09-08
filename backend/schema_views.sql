@@ -164,6 +164,41 @@ where a.dt_producao = ultimo_dia.d
 order by a.cod_recurso, a.hora_inicio;
 
 -- ----------------------------------------------------------------------------
+-- 8. Refugo por máquina (de "Refugo Produção.xlsx", aba "Consulta Perda")
+--    — granularidade real por evento/máquina/motivo, complementa a visão de
+--    perda por motivo (que vem de apontamentos).
+-- ----------------------------------------------------------------------------
+create or replace view public.v_refugo_producao_maquina
+with (security_invoker = true) as
+select
+  maquina,
+  sum(kg_perda) as kg_perda,
+  mode() within group (order by tipo) as motivo_principal
+from public.refugo_producao
+where maquina is not null and maquina <> ''
+group by maquina
+order by kg_perda desc;
+
+-- ----------------------------------------------------------------------------
+-- 9. Produção/refugo em kg por mês (de "Indicadores Diário - AAAA.xlsx",
+--    aba "Base Apontamentos (kg)")
+-- ----------------------------------------------------------------------------
+create or replace view public.v_producao_kg_mensal
+with (security_invoker = true) as
+select
+  date_trunc('month', dt_producao)::date as mes,
+  sum(peso_bruto) as peso_bruto_kg,
+  sum(refugo) as refugo_kg,
+  case when sum(peso_bruto) > 0
+    then sum(refugo) / sum(peso_bruto) * 100
+    else 0
+  end as refugo_pct
+from public.producao_kg
+where dt_producao is not null
+group by 1
+order by 1;
+
+-- ----------------------------------------------------------------------------
 -- Permissões — mesma regra das tabelas: leitura só para autenticado.
 -- Views com security_invoker=true precisam do GRANT explícito, mesmo já
 -- tendo RLS nas tabelas de origem, porque o Postgres checa privilégio na
@@ -177,5 +212,7 @@ grant select on
   public.v_fardos_mensal,
   public.v_refugo_mensal,
   public.v_ops_refugo,
-  public.v_apontamentos_ultimo_dia
+  public.v_apontamentos_ultimo_dia,
+  public.v_refugo_producao_maquina,
+  public.v_producao_kg_mensal
 to authenticated;

@@ -955,6 +955,27 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
           <div id="classe-chart"></div>
         </section>
 
+        <section class="grid-2 uneven equal-cols">
+          <div class="panel glass-live">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">Refugo por máquina (Produção)</h2>
+                <div class="panel-sub">kg apontados por evento &middot; base "Refugo Produção"</div>
+              </div>
+            </div>
+            <div id="refugo-producao-chart"></div>
+          </div>
+          <div class="panel glass-live">
+            <div class="panel-head">
+              <div>
+                <h2 class="panel-title">Produção mensal (kg)</h2>
+                <div class="panel-sub">Peso bruto por mês &middot; base "Indicadores Diário"</div>
+              </div>
+            </div>
+            <div id="producao-kg-chart"></div>
+          </div>
+        </section>
+
         <section class="panel glass-live">
           <div class="panel-head">
             <div>
@@ -1289,6 +1310,18 @@ const FALLBACK = {
     { nome:"Refeição Autorizada", horas: 14.8, cor:"#FA8072" },
   ],
   GANTT_SEGMENTS_RANDOM: true, // sem base real — o Gantt sorteia segmentos plausíveis, como sempre fez
+  REFUGO_PRODUCAO_MAQUINA: [
+    { maquina:"RT01",   kg_perda: 8420, motivo:"01_Falha_Impressao" },
+    { maquina:"REB 05", kg_perda: 6180, motivo:"08_Refile" },
+    { maquina:"R12",    kg_perda: 5340, motivo:"05_Acerto_de_Cor" },
+    { maquina:"L04",    kg_perda: 3120, motivo:"04_Marcas_de_Emenda" },
+    { maquina:"REB 04", kg_perda: 2460, motivo:"02_Acerto_Maquina" },
+  ],
+  PRODUCAO_KG_MENSAL: [
+    { mes:"jul", peso_bruto_kg: 612400, refugo_kg: 48200 },
+    { mes:"ago", peso_bruto_kg: 648900, refugo_kg: 51100 },
+    { mes:"set", peso_bruto_kg: 601200, refugo_kg: 46700 },
+  ],
 };
 /* Etapas de WIP e carteira — nenhuma tabela real disso foi conectada ainda
    (não veio nenhum BI de WIP/Carteira na carga). Fica isolado da view
@@ -1312,7 +1345,7 @@ const CLIENTES = [
 /* Preenchidos por loadRealData() (real) ou applyFallback() (referência) —
    todo o resto do arquivo só lê estas variáveis, nunca sabe qual das duas
    fontes alimentou elas. */
-let MAQUINAS, TIPOS_PERDA, CLASSIFICACOES, ADERENCIA_PROCESSO, MESES, APARAS_MENSAL, OPS, DOWNTIME, GANTT_POR_MAQUINA, PRODUTIVIDADE;
+let MAQUINAS, TIPOS_PERDA, CLASSIFICACOES, ADERENCIA_PROCESSO, MESES, APARAS_MENSAL, OPS, DOWNTIME, GANTT_POR_MAQUINA, PRODUTIVIDADE, REFUGO_PRODUCAO_MAQUINA, PRODUCAO_KG_MENSAL;
 let USANDO_DADOS_REAIS = false;
 
 /* Aderência ao planejado agregada por processo (Coating entra só no
@@ -1344,6 +1377,8 @@ function applyFallback(){
   DOWNTIME = FALLBACK.DOWNTIME.map(d=>({...d, corDark:d.cor}));
   GANTT_POR_MAQUINA = null; // sinaliza pro Gantt sortear (comportamento antigo)
   PRODUTIVIDADE = 214.6; // m²/h — referência, nenhuma base real traz essa métrica ainda
+  REFUGO_PRODUCAO_MAQUINA = FALLBACK.REFUGO_PRODUCAO_MAQUINA.map(r=>({...r}));
+  PRODUCAO_KG_MENSAL = FALLBACK.PRODUCAO_KG_MENSAL.map(p=>({...p}));
 }
 
 /* Carrega as views reais do Supabase. Se der qualquer problema (rede, view
@@ -1448,6 +1483,30 @@ async function loadRealData(){
 
     ADERENCIA_PROCESSO = calcAderenciaProcesso(MAQUINAS);
     PRODUTIVIDADE = null; // m²/h — sem coluna equivalente em nenhuma base carregada
+
+    // Views novas (Fase 1 de correção de planilhas) — busca à parte e sem
+    // travar o resto do painel se ainda não existirem (schema_views.sql
+    // precisa ser rodado de novo no Supabase pra criá-las).
+    try{
+      const [refugoProdRes, producaoKgRes] = await Promise.all([
+        client.from("v_refugo_producao_maquina").select("*"),
+        client.from("v_producao_kg_mensal").select("*"),
+      ]);
+      if(refugoProdRes.error) throw refugoProdRes.error;
+      if(producaoKgRes.error) throw producaoKgRes.error;
+      REFUGO_PRODUCAO_MAQUINA = (refugoProdRes.data||[]).slice(0,12).map(r=>({
+        maquina: r.maquina, kg_perda: Number(r.kg_perda)||0, motivo: prettyCodigo(r.motivo_principal),
+      }));
+      PRODUCAO_KG_MENSAL = (producaoKgRes.data||[]).slice(-12).map(r=>({
+        mes: new Date(r.mes+"T00:00:00").toLocaleDateString("pt-BR",{ month:"short" }).replace(".",""),
+        peso_bruto_kg: Number(r.peso_bruto_kg)||0, refugo_kg: Number(r.refugo_kg)||0,
+      }));
+    }catch(err){
+      console.error("Falha ao carregar refugo por máquina / produção em kg — usando referência só nesses gráficos:", err);
+      REFUGO_PRODUCAO_MAQUINA = FALLBACK.REFUGO_PRODUCAO_MAQUINA.map(r=>({...r}));
+      PRODUCAO_KG_MENSAL = FALLBACK.PRODUCAO_KG_MENSAL.map(p=>({...p}));
+    }
+
     USANDO_DADOS_REAIS = true;
   }catch(err){
     console.error("Falha ao carregar dados reais do painel — usando referência:", err);
@@ -1894,6 +1953,28 @@ hBarChart(document.getElementById("classe-chart"), CLASSIFICACOES.map(c=>({
   color2: c.aparas>META_APARAS ? "var(--serious)" : "var(--series-3)",
   tip:`<b>${esc(c.nome)}</b><br>${fmt1(c.aparas)}% de apara · ${fmt(c.kg)} kg produzidos`
 })), { idPrefix:"cl", W:1040, labelW:220, valueW:66, rowH:30, target: META_APARAS, targetLabel:`meta ${fmt1(META_APARAS)}%`, aria:"Apara por classificação de produto" });
+
+hBarChart(document.getElementById("refugo-producao-chart"), REFUGO_PRODUCAO_MAQUINA.map(r=>({
+  label: r.maquina, value: r.kg_perda, display: fmt(r.kg_perda)+" kg",
+  color:"var(--series-2)", color2:"var(--series-4)",
+  tip:`<b>${esc(r.maquina)}</b><br>${fmt(r.kg_perda)} kg de refugo · motivo mais comum: ${esc(r.motivo)}`
+})), { idPrefix:"rp", labelW:92, valueW:76, rowH:26, aria:"Refugo por máquina (Produção)" });
+
+(function(){
+  const holder = document.getElementById("producao-kg-chart");
+  if(PRODUCAO_KG_MENSAL.length === 0){
+    holder.innerHTML = `<div class="empty-state">Sem dados de produção no período.</div>`;
+    return;
+  }
+  multiLineChart(holder,
+    PRODUCAO_KG_MENSAL.map(p=>p.mes),
+    [
+      { name:"Peso bruto", short:"Bruto", color:"var(--series-2)", data: PRODUCAO_KG_MENSAL.map(p=>p.peso_bruto_kg/1000) },
+      { name:"Refugo",     short:"Refugo", color:"var(--critical)", dashed:true, data: PRODUCAO_KG_MENSAL.map(p=>p.refugo_kg/1000) },
+    ],
+    { idPrefix:"pk", fmtY: v=> fmt(v)+"t", fmtTip: v=> fmt1(v)+" t", aria:"Produção e refugo mensal em toneladas" }
+  );
+})();
 
 (function(){
   const tbody = document.querySelector("#ops-table tbody");
