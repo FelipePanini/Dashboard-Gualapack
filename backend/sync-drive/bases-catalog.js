@@ -228,6 +228,74 @@ export const BASES = [
     classificacao: "AUXILIAR",
     observacao: "Tabela de domínio: 1=PROCESSO PRODUTIVO, 2=TOCOS, 11=REFILE... Usada para traduzir o código em COMPLETOS/Detalhes1.",
   },
+  // --------------------------------------------------------------------------
+  // Base Aparas - 2024/2025/2026/Genérico — 7 a 16 abas cada. Só
+  // "BASE_DETALHE" estava mapeada (e ia pra tabela apontamentos).
+  // Aqui está a maior concentração de dado não usado do Drive inteiro.
+  // --------------------------------------------------------------------------
+  {
+    sheet: "DB_PRODUCAO_OP", origem: "PRODUCAO_OP",
+    fileKeywords: ["base_aparas"], sheetMatch: ["base_prod"],
+    headerRow: 0,
+    colunas: {
+      num_ordem: "num_ordem", cod_recurso: "cod_recurso", dt_producao: "dt_producao",
+      peso_bruto: "peso_bruto", refugo: "refugo", descricao: "descricao",
+      estrutura: "estrutura", processo: "processo", tipo_produto: "tipo_produto",
+      considerar: "considerar", maquina_real: "maquina_real",
+      cliente: "cliente", tipo_cliente: "tipo_cliente", sku: "sku",
+    },
+    numeric: ["peso_bruto", "refugo"], date: { dt_producao: "date" },
+    granularidade: "1 linha por OP x recurso x dia",
+    classificacao: "PRINCIPAL",
+    observacao: "NÃO mapeada hoje. É a única base com CLIENTE, TIPO CLIENTE e SKU junto da produção — o painel não tem visão de cliente hoje por falta disso.",
+  },
+  {
+    sheet: "DB_ENGENHARIA", origem: "CADASTRO_ENGENHARIA",
+    fileKeywords: ["base_aparas"], sheetMatch: ["engenharia"],
+    headerRow: 0,
+    colunas: {
+      num_ordem: "num_ordem", cod_estrutura: "cod_estrutura", descricao: "descricao",
+      cod_item: "cod_item", passo: "passo", largura: "largura",
+      nome_cliente: "cliente", cod_cliente: "cod_cliente", cod_sap: "cod_sap",
+      tipo_produto: "tipo_produto", horiz_faixa: "horiz_faixa",
+      vert_repet: "vert_repet", cilindro: "cilindro", data_emissao: "data_emissao",
+    },
+    numeric: ["passo", "largura", "horiz_faixa", "vert_repet", "cilindro"],
+    date: { data_emissao: "timestamp" },
+    granularidade: "1 linha por ordem/estrutura (cadastro de engenharia)",
+    classificacao: "AUXILIAR",
+    observacao: "~43 mil linhas. Cadastro de produto: passo, largura, cilindro, cliente, código SAP. NÃO mapeado hoje — é o que falta pra calcular produtividade em m²/h.",
+  },
+  {
+    sheet: "DB_SKU", origem: "CADASTRO_SKU",
+    fileKeywords: ["base_aparas"], sheetMatch: ["base_sku"],
+    headerRow: 0,
+    colunas: { codigo_pa: "codigo_pa", codigo_engenharia: "codigo_engenharia" },
+    numeric: [], date: {},
+    granularidade: "1 linha por SKU (de-para PA x Engenharia)",
+    classificacao: "AUXILIAR",
+    observacao: "~13 mil linhas. De-para entre código PA e código de engenharia. NÃO mapeado hoje.",
+  },
+  {
+    sheet: "DB_APONTAMENTOS_HIST", origem: "APONTAMENTOS_HIST",
+    fileKeywords: ["base_aparas"], sheetMatch: ["base_producao", "base_maq_emb"], multiSheet: true,
+    headerRow: 0,
+    colunas: {
+      num_ordem: "num_ordem", cod_recurso: "cod_recurso", cod_apont: "cod_apont",
+      qtd_produzida: "qtd_produzida", cod_desc: "cod_desc", dt_producao: "dt_producao",
+      hora_inicio: "hora_inicio", hora_fim: "hora_fim", qtd_horas: "qtd_horas", turno: "turno",
+      usr_peso_bruto_bobina: "peso_bruto_bobina", usr_tipodaperda: "tipo_perda",
+      usr_kgdaperda: "kg_perda", nome_operador: "nome_operador", descricao: "descricao",
+      tipo_produto: "tipo_produto", cod_estrutura: "cod_estrutura",
+      des_num_ordem: "des_num_ordem", cod_est: "cod_est", processo: "processo",
+      classificacao: "classificacao", nome_cliente: "nome_cliente",
+    },
+    numeric: ["qtd_produzida", "qtd_horas", "peso_bruto_bobina", "kg_perda"],
+    date: { dt_producao: "date", hora_inicio: "timestamp", hora_fim: "timestamp" },
+    granularidade: "1 linha por evento de máquina",
+    classificacao: "REDUNDANTE",
+    observacao: "ATENÇÃO: 'Base Produção' (389 mil linhas em 2024, 367 mil em 2025), 'BASE_MÁQ_EMB' (168 mil) e 'BASE_DETALHE' (22 mil, a única usada hoje) têm as MESMAS 22 colunas. É a maior sobreposição encontrada — comparar antes de decidir qual é a oficial.",
+  },
   {
     sheet: "DB_TIPOS_MATERIAL", origem: "CADASTRO_TIPO_MATERIAL",
     fileKeywords: ["sequenciamento"], sheetMatch: ["tipo_refugo"],
@@ -252,4 +320,17 @@ export const ABAS_NAO_TABULARES = [
   { arquivo: "Refugo Aparas.xlsx", aba: "Master Plan", motivo: "Conta Refugo + REFILE/RODA CARROÇA; sobreposição quase total." },
   { arquivo: "Graficos Tendência.xlsx", aba: "Dados Prod", motivo: "Blocos lado a lado (Volume/Lote/Aparas/Vazão) — é painel, não tabela." },
   { arquivo: "Graficos Tendência.xlsx", aba: "Volume (km) / Volume (ton) / Scrap", motivo: "Blocos lado a lado por processo — precisa de parser dedicado por bloco." },
+  { arquivo: "Base Aparas - *", aba: "DIM / Dinamica / Planilha3", motivo: "Tabelas dinâmicas (Rótulos de Linha / Soma de ...)." },
+  { arquivo: "Base Aparas - *", aba: "Sylvamo", motivo: "Tabela dinâmica filtrada (produção Sylvamo R18/R20)." },
+  { arquivo: "Base Aparas - 2025", aba: "Planilha5 e Planilha5 (2)", motivo: "Duas cópias idênticas (4.869 linhas cada) do formato BASE_PROD — provável trabalho manual em rascunho." },
+  { arquivo: "Base Aparas - 2025/2026", aba: "Planilha1 / Planilha2", motivo: "Conferência manual OP a OP entre roto e corte, em blocos lado a lado por mês." },
+  { arquivo: "Base Aparas - 2025", aba: "Planilha4 / Planilha7", motivo: "Saída de pivot (MÊS|PESO) e lista solta de OPs." },
+];
+
+// Divergências de nome de aba entre arquivos do MESMO template — o
+// consolidador precisa casar por aproximação, não por nome exato.
+export const VARIACOES_DE_NOME = [
+  { base: "DB_APARAS_FORA_PROCESSO", variantes: ["DETALHES - FP", "DETALHES"], observacao: "Setembro usa 'DETALHES - FP'; Fevereiro/Março usam só 'DETALHES'." },
+  { base: "DB_APONTAMENTOS_HIST", variantes: ["Base Produção", "BASE_MÁQ_EMB", "BASE_DETALHE"], observacao: "Mesmo layout de 22 colunas com três nomes diferentes, às vezes no mesmo arquivo." },
+  { base: "DB_MOTIVOS_APARAS", variantes: ["CLASSIFICAÇÃO "], observacao: "A lista de códigos varia entre meses (12, 13 ou 14 linhas) — o cadastro não é estável." },
 ];
