@@ -66,22 +66,29 @@ async function main() {
     console.log(`## ARQUIVO: ${file.name}`);
     console.log(`   id=${file.id} mime=${file.mimeType}`);
 
-    let bytes, sheetNames;
+    // UMA leitura por arquivo, não uma por aba: cada XLSX.read descompacta o
+    // zip inteiro, então ler aba por aba num arquivo de 95 MB com 10 abas
+    // significa descompactar 95 MB dez vezes (foi o que travou a 1ª tentativa).
+    // sheetRows materializa só as primeiras linhas de CADA aba, então a
+    // leitura única sai barata em memória.
+    let wb;
     try {
-      bytes = await downloadFile(drive, file);
-      console.log(`   tamanho=${(bytes.length / 1024 / 1024).toFixed(1)} MB`);
-      sheetNames = XLSX.read(bytes, { type: "array", bookSheets: true }).SheetNames;
+      const t0 = Date.now();
+      const bytes = await downloadFile(drive, file);
+      console.log(`   tamanho=${(bytes.length / 1024 / 1024).toFixed(1)} MB (download ${Date.now() - t0}ms)`);
+      const t1 = Date.now();
+      wb = XLSX.read(bytes, { type: "array", sheetRows: PARSE_ROWS });
+      console.log(`   parse ${Date.now() - t1}ms`);
     } catch (err) {
       console.log(`   [ERRO] não consegui abrir: ${err.message}`);
       continue;
     }
 
+    const sheetNames = wb.SheetNames;
     console.log(`   ${sheetNames.length} aba(s): ${sheetNames.join(" ; ")}`);
 
     for (const name of sheetNames) {
       try {
-        const t0 = Date.now();
-        const wb = XLSX.read(bytes, { type: "array", sheets: [name], sheetRows: PARSE_ROWS });
         const sheet = wb.Sheets[name];
         if (!sheet) {
           console.log(`\n   --- ABA "${name}": vazia (sem range)`);
@@ -91,7 +98,7 @@ async function main() {
         const full = dims(sheet["!fullref"] ?? sheet["!ref"]);
         const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "", raw: false, blankrows: false });
 
-        console.log(`\n   --- ABA "${name}" — ${full ? `${full.linhas} linhas x ${full.colunas} colunas` : "dimensão desconhecida"} (${Date.now() - t0}ms)`);
+        console.log(`\n   --- ABA "${name}" — ${full ? `${full.linhas} linhas x ${full.colunas} colunas` : "dimensão desconhecida"}`);
         if (rows.length === 0) {
           console.log(`       (sem conteúdo)`);
           continue;
