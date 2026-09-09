@@ -35,6 +35,8 @@ import {
   dedupeRows, detectTables, detectSheet, sheetToRows, coerceRow,
   driveClient, listFolderFiles, downloadFile, CENTRAL_FILE_NAME, DB_SHEET_NAME,
 } from "./lib.js";
+import { coletarBases, COLUNAS_ORIGEM } from "./collect-bases.js";
+import { BASES } from "./bases-catalog.js";
 
 const required = ["DRIVE_FOLDER_ID", "GOOGLE_SERVICE_ACCOUNT_JSON"];
 for (const key of required) {
@@ -44,12 +46,35 @@ for (const key of required) {
   }
 }
 
+// Uma base pode vir de vários arquivos (ex: TMR só do Graficos Tendência,
+// mas DB_APARAS_DETALHE de 9 Sequenciamentos) — junta tudo na mesma aba.
+function mesclarBases(destino, novo) {
+  for (const [aba, b] of novo) {
+    const atual = destino.get(aba) ?? { linhas: [], colunas: new Set(), origens: [], erros: [] };
+    atual.linhas.push(...b.linhas);
+    b.colunas.forEach((c) => atual.colunas.add(c));
+    atual.origens.push(...b.origens);
+    atual.erros.push(...b.erros);
+    destino.set(aba, atual);
+  }
+}
+
+// Um arquivo com layout inesperado não pode derrubar a consolidação inteira.
+function coletarBasesSeguro(nome, bytes, importadoEm) {
+  try {
+    return coletarBases(nome, bytes, importadoEm);
+  } catch (err) {
+    console.error(`[erro] bases de inventário de "${nome}": ${err.message}`);
+    return new Map();
+  }
+}
+
 const PENDENTES = [
   "DB_TMR (Gráficos Tendência.xlsx, abas TMR-*) — aguardando confirmar chave/granularidade mista (máquina x processo).",
   "DB_ADERENCIA (Aderência Semanal.xlsx, aba ADERÊNCIA DIÁRIA) — aguardando confirmar chave única contra os dados reais.",
 ];
 
-async function collectTableRows(drive, files) {
+async function collectTableRows(drive, files, importadoEm, porBase) {
   // tabela -> { rows: [...], arquivos: Set, erros: [] }
   const porTabela = new Map();
   const touch = (table) => {
@@ -59,7 +84,19 @@ async function collectTableRows(drive, files) {
 
   for (const file of files) {
     const defs = detectTables(file.name);
-    if (defs.length === 0 || !defs.some((d) => DB_SHEET_NAME[d.table])) continue;
+    const abastaceSupabase = defs.some((d) => DB_SHEET_NAME[d.table]);
+
+    // Um arquivo pode não alimentar tabela nenhuma do Supabase e mesmo assim
+    // ter bases de inventário (é o caso de Aderência Semanal, hoje sem uso).
+    if (!abastaceSupabase) {
+      try {
+        const bytes = await downloadFile(drive, file);
+        mesclarBases(porBase, coletarBasesSeguro(file.name, bytes, importadoEm));
+      } catch (err) {
+        console.error(`[erro] "${file.name}": ${err.message}`);
+      }
+      continue;
+    }
 
     let bytes;
     try {
@@ -68,6 +105,10 @@ async function collectTableRows(drive, files) {
       for (const def of defs) if (DB_SHEET_NAME[def.table]) touch(def.table).erros.push(`${file.name}: falha ao baixar (${err.message})`);
       continue;
     }
+
+    // Bases de inventário do mesmo arquivo, reaproveitando o download.
+    mesclarBases(porBase, coletarBasesSeguro(file.name, bytes, importadoEm));
+
     const sheetNames = XLSX.read(bytes, { type: "array", bookSheets: true }).SheetNames;
 
     for (const def of defs) {
@@ -119,44 +160,89 @@ async function collectTableRows(drive, files) {
   return porTabela;
 }
 
-function buildWorkbook(porTabela) {
-  const wb = XLSX.utils.book_new();
+function periodo(linhas) {
+  const datas = [];
+  for (const l of linhas) {
+    for (const [k, v] of Object.entries(l)) {
+      if (!/^(data|dt_|.*_data)/.test(k) || typeof v !== "string") continue;
+      if (/^\d{4}-\d\d-\d\d/.test(v)) datas.push(v.slice(0, 10));
+    }
+  }
+  if (datas.length === 0) return { primeira: "", ultima: "" };
+  datas.sort();
+  return { primeira: datas[0], ultima: datas[datas.length - 1] };
+}
 
+function buildWorkbook(porTabela, porBase, agora) {
+  const wb = XLSX.utils.book_new();
+  const controleRows = [];
+
+  // 1. Abas que alimentam o Supabase (formato TABLE_DEFS).
   for (const def of TABLE_DEFS) {
     const sheetName = DB_SHEET_NAME[def.table];
     if (!sheetName) continue;
-    const bucket = porTabela.get(def.table) ?? { rows: [], arquivos: new Set() };
+    const bucket = porTabela.get(def.table) ?? { rows: [], arquivos: new Set(), erros: [] };
     // ordem de coluna estável = a mesma ordem de "allowed" no TABLE_DEFS,
     // mais _source_file no fim (controle, não é dado de negócio).
     const header = [...def.allowed, "_source_file"];
-    const ws = XLSX.utils.json_to_sheet(bucket.rows, { header });
-    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bucket.rows, { header }), sheetName);
+
+    const p = periodo(bucket.rows);
+    controleRows.push({
+      aba: sheetName, destino: `supabase:${def.table}`,
+      arquivo_origem: Array.from(bucket.arquivos).join(" | ") || "(nenhum arquivo encontrado)",
+      aba_origem: def.sheetKeywords.join(" | "),
+      registros: bucket.rows.length, primeira_data: p.primeira, ultima_data: p.ultima,
+      data_importacao: agora,
+      status: bucket.erros.length ? "erro" : bucket.rows.length ? "ok" : "vazio",
+      classificacao: "EM USO", granularidade: "", observacoes: bucket.erros.join(" ; "),
+    });
   }
 
-  const agora = new Date().toISOString();
-  const controleRows = TABLE_DEFS
-    .filter((def) => DB_SHEET_NAME[def.table])
-    .map((def) => {
-      const bucket = porTabela.get(def.table) ?? { rows: [], arquivos: new Set(), erros: [] };
-      return {
-        aba: DB_SHEET_NAME[def.table],
-        registros: bucket.rows.length,
-        arquivos_origem: Array.from(bucket.arquivos).join(" | ") || "(nenhum arquivo encontrado)",
-        ultima_execucao: agora,
-        status: bucket.erros.length ? "erro" : bucket.rows.length ? "ok" : "vazio",
-        observacao: bucket.erros.join(" ; "),
-      };
+  // 2. Abas de inventário (formato bases-catalog) — não vão pro Supabase
+  //    ainda; existem pra podermos comparar e decidir depois.
+  for (const base of BASES) {
+    const bucket = porBase.get(base.sheet);
+    if (!bucket) {
+      controleRows.push({
+        aba: base.sheet, destino: "inventario", arquivo_origem: "", aba_origem: base.sheetMatch.join(" | "),
+        registros: 0, primeira_data: "", ultima_data: "", data_importacao: agora,
+        status: "não encontrada", classificacao: base.classificacao,
+        granularidade: base.granularidade, observacoes: base.observacao,
+      });
+      continue;
+    }
+    const header = [...new Set([...Object.values(base.colunas), "recurso", "recurso_rotulo", "granularidade", ...COLUNAS_ORIGEM])]
+      .filter((c) => bucket.colunas.has(c));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(bucket.linhas, { header }), base.sheet);
+
+    const p = periodo(bucket.linhas);
+    const descartadas = bucket.origens.reduce((s, o) => s + (o.descartadas_retencao || 0), 0);
+    controleRows.push({
+      aba: base.sheet, destino: "inventario",
+      arquivo_origem: [...new Set(bucket.origens.map((o) => o.arquivo))].join(" | "),
+      aba_origem: [...new Set(bucket.origens.map((o) => o.aba))].join(" | "),
+      registros: bucket.linhas.length, primeira_data: p.primeira, ultima_data: p.ultima,
+      data_importacao: agora,
+      status: bucket.erros.length ? "erro" : bucket.linhas.length ? "ok" : "vazio",
+      classificacao: base.classificacao, granularidade: base.granularidade,
+      observacoes: [base.observacao, descartadas ? `${descartadas} linha(s) fora da janela de ${RETENTION_MONTHS} meses` : "", ...bucket.erros]
+        .filter(Boolean).join(" ; "),
     });
-  controleRows.push(
-    ...PENDENTES.map((texto) => ({
-      aba: texto.split(" ")[0], registros: 0, arquivos_origem: "", ultima_execucao: agora,
-      status: "pendente", observacao: texto,
-    }))
-  );
-  const wsControle = XLSX.utils.json_to_sheet(controleRows, {
-    header: ["aba", "registros", "arquivos_origem", "ultima_execucao", "status", "observacao"],
-  });
-  XLSX.utils.book_append_sheet(wb, wsControle, "DB_CONTROLE");
+  }
+
+  for (const texto of PENDENTES) {
+    controleRows.push({
+      aba: texto.split(" ")[0], destino: "pendente", arquivo_origem: "", aba_origem: "",
+      registros: 0, primeira_data: "", ultima_data: "", data_importacao: agora,
+      status: "pendente", classificacao: "INCERTA", granularidade: "", observacoes: texto,
+    });
+  }
+
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(controleRows, {
+    header: ["aba", "destino", "arquivo_origem", "aba_origem", "registros", "primeira_data",
+      "ultima_data", "data_importacao", "status", "classificacao", "granularidade", "observacoes"],
+  }), "DB_CONTROLE");
 
   return wb;
 }
@@ -202,16 +288,23 @@ async function main() {
   const files = await listFolderFiles(drive);
   console.log(`${files.length} arquivo(s) na pasta do Drive.`);
 
-  const porTabela = await collectTableRows(drive, files);
-  const wb = buildWorkbook(porTabela);
+  const agora = new Date().toISOString();
+  const porBase = new Map();
+  const porTabela = await collectTableRows(drive, files, agora, porBase);
+  const wb = buildWorkbook(porTabela, porBase, agora);
   const buffer = XLSX.write(wb, { type: "buffer", bookType: "xlsx" });
   console.log(`Arquivo central montado em memória: ${(buffer.length / 1024 / 1024).toFixed(1)} MB.`);
 
   await uploadCentralFile(drive, buffer);
 
-  console.log("\nResumo:");
+  console.log("\nResumo — abas que alimentam o Supabase:");
   for (const [table, bucket] of porTabela) {
     console.log(`  ${DB_SHEET_NAME[table]}: ${bucket.rows.length} linhas de ${bucket.arquivos.size} arquivo(s)${bucket.erros.length ? ` — ${bucket.erros.length} erro(s)` : ""}`);
+  }
+  console.log("\nResumo — abas de inventário (não vão pro Supabase ainda):");
+  for (const base of BASES) {
+    const b = porBase.get(base.sheet);
+    console.log(`  ${base.sheet.padEnd(28)} ${String(b?.linhas.length ?? 0).padStart(7)} linhas  [${base.classificacao}]${b?.erros.length ? ` — ${b.erros.length} erro(s)` : ""}`);
   }
   if (PENDENTES.length) {
     console.log("\nAbas ainda não incluídas (pendentes de validação):");

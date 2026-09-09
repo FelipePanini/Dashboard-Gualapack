@@ -229,6 +229,160 @@ export const BASES = [
     observacao: "Tabela de domínio: 1=PROCESSO PRODUTIVO, 2=TOCOS, 11=REFILE... Usada para traduzir o código em COMPLETOS/Detalhes1.",
   },
   // --------------------------------------------------------------------------
+  // Indicadores Diário - 2025/2026.xlsx — 10 abas. Duas já usadas
+  // (apontamentos e producao_kg); estas três nunca foram tocadas e são as
+  // que destravam indicadores hoje vazios no painel.
+  // --------------------------------------------------------------------------
+  {
+    sheet: "DB_METAS", origem: "METAS",
+    fileKeywords: ["indicadores"], sheetMatch: ["metas"],
+    headerRow: 0,
+    colunas: { data: "data", maquina: "maquina", meta: "meta", chave: "chave_periodo" },
+    numeric: ["meta"], date: { data: "date" },
+    granularidade: "1 linha por dia x máquina",
+    classificacao: "PRINCIPAL",
+    observacao: "3.668 linhas. Meta diária por máquina. NÃO mapeada — o painel não tem meta por máquina hoje.",
+  },
+  {
+    sheet: "DB_CLASSIFICACAO_APONT", origem: "CADASTRO_CLASSIFICACAO_APONT",
+    fileKeywords: ["indicadores"], sheetMatch: ["classificacao_oficial"],
+    headerRow: 0,
+    colunas: {
+      cod: "cod_apont", descricao: "descricao",
+      classificacao_disp: "classificacao_disponibilidade", classificacao: "classificacao_horas",
+    },
+    numeric: [], date: {},
+    granularidade: "1 linha por código de apontamento (cadastro oficial)",
+    classificacao: "AUXILIAR",
+    observacao: "112 códigos. Liga cod_apont a SETUP/INICIALIZAÇÃO/INATIVIDADE/IMPRODUTIVO — é a definição oficial do TMR. Usar a versão 'Oficial': o código vem zero-padded ('01'), igual ao das bases de evento; a aba 'Classificação' usa '1' e não casaria.",
+  },
+
+  // --------------------------------------------------------------------------
+  // Machine Card Oficial - 2025/Genérico.xlsx — 26 e 32 abas. Usávamos 1.
+  // --------------------------------------------------------------------------
+  {
+    sheet: "DB_PRODUCAO_METROS", origem: "PRODUCAO_METROS",
+    fileKeywords: ["machine_card"], sheetMatch: ["producao_metros"],
+    headerRow: 0,
+    colunas: {
+      num_ordem: "num_ordem", cod_recurso: "cod_recurso", dt_producao: "dt_producao",
+      tipo_produto: "tipo_produto", descricao: "descricao", operador: "operador",
+      turno: "turno", qtd_horas: "qtd_horas",
+      qtd_produzida_metros: "qtd_produzida_m", producao_m: "producao_m2",
+      largura_real: "largura_real",
+    },
+    numeric: ["qtd_horas", "qtd_produzida_m", "producao_m2", "largura_real"],
+    date: { dt_producao: "date" },
+    granularidade: "1 linha por OP x recurso x dia",
+    classificacao: "PRINCIPAL",
+    observacao: "É a única base com PRODUÇÃO M² e LARGURA REAL. O KPI de produtividade (m²/h) do painel está vazio hoje por falta exatamente disso.",
+  },
+  {
+    sheet: "DB_ABSENTEISMO", origem: "ABSENTEISMO",
+    fileKeywords: ["machine_card"], sheetMatch: ["absenteismo"],
+    headerRow: 0,
+    colunas: {
+      data: "data", planta: "planta", ano: "ano", mes: "mes",
+      colaborador: "colaborador", centro_de_custo: "centro_custo",
+      local_correto: "local", tipo: "tipo",
+      horas_normais_trabalhadas: "horas_normais",
+    },
+    numeric: ["ano", "horas_normais"], date: { data: "date" },
+    granularidade: "1 linha por colaborador x dia",
+    classificacao: "COMPLEMENTAR",
+    observacao: "4.735 linhas. Abre o domínio de PESSOAS, que o painel não cobre. Contém nome de colaborador — avaliar privacidade antes de levar ao dashboard.",
+  },
+  {
+    sheet: "DB_CORES_POR_OP", origem: "CORES_POR_OP",
+    fileKeywords: ["machine_card"], sheetMatch: ["cores_por_op"],
+    headerRow: 0,
+    colunas: {
+      num_ordem: "num_ordem", cod_estrutura: "cod_estrutura", maq: "maquina",
+      grupo: "grupo", n_cores: "num_cores", n_ops: "num_ops",
+    },
+    numeric: ["num_cores", "num_ops"], date: {},
+    granularidade: "1 linha por OP x estrutura",
+    classificacao: "COMPLEMENTAR",
+    observacao: "6.593 linhas. Número de cores por OP — explica tempo de setup em impressão.",
+  },
+
+  // --------------------------------------------------------------------------
+  // Aderência Semanal.xlsx — 19 abas, NENHUMA usada hoje. A tabela
+  // aderencia_programacao do Supabase está órfã (nenhum arquivo a alimenta).
+  // --------------------------------------------------------------------------
+  {
+    sheet: "DB_ADERENCIA_DIARIA", origem: "ADERENCIA_DIARIA",
+    fileKeywords: ["aderencia"], sheetMatch: ["aderencia_diaria"],
+    headerRow: 0,
+    colunas: {
+      num_ordem: "num_ordem", maquina: "maquina", dt_ini_plan: "dt_ini_plan",
+      qtd_planejada: "qtd_planejada", produto: "produto",
+      qtd_produzida: "qtd_produzida", ano: "ano", base: "base", dtentrega: "dt_entrega",
+    },
+    numeric: ["qtd_planejada", "qtd_produzida", "ano"],
+    date: { dt_ini_plan: "date", dt_entrega: "date" },
+    granularidade: "1 linha por OP x máquina x data planejada",
+    classificacao: "PRINCIPAL",
+    observacao: "15.550 linhas. Planejado x produzido. Chave candidata (num_ordem, maquina, dt_ini_plan) AINDA NÃO CONFIRMADA contra o dado.",
+  },
+  {
+    sheet: "DB_ADERENCIA_SEMANAL", origem: "ADERENCIA_SEMANAL",
+    fileKeywords: ["aderencia"], sheetMatch: ["aderencia_semanal"],
+    headerRow: 0,
+    colunas: {
+      maquina: "maquina", op: "num_ordem", descricao: "descricao",
+      planejado: "planejado", inicio: "dt_inicio", semana: "semana",
+    },
+    numeric: ["planejado", "semana"], date: { dt_inicio: "date" },
+    granularidade: "1 linha por OP x máquina x semana",
+    classificacao: "COMPLEMENTAR",
+    observacao: "6.694 linhas. Granularidade semanal — complementa a diária, não substitui.",
+  },
+  {
+    sheet: "DB_PROGRAMACAO", origem: "PROGRAMACAO",
+    fileKeywords: ["aderencia"], sheetMatch: ["programacao"],
+    headerRow: 0,
+    colunas: {
+      num_ordem: "num_ordem", maquina: "maquina", dt_ini_plan: "dt_ini_plan",
+      qtd_planejada: "qtd_planejada", produto: "produto", chave: "chave_periodo",
+    },
+    numeric: ["qtd_planejada"], date: { dt_ini_plan: "date" },
+    granularidade: "1 linha por OP programada",
+    classificacao: "COMPLEMENTAR",
+    observacao: "718 linhas. Programação vigente.",
+  },
+  {
+    sheet: "DB_CALENDARIO_SEMANAS", origem: "CALENDARIO",
+    fileKeywords: ["aderencia"], sheetMatch: ["semanas"],
+    headerRow: 0,
+    colunas: { data: "data", semana: "semana" },
+    numeric: ["semana"], date: { data: "date" },
+    granularidade: "1 linha por dia",
+    classificacao: "AUXILIAR",
+    observacao: "427 linhas. De-para dia -> semana do ano. Existe em duplicidade ('Semanas' e 'Tabela Semana ').",
+  },
+
+  // --------------------------------------------------------------------------
+  // Refugo Produção.xlsx — 9 abas, 1 usada.
+  // --------------------------------------------------------------------------
+  {
+    sheet: "DB_CONTROLE_PERDAS", origem: "CONTROLE_PERDAS",
+    fileKeywords: ["refugo_producao"], sheetMatch: ["formulario_controle_perdas"],
+    headerRow: 0,
+    colunas: {
+      hora: "hora", peso: "peso_kg", data: "data", op: "num_ordem",
+      maquina: "maquina", turno: "turno", nome: "operador",
+      valor_sistema: "valor_sistema", status: "status",
+      valor_apontado: "valor_apontado", delta_apontado: "delta_apontado",
+    },
+    numeric: ["peso_kg", "turno", "valor_sistema", "valor_apontado", "delta_apontado"],
+    date: { data: "date" },
+    granularidade: "1 linha por formulário de perda",
+    classificacao: "COMPLEMENTAR",
+    observacao: "367 linhas. Compara VALOR SISTEMA x VALOR APONTADO e calcula DELTA — é a única base de DIVERGÊNCIA que existe. Nenhum uso hoje.",
+  },
+
+  // --------------------------------------------------------------------------
   // Base Aparas - 2024/2025/2026/Genérico — 7 a 16 abas cada. Só
   // "BASE_DETALHE" estava mapeada (e ia pra tabela apontamentos).
   // Aqui está a maior concentração de dado não usado do Drive inteiro.
