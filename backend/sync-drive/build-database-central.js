@@ -178,20 +178,25 @@ function buildWorkbook(porTabela) {
 async function findExistingCentralFile(drive) {
   const res = await drive.files.list({
     q: `'${process.env.DRIVE_FOLDER_ID}' in parents and trashed = false and name = '${CENTRAL_FILE_NAME}'`,
-    fields: "files(id, name)",
+    fields: "files(id, name, mimeType)",
     pageSize: 5,
   });
   return res.data.files?.[0] ?? null;
 }
 
+const XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
+
 async function uploadCentralFile(drive, buffer) {
-  const media = {
-    mimeType: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    body: Readable.from(buffer),
-  };
+  const media = { mimeType: XLSX_MIME, body: Readable.from(buffer) };
   const existing = await findExistingCentralFile(drive);
   if (existing) {
-    await drive.files.update({ fileId: existing.id, media });
+    // Se o placeholder foi criado como Planilha Google (não .xlsx de
+    // verdade), o update precisa trocar o mimeType junto com o conteúdo,
+    // senão o Drive tenta converter o binário pro formato nativo e corrompe
+    // o arquivo. Só entra nesse "if" na primeira vez — depois que vira
+    // .xlsx de fato, mimeType já bate e o Drive ignora o campo.
+    const requestBody = existing.mimeType !== XLSX_MIME ? { mimeType: XLSX_MIME } : undefined;
+    await drive.files.update({ fileId: existing.id, media, requestBody });
     console.log(`"${CENTRAL_FILE_NAME}" atualizado (id ${existing.id}).`);
   } else {
     await drive.files.create({
