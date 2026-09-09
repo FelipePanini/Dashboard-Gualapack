@@ -146,7 +146,15 @@ export function coletarBases(fileName, bytes, importadoEm) {
           recursoRotulo = String(cru[base.recursoFromRow]?.[0] ?? "").trim() || null;
         }
 
-        let convertidas = linhas.map((l) => converterLinha(l, base));
+        // Bases marcadas com "amostra" são as redundantes gigantes (ex:
+        // "Base Produção", 389 mil linhas com as MESMAS 22 colunas que já
+        // carregamos). Copiar tudo levaria o arquivo central a passar de
+        // 1 GB sem acrescentar informação. Guardamos uma amostra pra dar
+        // pra comparar, e o total real vai pro DB_CONTROLE.
+        const totalReal = linhas.length;
+        const recortadas = base.amostra ? linhas.slice(0, base.amostra) : linhas;
+
+        let convertidas = recortadas.map((l) => converterLinha(l, base));
         convertidas = convertidas.filter((l) => Object.values(l).some((v) => v !== null && v !== ""));
 
         const colRetencao = RETENCAO_POR_BASE[base.sheet];
@@ -172,7 +180,8 @@ export function coletarBases(fileName, bytes, importadoEm) {
         }
 
         bucket.origens.push({
-          arquivo: fileName, aba, lidas: linhas.length, mantidas: convertidas.length,
+          arquivo: fileName, aba, lidas: totalReal, mantidas: convertidas.length,
+          amostrada: base.amostra ? totalReal > base.amostra : false,
           descartadas_retencao: colRetencao ? antes - convertidas.length : 0,
           cabecalhos: headers.filter(Boolean),
         });

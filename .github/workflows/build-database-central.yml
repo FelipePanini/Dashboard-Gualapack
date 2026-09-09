@@ -10,6 +10,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Sem limite, uma execução travada corre até o teto padrão de 6 horas
+    # sem avisar — aconteceu ao ler abas de centenas de milhares de linhas.
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: backend/sync-drive

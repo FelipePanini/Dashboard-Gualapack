@@ -434,6 +434,12 @@ export const BASES = [
     sheet: "DB_APONTAMENTOS_HIST", origem: "APONTAMENTOS_HIST",
     fileKeywords: ["base_aparas"], sheetMatch: ["base_producao", "base_maq_emb"], multiSheet: true,
     headerRow: 0,
+    // Só amostra: são ~1,5 milhão de linhas com as MESMAS 22 colunas que já
+    // carregamos via BASE_DETALHE. Copiar tudo levaria o arquivo central a
+    // passar de 1 GB sem acrescentar informação nenhuma. O total real de
+    // cada aba fica registrado no DB_CONTROLE, e a amostra permite comparar
+    // conteúdo e período antes de decidir qual das três é a oficial.
+    amostra: 5000,
     colunas: {
       num_ordem: "num_ordem", cod_recurso: "cod_recurso", cod_apont: "cod_apont",
       qtd_produzida: "qtd_produzida", cod_desc: "cod_desc", dt_producao: "dt_producao",

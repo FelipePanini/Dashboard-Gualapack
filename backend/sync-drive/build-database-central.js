@@ -218,16 +218,23 @@ function buildWorkbook(porTabela, porBase, agora) {
 
     const p = periodo(bucket.linhas);
     const descartadas = bucket.origens.reduce((s, o) => s + (o.descartadas_retencao || 0), 0);
+    const totalOrigem = bucket.origens.reduce((s, o) => s + (o.lidas || 0), 0);
+    const amostrada = bucket.origens.some((o) => o.amostrada);
     controleRows.push({
       aba: base.sheet, destino: "inventario",
       arquivo_origem: [...new Set(bucket.origens.map((o) => o.arquivo))].join(" | "),
       aba_origem: [...new Set(bucket.origens.map((o) => o.aba))].join(" | "),
-      registros: bucket.linhas.length, primeira_data: p.primeira, ultima_data: p.ultima,
+      registros: bucket.linhas.length, registros_na_origem: totalOrigem,
+      primeira_data: p.primeira, ultima_data: p.ultima,
       data_importacao: agora,
       status: bucket.erros.length ? "erro" : bucket.linhas.length ? "ok" : "vazio",
       classificacao: base.classificacao, granularidade: base.granularidade,
-      observacoes: [base.observacao, descartadas ? `${descartadas} linha(s) fora da janela de ${RETENTION_MONTHS} meses` : "", ...bucket.erros]
-        .filter(Boolean).join(" ; "),
+      observacoes: [
+        base.observacao,
+        amostrada ? `AMOSTRA: ${bucket.linhas.length} de ${totalOrigem} linhas na origem (limite ${base.amostra}/aba)` : "",
+        descartadas ? `${descartadas} linha(s) fora da janela de ${RETENTION_MONTHS} meses` : "",
+        ...bucket.erros,
+      ].filter(Boolean).join(" ; "),
     });
   }
 
@@ -240,8 +247,9 @@ function buildWorkbook(porTabela, porBase, agora) {
   }
 
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(controleRows, {
-    header: ["aba", "destino", "arquivo_origem", "aba_origem", "registros", "primeira_data",
-      "ultima_data", "data_importacao", "status", "classificacao", "granularidade", "observacoes"],
+    header: ["aba", "destino", "arquivo_origem", "aba_origem", "registros", "registros_na_origem",
+      "primeira_data", "ultima_data", "data_importacao", "status", "classificacao",
+      "granularidade", "observacoes"],
   }), "DB_CONTROLE");
 
   return wb;
