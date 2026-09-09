@@ -114,18 +114,51 @@ do negócio).
 
 ---
 
-## 8. `Sequenciamento Acumulado 2026.xlsx` ⚠️ único com efeito no painel hoje
+## 8. `Sequenciamento Acumulado 2026.xlsx` 🔴 CONFIRMADO: duplica dado no painel hoje
 
 - **O que faz:** entra em `fardos_aparas` junto com os 9 arquivos mensais.
-- **Dados:** 1.724 linhas (contra 3.786 dos mensais somados).
-- **Sobreposição:** desconhecida — 1.724 linhas ≈ 4 meses de fardos.
-- **Problemas:** se for acumulado dos mesmos meses, **estamos contando fardo
-  duas vezes** no indicador de apara confirmada.
-- **Recomendação:** verificar sobreposição de datas com os mensais. Se houver,
-  excluir do `fileKeywords` (é uma linha de código) ou parar de usar os mensais.
-- **Confiança:** **Média** de que há problema · **Alta** de que precisa ser
-  verificado antes de qualquer outra coisa, porque é o único item da lista que
-  pode estar distorcendo número hoje.
+- **Verificação feita** (consultas no Supabase, 2026-09-09):
+
+| Fonte | Período | Linhas | Dias distintos | kg bruto |
+|---|---|---:|---:|---:|
+| Acumulado | 2026-01-02 → **2026-06-12** | 1.724 | 140 | 401.493 |
+| Mensais | 2026-01-02 → **2026-08-29** | 3.786 | 203 | 565.163 |
+
+Restringindo os dois ao **mesmo período** (01/01 a 12/06/2026):
+
+| | Acumulado | Mensais |
+|---|---:|---:|
+| Linhas | 1.724 | 1.725 |
+| kg bruto | 401.493 | 401.537 |
+
+Pares `(data, nº do fardo)` presentes **nas duas** fontes: **1.495**.
+
+- **Conclusão:** é o **mesmo dado**, duplicado. Diferença de 1 linha e 44 kg
+  entre as duas fontes no mesmo intervalo. O período do acumulado está
+  inteiramente contido no dos mensais, que ainda vão dois meses além.
+- **Efeito visível no painel** (`v_fardos_mensal`):
+
+| Mês | kg bruto | apara % |
+|---|---:|---:|
+| jan/26 | 142.413 | 24,68% |
+| fev/26 | 138.143 | 26,30% |
+| mar/26 | 163.784 | 23,05% |
+| abr/26 | 161.378 | 25,59% |
+| mai/26 | 146.442 | 14,58% |
+| **jun/26** (overlap acaba dia 12) | 85.134 | 10,05% |
+| jul/26 (sem overlap) | 65.395 | 8,66% |
+| ago/26 (sem overlap) | 63.966 | 6,58% |
+
+O degrau é exatamente onde a sobreposição termina: jan–abr com volume ~2x e
+apara ~25%, contra ~6-8% nos meses limpos. **O KPI "Apara Confirmada" está
+errado de janeiro a junho de 2026.**
+
+- **Recomendação:** remover o acumulado da carga de `fardos_aparas` (os mensais
+  cobrem o mesmo período e vão além), mantendo o arquivo catalogado como base
+  de inventário para não perder o dado.
+- **Confiança:** **Alta.** Verificado no dado, com efeito mensurável no painel.
+- **Status:** aguardando seu aval — é uma decisão de "qual base deixa de ser
+  usada", e combinamos que isso não seria decidido nesta fase.
 
 ---
 
@@ -147,7 +180,8 @@ do negócio).
 
 Em ordem de urgência:
 
-1. **Sequenciamento Acumulado** — é o único que pode estar errando número hoje.
+1. ~~**Sequenciamento Acumulado**~~ — ✅ **verificado**: confirmado que duplica
+   jan–jun/2026 e distorce o KPI de apara confirmada. Falta só o aval para corrigir.
 2. **`aderencia_programacao` órfã** — o indicador "Aderência ao Plano" do painel
    sai de uma tabela que nenhum arquivo alimenta. Ver `MAPA_ORIGEM_DADOS.md`.
 3. **`tendencia_mensal` vazia** — carga quebrada em silêncio desde sempre.
