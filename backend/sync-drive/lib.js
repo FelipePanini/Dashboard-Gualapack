@@ -227,6 +227,21 @@ export async function listFolderFiles(drive) {
 
 // Arquivos do Google Sheets (criados nativamente no Drive) precisam ser
 // exportados; .xlsx/.csv enviados de verdade baixam direto.
+export const CENTRAL_FILE_NAME = "DATABASE_GUALAPACK.xlsx";
+
+// tabela (mesmo nome usado no Supabase, via TABLE_DEFS) -> nome da aba DB_
+// no arquivo central (DATABASE_GUALAPACK.xlsx). Só as abas já validadas
+// entram aqui — DB_TMR e DB_ADERENCIA ainda não (ver build-database-central.js).
+export const DB_SHEET_NAME = {
+  apontamentos: "DB_APONTAMENTOS",
+  producao_kg: "DB_PRODUCAO_KG",
+  fardos_aparas: "DB_FARDOS_APARAS",
+  refugo_aparas_historico: "DB_REFUGO_APARAS",
+  refugo_producao: "DB_REFUGO_PRODUCAO",
+  tendencia_mensal: "DB_TENDENCIA",
+  maquinas: "DB_MAQUINAS",
+};
+
 export async function downloadFile(drive, file) {
   if (file.mimeType === "application/vnd.google-apps.spreadsheet") {
     const res = await drive.files.export(

@@ -33,7 +33,7 @@ import { Readable } from "node:stream";
 import {
   TABLE_DEFS, RETENTION_MONTHS, RETENTION_DATE_COL, DEDUPE_KEY,
   dedupeRows, detectTables, detectSheet, sheetToRows, coerceRow,
-  driveClient, listFolderFiles, downloadFile,
+  driveClient, listFolderFiles, downloadFile, CENTRAL_FILE_NAME, DB_SHEET_NAME,
 } from "./lib.js";
 
 const required = ["DRIVE_FOLDER_ID", "GOOGLE_SERVICE_ACCOUNT_JSON"];
@@ -43,20 +43,6 @@ for (const key of required) {
     process.exit(1);
   }
 }
-
-const CENTRAL_FILE_NAME = "DATABASE_GUALAPACK.xlsx";
-
-// tabela (mesmo nome usado no Supabase, via TABLE_DEFS) -> nome da aba DB_
-// no arquivo central. Só as abas já validadas entram aqui.
-const DB_SHEET_NAME = {
-  apontamentos: "DB_APONTAMENTOS",
-  producao_kg: "DB_PRODUCAO_KG",
-  fardos_aparas: "DB_FARDOS_APARAS",
-  refugo_aparas_historico: "DB_REFUGO_APARAS",
-  refugo_producao: "DB_REFUGO_PRODUCAO",
-  tendencia_mensal: "DB_TENDENCIA",
-  maquinas: "DB_MAQUINAS",
-};
 
 const PENDENTES = [
   "DB_TMR (Gráficos Tendência.xlsx, abas TMR-*) — aguardando confirmar chave/granularidade mista (máquina x processo).",
