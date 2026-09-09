@@ -39,6 +39,21 @@ function abasDaBase(base, sheetNames) {
   return base.multiSheet ? escolhidas : escolhidas.slice(0, 1);
 }
 
+// Teto de linhas materializadas por aba na leitura. Serve pras abas
+// redundantes gigantes (ex: "Base Produção", 389 mil linhas com as MESMAS
+// 22 colunas que já carregamos): converter tudo é o passo caro e não
+// acrescenta informação. Todas as bases de verdade cabem folgado — a maior
+// é Engenharia, com ~45 mil linhas. Quando uma aba passa do teto, o total
+// real fica registrado via "!fullref" e vai pro DB_CONTROLE.
+const TETO_LINHAS_POR_ABA = 60000;
+
+// Total real de linhas da aba, mesmo quando a leitura foi truncada.
+export function totalDeLinhas(sheet) {
+  const ref = sheet?.["!fullref"] ?? sheet?.["!ref"];
+  const m = ref && /:[A-Z]+(\d+)$/.exec(ref);
+  return m ? Number(m[1]) : null;
+}
+
 // Converte a aba em objetos usando a linha de cabeçalho declarada no
 // catálogo (headerRow), não por auto-detecção — as planilhas reais têm
 // linha de título acima do cabeçalho em vários casos.
@@ -119,7 +134,9 @@ export function coletarBases(fileName, bytes, importadoEm) {
   }
   if (necessarias.size === 0) return new Map();
 
-  const wb = XLSX.read(bytes, { type: "array", sheets: Array.from(necessarias) });
+  const wb = XLSX.read(bytes, {
+    type: "array", sheets: Array.from(necessarias), sheetRows: TETO_LINHAS_POR_ABA,
+  });
 
   const corte = new Date();
   corte.setMonth(corte.getMonth() - RETENTION_MONTHS);
@@ -146,12 +163,10 @@ export function coletarBases(fileName, bytes, importadoEm) {
           recursoRotulo = String(cru[base.recursoFromRow]?.[0] ?? "").trim() || null;
         }
 
-        // Bases marcadas com "amostra" são as redundantes gigantes (ex:
-        // "Base Produção", 389 mil linhas com as MESMAS 22 colunas que já
-        // carregamos). Copiar tudo levaria o arquivo central a passar de
-        // 1 GB sem acrescentar informação. Guardamos uma amostra pra dar
-        // pra comparar, e o total real vai pro DB_CONTROLE.
-        const totalReal = linhas.length;
+        // "amostra" corta ainda mais que o teto de leitura, pras bases
+        // redundantes onde nem 60 mil linhas fazem sentido guardar.
+        // O total real vem do range da aba, não do que foi lido.
+        const totalReal = totalDeLinhas(sheet) ?? linhas.length;
         const recortadas = base.amostra ? linhas.slice(0, base.amostra) : linhas;
 
         let convertidas = recortadas.map((l) => converterLinha(l, base));
@@ -181,7 +196,7 @@ export function coletarBases(fileName, bytes, importadoEm) {
 
         bucket.origens.push({
           arquivo: fileName, aba, lidas: totalReal, mantidas: convertidas.length,
-          amostrada: base.amostra ? totalReal > base.amostra : false,
+          amostrada: convertidas.length < totalReal - 1,
           descartadas_retencao: colRetencao ? antes - convertidas.length : 0,
           cabecalhos: headers.filter(Boolean),
         });
