@@ -1,0 +1,29 @@
+name: Montar base central (DATABASE_GUALAPACK.xlsx)
+
+# Etapa A da arquitetura combinada: consolida as bases originais do Drive
+# num único arquivo (DATABASE_GUALAPACK.xlsx), gravado de volta no Drive.
+# Só workflow_dispatch por enquanto — roda manualmente até validarmos o
+# arquivo gerado; depois disso entra num schedule antes do sync-drive.yml.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend/sync-drive
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - run: npm install
+
+      - name: Montar e gravar o arquivo central
+        env:
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: node build-database-central.js
