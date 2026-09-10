@@ -319,7 +319,10 @@ h1,h2{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; m
   // no nome do arquivo vence (por isso "sequenciamento" vem antes de
   // "aparas" sozinho, senão pegaria os arquivos errados).
   const TABLES = [
-    { table: "fardos_aparas", label: "Fardos de aparas", fileKeywords: ["sequenciamento"], sheetKeywords: ["completos", "base_aparas_total"] },
+    // fileExclude: o "Sequenciamento Acumulado" repete os arquivos mensais
+    // (ver comentário em backend/sync-drive/lib.js). Não sugerir essa tabela
+    // pra ele, pra não reintroduzir a duplicação por upload manual.
+    { table: "fardos_aparas", label: "Fardos de aparas", fileKeywords: ["sequenciamento"], fileExclude: ["acumulado"], sheetKeywords: ["completos", "base_aparas_total"] },
     { table: "aderencia_maquinas_diaria", label: "Aderência — máquinas (diário)", fileKeywords: ["aderencia_maquinas", "aderenciamaquinas"], sheetKeywords: ["apontamentos_producao"] },
     { table: "aderencia_programacao", label: "Aderência — programação", fileKeywords: ["historico_aderencia", "aderencia_programacao"], sheetKeywords: ["programacao_passado"] },
     { table: "refugo_aparas_historico", label: "Refugo/aparas — histórico", fileKeywords: ["refugo_aparas"], sheetKeywords: ["conta_refugo"] },
@@ -348,7 +351,8 @@ h1,h2{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; m
   function detectTable(fileName){
     const norm = normalize(fileName);
     for(const t of TABLES){
-      if(t.fileKeywords.some(k=> norm.includes(k))) return t.table;
+      if(t.fileKeywords.some(k=> norm.includes(k)) &&
+         !(t.fileExclude||[]).some(k=> norm.includes(k))) return t.table;
     }
     return null;
   }

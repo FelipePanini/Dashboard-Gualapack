@@ -1450,9 +1450,12 @@ async function loadRealData(){
     const fmtMes = iso => new Date(iso+"T00:00:00").toLocaleDateString("pt-BR",{ month:"short" }).replace(".","");
     if(mesesOrdenados.length >= 2){
       MESES = mesesOrdenados.map(fmtMes);
+      // null (e não 0) quando o mês não tem aquela medição: as duas séries
+      // cobrem períodos diferentes, e preencher com zero desenhava uma
+      // queda para 0% que nunca aconteceu — era o que zerava o KPI da capa.
       APARAS_MENSAL = {
-        apontado: mesesOrdenados.map(m=> porMes.get(m).apontado ?? 0),
-        confirmado: mesesOrdenados.map(m=> porMes.get(m).confirmado ?? porMes.get(m).apontado ?? 0),
+        apontado: mesesOrdenados.map(m=> porMes.get(m).apontado ?? null),
+        confirmado: mesesOrdenados.map(m=> porMes.get(m).confirmado ?? null),
       };
     }else{
       // histórico real curto demais pra formar uma série — usa a referência
@@ -1652,7 +1655,13 @@ function multiLineChart(holder, labels, series, opts={}){
   const W = 640, H = opts.height ?? 220;
   const padL = 38, padR = 58, padT = 14, padB = 26;
   const plotW = W-padL-padR, plotH = H-padT-padB;
-  const all = series.flatMap(s=>s.data);
+  // Ignora os buracos (null) da série ao calcular a escala — um mês sem
+  // medição não é zero, e entrava puxando o eixo pra baixo.
+  const all = series.flatMap(s=>s.data).filter(v=> v != null && Number.isFinite(v));
+  if(all.length === 0){
+    holder.innerHTML = `<div class="empty-state">Sem dados no período.</div>`;
+    return;
+  }
   const yMin = opts.yMin ?? Math.max(0, Math.floor(Math.min(...all) - 1));
   const yMax = opts.yMax ?? Math.ceil(Math.max(...all) + 1);
   const n = labels.length;
@@ -1682,11 +1691,24 @@ function multiLineChart(holder, labels, series, opts={}){
 
   let areas="", glow="", lines="", dots="";
   series.forEach((s,si)=>{
-    const d = s.data.map((v,i)=> `${i===0?"M":"L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
-    areas += `<path d="${d} L${x(n-1).toFixed(1)},${y(yMin).toFixed(1)} L${x(0).toFixed(1)},${y(yMin).toFixed(1)} Z" fill="url(#${opts.idPrefix}-a${si})" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.6s" fill="freeze"/></path>`;
+    // Ponto sem dado quebra a linha em vez de virar zero: recomeça o traço
+    // ("M") no próximo ponto com valor.
+    let comecou = false;
+    const d = s.data.map((v,i)=>{
+      if(v == null || !Number.isFinite(v)){ comecou = false; return ""; }
+      const cmd = comecou ? "L" : "M";
+      comecou = true;
+      return `${cmd}${x(i).toFixed(1)},${y(v).toFixed(1)}`;
+    }).filter(Boolean).join(" ");
+    // Índices do primeiro e do último ponto com dado, pra fechar a área e
+    // ancorar o rótulo da série no lugar certo.
+    const idx = s.data.map((v,i)=> (v!=null && Number.isFinite(v)) ? i : -1).filter(i=> i>=0);
+    if(idx.length === 0) return;
+    const iIni = idx[0], iFim = idx[idx.length-1];
+    areas += `<path d="${d} L${x(iFim).toFixed(1)},${y(yMin).toFixed(1)} L${x(iIni).toFixed(1)},${y(yMin).toFixed(1)} Z" fill="url(#${opts.idPrefix}-a${si})" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.6s" fill="freeze"/></path>`;
     glow  += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" opacity="0" filter="url(#${opts.idPrefix}-glow)"><animate attributeName="opacity" from="0" to="0.5" dur="0.5s" fill="freeze"/></path>`;
     lines += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" stroke-dasharray="${s.dashed?'5,4':'none'}" opacity="0"><animate attributeName="opacity" from="0" to="1" dur="0.5s" fill="freeze"/></path>`;
-    const li = n-1;
+    const li = iFim;
     dots  += `<circle cx="${x(li)}" cy="${y(s.data[li])}" r="3.5" fill="${s.color}" stroke="var(--surface-1)" stroke-width="1.5"/>`;
     dots  += `<text x="${x(li)+8}" y="${y(s.data[li])+3.5}" font-size="10.5" font-weight="600" fill="${s.color}" font-family="Public Sans, sans-serif">${esc(s.short||"")}</text>`;
   });
@@ -1720,7 +1742,10 @@ function multiLineChart(holder, labels, series, opts={}){
     hover.innerHTML = `<line x1="${cx}" y1="${padT}" x2="${cx}" y2="${padT+plotH}" stroke="var(--text-muted)" stroke-width="1" stroke-dasharray="3,3"/>`;
     let rowsHtml = `<div style="font-size:11px;color:var(--text-muted);margin-bottom:5px;">${esc(labels[idx])}</div>`;
     series.forEach(s=>{
-      rowsHtml += `<div style="display:flex;align-items:center;gap:10px;justify-content:space-between;"><span style="display:flex;align-items:center;gap:6px;"><span style="width:7px;height:7px;border-radius:2px;background:${s.color};display:inline-block;"></span>${esc(s.name)}</span><span class="mono">${opts.fmtTip ? opts.fmtTip(s.data[idx]) : s.data[idx]}</span></div>`;
+      const v = s.data[idx];
+      const txt = (v == null || !Number.isFinite(v)) ? "sem dados"
+                : (opts.fmtTip ? opts.fmtTip(v) : v);
+      rowsHtml += `<div style="display:flex;align-items:center;gap:10px;justify-content:space-between;"><span style="display:flex;align-items:center;gap:6px;"><span style="width:7px;height:7px;border-radius:2px;background:${s.color};display:inline-block;"></span>${esc(s.name)}</span><span class="mono">${txt}</span></div>`;
     });
     attachTip(holder, rowsHtml, e);
   });
@@ -1769,8 +1794,11 @@ function wobble(base, amp, n=12){
 function renderDashboard(){
 
 /* ============ VISÃO GERAL ============ */
-const aparasMedia   = APARAS_MENSAL.apontado[APARAS_MENSAL.apontado.length-1];
-const confirmMedia  = APARAS_MENSAL.confirmado[APARAS_MENSAL.confirmado.length-1];
+// Último valor COM dado, não o último da série: as duas séries terminam em
+// meses diferentes, e ler a última posição pegava um mês vazio.
+const ultimoValido = arr => { for(let i=arr.length-1;i>=0;i--) if(arr[i]!=null) return arr[i]; return null; };
+const aparasMedia   = ultimoValido(APARAS_MENSAL.apontado);
+const confirmMedia  = ultimoValido(APARAS_MENSAL.confirmado);
 const tmrMedio      = MAQUINAS.reduce((a,m)=>a+m.tmr,0)/MAQUINAS.length;
 const aderMedia     = ADERENCIA_PROCESSO.reduce((a,p)=>a+p.pct,0)/ADERENCIA_PROCESSO.length;
 const produtividade = PRODUTIVIDADE; // m²/h — null quando nenhuma base carregada traz essa métrica
@@ -1810,8 +1838,10 @@ renderKpis(document.getElementById("kpi-row"), kpisGerais);
       ...d, data: APARAS_MENSAL[d.id].slice(-janela)
     }));
     if(!series.length) return;
+    // Escala automática: estava fixa em 3–9% e os valores reais chegam a
+    // 26%, então a maior parte da série ficava fora do eixo.
     multiLineChart(holder, labels, series, {
-      idPrefix:"ap", yMin:3, yMax:9, meta:META_APARAS,
+      idPrefix:"ap", meta:META_APARAS,
       fmtY: v=> v.toFixed(0)+"%", fmtTip: v=> fmt1(v)+"%",
       aria:"Apara apontada e confirmada por mês"
     });

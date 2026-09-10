@@ -15,7 +15,15 @@ import * as XLSX from "xlsx";
 // em backend/functions/ingest/index.ts.
 export const TABLE_DEFS = [
   {
-    table: "fardos_aparas", fileKeywords: ["sequenciamento"], sheetKeywords: ["completos", "base_aparas_total"],
+    // fileExclude: "Sequenciamento Acumulado 2026.xlsx" repete jan–jun/2026
+    // dos arquivos mensais (verificado em 2026-09-09: mesmo intervalo, 1.724
+    // x 1.725 linhas, 401.493 x 401.537 kg, 1.495 pares data+nº nas duas
+    // fontes). Contava cada fardo duas vezes e inflava a apara apontada de
+    // jan a jun. Deduplicar por (data, nº) não resolve: 39% dos fardos não
+    // têm número. Os mensais cobrem o mesmo período e ainda vão até agosto,
+    // então a fonte oficial são eles. O acumulado continua no inventário.
+    table: "fardos_aparas", fileKeywords: ["sequenciamento"], fileExclude: ["acumulado"],
+    sheetKeywords: ["completos", "base_aparas_total"],
     numeric: ["numero", "qtd_bruta_kg", "qtd_liquida_kg"], date: { data: "date" },
     allowed: ["codigo", "dp_fp", "refugo", "refile", "data", "numero", "qtd_bruta_kg", "qtd_liquida_kg", "nome", "classificacao", "tipo"],
   },
@@ -152,7 +160,10 @@ export const HEADER_ALIASES = {
 // — por isso retorna TODOS os defs que baterem, não só o primeiro.
 export function detectTables(fileName) {
   const norm = normalize(fileName);
-  return TABLE_DEFS.filter((t) => t.fileKeywords.some((k) => norm.includes(k)));
+  return TABLE_DEFS.filter((t) =>
+    t.fileKeywords.some((k) => norm.includes(k)) &&
+    !(t.fileExclude ?? []).some((k) => norm.includes(k))
+  );
 }
 
 export function detectSheet(def, sheetNames) {

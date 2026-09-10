@@ -95,33 +95,43 @@ order by horas desc;
 -- ----------------------------------------------------------------------------
 -- 5. Série mensal de aparas — apontado (fardos) e confirmado (balança)
 -- ----------------------------------------------------------------------------
+-- Dois filtros que existem pelo mesmo motivo: não deixar mês sem realizado
+-- virar 0% na série.
+--   "data <= current_date": as planilhas trazem os meses futuros do ano já
+--   como linha, zerados. Sem o corte eles entravam como realizado e o KPI
+--   da capa (que lê o último mês da série) mostrava 0,0%.
+--   "having sum(...) > 0": o mês corrente também vem zerado até fechar, e
+--   mês sem volume medido não tem percentual de apara — mostrar 0% ali
+--   seria inventar número. Sem volume = o mês simplesmente não entra.
 create or replace view public.v_fardos_mensal
 with (security_invoker = true) as
 select
   date_trunc('month', data)::date as mes,
   sum(qtd_bruta_kg)   as bruta_kg,
   sum(qtd_liquida_kg) as liquida_kg,
-  case when sum(qtd_bruta_kg) > 0
-    then (sum(qtd_bruta_kg) - sum(qtd_liquida_kg)) / sum(qtd_bruta_kg) * 100
-    else 0
-  end as apara_pct
+  (sum(qtd_bruta_kg) - sum(qtd_liquida_kg)) / sum(qtd_bruta_kg) * 100 as apara_pct
 from public.fardos_aparas
 where data is not null
+  and data <= current_date
 group by 1
+having sum(qtd_bruta_kg) > 0
 order by 1;
 
+-- Mesmos dois filtros da view acima, pelo mesmo motivo: "Conta Refugo" vai
+-- até dezembro do ano corrente com os meses que ainda não aconteceram
+-- zerados, e o mês em curso também fica zerado até fechar.
 create or replace view public.v_refugo_mensal
 with (security_invoker = true) as
 select
   date_trunc('month', data)::date as mes,
   sum(volume_jgr) as volume_jgr,
   sum(scrap_jgr)  as scrap_jgr,
-  case when sum(volume_jgr) > 0
-    then sum(scrap_jgr) / sum(volume_jgr) * 100
-    else 0
-  end as scrap_pct
+  sum(scrap_jgr) / sum(volume_jgr) * 100 as scrap_pct
 from public.refugo_aparas_historico
+where data is not null
+  and data <= current_date
 group by 1
+having sum(volume_jgr) > 0
 order by 1;
 
 -- ----------------------------------------------------------------------------
