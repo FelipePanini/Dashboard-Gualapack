@@ -123,16 +123,22 @@ async function main() {
     const bytes = await downloadFile(drive, file);
     console.log(`   baixado: ${(bytes.length/1024/1024).toFixed(1)} MB em ${Date.now()-t0}ms`);
 
+    // UMA leitura por arquivo com as duas abas: cada XLSX.read descompacta
+    // o zip inteiro, e ler aba por aba num arquivo de 87 MB significa
+    // descompactar 87 MB duas vezes.
+    const t1 = Date.now();
+    const wb = XLSX.read(bytes, { type: "array", sheets: ABAS });
+    console.log(`   parse das ${ABAS.length} abas: ${Date.now()-t1}ms`);
+
     for (const aba of ABAS) {
       try {
-        const t1 = Date.now();
-        const wb = XLSX.read(bytes, { type: "array", sheets: [aba] });
         const sheet = wb.Sheets[aba];
         if (!sheet) { console.log(`\n   [aba "${aba}" não existe neste arquivo]`); continue; }
+        const t2 = Date.now();
         // header:1 devolve array de arrays — bem mais leve que objetos com
         // as 25 chaves repetidas em 380 mil linhas.
         const linhas = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: true, blankrows: false });
-        console.log(`   [${aba}] lida em ${Date.now()-t1}ms`);
+        console.log(`   [${aba}] ${linhas.length} linhas convertidas em ${Date.now()-t2}ms`);
         const r = analisar(file.name, aba, linhas, corte);
         resumo.push({ arquivo: file.name, aba, ...r });
       } catch (err) {
