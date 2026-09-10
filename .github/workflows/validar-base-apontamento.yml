@@ -1,0 +1,30 @@
+name: Validar Base Apontamento (antes de trocar o TMR)
+
+# Ferramenta temporária: confere se a aba "Base Apontamento" serve como
+# fonte do TMR antes de mexer na carga. Só leitura.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  validar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: backend/sync-drive
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - run: npm install
+
+      - name: Validar
+        env:
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          # A aba tem 380 mil linhas; o padrão do Node não dá conta.
+          NODE_OPTIONS: --max-old-space-size=6144
+        run: node validar-base-apontamento.js
