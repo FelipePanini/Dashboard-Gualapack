@@ -91,11 +91,77 @@ A aba `Base Máquina_Embalagem` cobre só as 5 rebobinadeiras; as outras 11
 máquinas entram apenas via `BASE_DETALHE`, que tem um único código de
 apontamento (refugo) e zero horas.
 
-**Hipótese a validar:** a aba `Base Apontamento` (379.792 linhas, 25 colunas)
-é a base completa. Rodando `validar-base-apontamento.js` para conferir
-período, máquinas, horas, eventos produzindo e classificação antes de trocar.
+**Hipótese confirmada** (validação de 2026-09-10, arquivo Indicadores Diário
+2026):
 
-**Status:** ⏳ validação em andamento.
+| | Base Apontamento | Base Máquina_Embalagem (em uso) |
+|---|---:|---:|
+| Linhas | 219.623 | 97.282 |
+| Colunas | 26 | 22 |
+| Período | 2026-01-02 → 2026-08-17 | 2026-01-02 → 2026-08-17 |
+| **Máquinas** | **18** | **5** |
+| CLASSIFICAÇÃO DISP. | sim — 209 vazias de 219.623 (0,1%) | não existe |
+
+Valores de `CLASSIFICAÇÃO DISP.`: PLANEJADO 104.047 · IMPRODUTIVO 66.478 ·
+PRODUZINDO 48.888.
+
+TMR por máquina saindo da Base Apontamento — as 16 máquinas passam a ter
+valor real, contra 5 hoje:
+
+| Máquina | Linhas | Horas | Ev. prod. | H. prod. | TMR |
+|---|---:|---:|---:|---:|---:|
+| COATING 01 | 2.879 | 2.710 | 644 | 1.210 | 44,7% |
+| L04 | 12.522 | 4.800 | 2.859 | 1.836 | 38,2% |
+| REB 10 | 33.110 | 4.294 | 10.310 | 1.387 | 32,3% |
+| R18 | 12.617 | 5.106 | 3.119 | 1.613 | 31,6% |
+| L02 | 8.188 | 3.404 | 2.733 | 1.071 | 31,4% |
+| REB 05 | 20.377 | 4.173 | 6.414 | 1.045 | 25,0% |
+| REB 04 | 6.510 | 3.976 | 2.609 | 993 | 25,0% |
+| L03 | 4.343 | 3.332 | 1.336 | 833 | 25,0% |
+| R12 | 4.409 | 4.159 | 1.170 | 984 | 23,7% |
+| RT01 | 5.903 | 2.581 | 920 | 598 | 23,2% |
+| REB 09 | 18.637 | 4.796 | 7.274 | 1.034 | 21,6% |
+| R20 | 13.146 | 4.313 | 3.198 | 922 | 21,4% |
+| HMC01 | 2.137 | 2.205 | 873 | 443 | 20,1% |
+| REB 01 | 14.896 | 3.810 | 5.371 | 634 | 16,6% |
+
+### ⚠️ Divergência entre as duas fontes — precisa de decisão
+
+Para as 5 máquinas que existem nas duas abas, os números **não batem**:
+
+| Máquina | TMR (Base Apontamento) | TMR (Base Máq_Emb) | Horas (BA) | Horas (BME) |
+|---|---:|---:|---:|---:|
+| REB 10 | 32,3% | 26,0% | 4.294 | 5.448 |
+| REB 05 | 25,0% | 21,2% | 4.173 | 5.059 |
+| REB 09 | 21,6% | 19,7% | 4.796 | 5.379 |
+| REB 01 | 16,6% | 14,0% | 3.810 | 4.990 |
+| REB 04 | 25,0% | 24,8% | 3.976 | 4.570 |
+
+**Diferença:** a Base Apontamento tem consistentemente **menos horas totais**
+(~20% a menos) para as mesmas máquinas e mesmo período, o que empurra o TMR
+para cima.
+
+**Possível causa:** as duas abas parecem aplicar recortes diferentes do mesmo
+log — a de Embalagem inclui apontamentos que a completa não traz, ou vice-versa.
+A contagem de linhas é próxima (93.530 × 97.282 para as 5 REBs), então não é
+um subconjunto simples.
+
+**Fonte recomendada:** Base Apontamento — cobre as 16 máquinas e traz a
+classificação oficial de disponibilidade. Mas a diferença de horas precisa ser
+explicada por quem conhece o processo antes de virar número oficial.
+
+### ⚠️ Restrição operacional — arquivo de 2025 não processa
+
+O `Indicadores Diário - 2025.xlsx` (87,8 MB, aba com 379.792 linhas) **não
+terminou de ser lido em 18 minutos** e o job foi encerrado pelo timeout. O de
+2026 (47,9 MB, 219.623 linhas) levou 27s de parse + 2,5s de conversão.
+
+Não é proporcional ao tamanho — provavelmente pressão de memória. Consequência
+prática: se a carga diária tentar ler essa aba dos dois arquivos, **o sync
+quebra**. A janela de retenção de 12 meses precisa de set–dez/2025, que só
+existe no arquivo de 2025.
+
+**Status:** ⏸️ aguardando decisão sobre o histórico de 2025.
 
 ---
 
