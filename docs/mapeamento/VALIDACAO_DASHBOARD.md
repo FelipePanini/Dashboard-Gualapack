@@ -125,7 +125,7 @@ valor real, contra 5 hoje:
 | HMC01 | 2.137 | 2.205 | 873 | 443 | 20,1% |
 | REB 01 | 14.896 | 3.810 | 5.371 | 634 | 16,6% |
 
-### ⚠️ Divergência entre as duas fontes — precisa de decisão
+### Divergência entre as duas fontes — decidida em 2026-09-10
 
 Para as 5 máquinas que existem nas duas abas, os números **não batem**:
 
@@ -146,22 +146,53 @@ log — a de Embalagem inclui apontamentos que a completa não traz, ou vice-ver
 A contagem de linhas é próxima (93.530 × 97.282 para as 5 REBs), então não é
 um subconjunto simples.
 
-**Fonte recomendada:** Base Apontamento — cobre as 16 máquinas e traz a
-classificação oficial de disponibilidade. Mas a diferença de horas precisa ser
-explicada por quem conhece o processo antes de virar número oficial.
+**Fonte definida (decisão do usuário, 2026-09-10):** **Base Apontamento**, e
+só ela. A `Base Máquina_Embalagem` é a base das máquinas de *embalagem* — não
+descreve o parque que o TMR mede, então a divergência de horas não é um empate
+a desempatar: as duas abas não falam do mesmo conjunto de máquinas. A aba de
+Embalagem deixa de ser lida.
 
-### ⚠️ Restrição operacional — arquivo de 2025 não processa
+**Troca aplicada em:**
+
+| Onde | Mudança |
+|---|---|
+| `lib.js` — def `apontamentos` | `sheetKeywords`: `base_maquina` → `base_apontamento` |
+| `lib.js` — `allowed` | + `classificacao_disp`, `classificacao_horas` |
+| `lib.js` — `detectSheet()` | match exato antes de "contém" |
+| `schema_data.sql` | + as 2 colunas (com `add column if not exists`) |
+| `demo/upload.html` | espelha as duas mudanças |
+
+Sobre `detectSheet()`: o arquivo tem **"Base Apontamento"** e **"Base
+Apontamentos (kg)"**, e a segunda *contém* a palavra-chave da primeira. Sem a
+prioridade de match exato, a tabela `apontamentos` podia acabar lendo a aba de
+kg conforme a ordem das abas no arquivo.
+
+O cálculo do TMR **continua** por `cod_apont = '20'`. `CLASSIFICAÇÃO DISP.`
+concorda com ele (48.888 eventos `PRODUZINDO` × 48.830 com `cod_apont = '20'`
+em 2026), então a coluna é gravada para conferência, sem virar a regra ainda —
+trocar a regra mudaria números já validados sem ganho medido.
+
+### Restrição operacional — arquivo de 2025
 
 O `Indicadores Diário - 2025.xlsx` (87,8 MB, aba com 379.792 linhas) **não
 terminou de ser lido em 18 minutos** e o job foi encerrado pelo timeout. O de
-2026 (47,9 MB, 219.623 linhas) levou 27s de parse + 2,5s de conversão.
+2026 (47,9 MB, 219.623 linhas) levou 27s de parse + 2,5s de conversão. Não é
+proporcional ao tamanho — é pressão de memória.
 
-Não é proporcional ao tamanho — provavelmente pressão de memória. Consequência
-prática: se a carga diária tentar ler essa aba dos dois arquivos, **o sync
-quebra**. A janela de retenção de 12 meses precisa de set–dez/2025, que só
-existe no arquivo de 2025.
+Duas correções aplicadas no `build-database-central.js` / workflow:
 
-**Status:** ⏸️ aguardando decisão sobre o histórico de 2025.
+1. **Uma leitura por arquivo, não uma por tabela.** Cada `XLSX.read`
+   descompacta o zip inteiro; o Indicadores Diário alimenta duas tabelas
+   (`apontamentos` e `producao_kg`), então o arquivo de 87 MB estava sendo
+   descompactado **duas vezes**.
+2. `NODE_OPTIONS: --max-old-space-size=6144` e `timeout-minutes: 50`.
+
+Se ainda assim o de 2025 não passar, o `try/catch` por arquivo registra o erro
+no `DB_CONTROLE` e o build segue — o resultado é TMR real de jan/2026 em
+diante, sem set–dez/2025, e **sem mistura de fontes**.
+
+**Status:** ✅ troca aplicada · ⏳ falta rodar o build e conferir o
+`DB_CONTROLE`.
 
 ---
 

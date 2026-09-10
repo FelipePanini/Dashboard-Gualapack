@@ -328,7 +328,7 @@ h1,h2{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; m
     { table: "refugo_aparas_historico", label: "Refugo/aparas — histórico", fileKeywords: ["refugo_aparas"], sheetKeywords: ["conta_refugo"] },
     { table: "tendencia_mensal", label: "Tendência mensal", fileKeywords: ["tendencia", "grafico"], sheetKeywords: ["dados_prod"] },
     { table: "maquinas", label: "Catálogo de máquinas", fileKeywords: ["machine_card"], sheetKeywords: ["dim_eqtos"] },
-    { table: "apontamentos", label: "Apontamentos", fileKeywords: ["indicadores", "base_aparas"], sheetKeywords: ["base_maquina", "base_detalhe"] },
+    { table: "apontamentos", label: "Apontamentos", fileKeywords: ["indicadores", "base_aparas"], sheetKeywords: ["base_apontamento", "base_detalhe"] },
     { table: "refugo_producao", label: "Refugo por máquina (Produção)", fileKeywords: ["refugo_producao"], sheetKeywords: ["consulta_perda"] },
     // "producao_kg" fica por último de propósito: compartilha o fileKeyword
     // "indicadores" com "apontamentos" (mesmo arquivo alimenta as duas), e o
@@ -360,6 +360,10 @@ h1,h2{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; m
   function detectSheet(tableKey, sheetNames){
     const cfg = TABLE_BY_KEY[tableKey];
     if(!cfg) return sheetNames[0];
+    // Match exato antes de "contém": "Base Apontamentos (kg)" contém a
+    // palavra-chave de "Base Apontamento" (espelha lib.js).
+    const exato = sheetNames.find(n=> cfg.sheetKeywords.includes(normalize(n)));
+    if(exato) return exato;
     const byKeyword = sheetNames.find(n=> cfg.sheetKeywords.some(k=> normalize(n).includes(k)));
     return byKeyword || sheetNames[0];
   }

@@ -111,13 +111,32 @@ async function collectTableRows(drive, files, importadoEm, porBase) {
 
     const sheetNames = XLSX.read(bytes, { type: "array", bookSheets: true }).SheetNames;
 
-    for (const def of defs) {
-      if (!DB_SHEET_NAME[def.table]) continue; // aba ainda não validada (DB_TMR, DB_ADERENCIA) — pula
+    // UMA leitura por arquivo com todas as abas de que precisamos. Cada
+    // XLSX.read descompacta o zip inteiro: no Indicadores Diário (87 MB,
+    // duas tabelas) ler def por def significava descompactar 87 MB duas
+    // vezes, e o job estourava o timeout de 30 min.
+    const usados = defs.filter((d) => DB_SHEET_NAME[d.table]);
+    const abasPorDef = new Map(usados.map((d) => [d.table, detectSheet(d, sheetNames)]));
+    const abas = [...new Set(abasPorDef.values())];
+    let workbook;
+    try {
+      workbook = XLSX.read(bytes, { type: "array", sheets: abas });
+    } catch (err) {
+      for (const def of usados) touch(def.table).erros.push(`${file.name}: falha ao ler (${err.message})`);
+      console.error(`[erro] "${file.name}": falha ao ler — ${err.message}`);
+      continue;
+    }
+
+    for (const def of usados) {
       const bucket = touch(def.table);
       try {
-        const sheetName = detectSheet(def, sheetNames);
-        const workbook = XLSX.read(bytes, { type: "array", sheets: [sheetName] });
-        const rawRows = sheetToRows(workbook.Sheets[sheetName]);
+        const sheetName = abasPorDef.get(def.table);
+        const sheet = workbook.Sheets[sheetName];
+        if (!sheet) {
+          bucket.erros.push(`${file.name}: aba "${sheetName}" não veio na leitura.`);
+          continue;
+        }
+        const rawRows = sheetToRows(sheet);
         if (rawRows.length === 0) continue;
 
         let rows = rawRows.map((r) => coerceRow(r, def.numeric, def.date, def.allowed));

@@ -59,8 +59,20 @@ create table if not exists public.apontamentos (
   cod_est             text,
   processo            text,          -- 'Impressão', 'Laminação', 'Corte'...
   classificacao       text,          -- família de produto
-  nome_cliente         text
+  nome_cliente         text,
+  -- Só existem na aba [Base Apontamento] (fonte do TMR desde 2026-09-10).
+  -- classificacao_disp: PLANEJADO / IMPRODUTIVO / PRODUZINDO — é a
+  -- classificação oficial de disponibilidade da própria origem. Hoje o TMR
+  -- ainda é calculado por cod_apont = '20'; as duas concordam (48.888
+  -- eventos PRODUZINDO x 48.830 com cod_apont '20' em 2026), então a coluna
+  -- fica gravada para conferência antes de virar a regra do cálculo.
+  classificacao_disp   text,
+  classificacao_horas  text
 );
+
+-- Migração para bancos que já têm a tabela criada (idempotente).
+alter table public.apontamentos add column if not exists classificacao_disp  text;
+alter table public.apontamentos add column if not exists classificacao_horas text;
 
 create index if not exists idx_apontamentos_data on public.apontamentos (dt_producao desc);
 create index if not exists idx_apontamentos_recurso on public.apontamentos (cod_recurso, dt_producao desc);

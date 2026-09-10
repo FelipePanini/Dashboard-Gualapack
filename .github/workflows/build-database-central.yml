@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     # Sem limite, uma execução travada corre até o teto padrão de 6 horas
     # sem avisar — aconteceu ao ler abas de centenas de milhares de linhas.
-    timeout-minutes: 30
+    timeout-minutes: 50
     defaults:
       run:
         working-directory: backend/sync-drive
@@ -29,4 +29,8 @@ jobs:
         env:
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          # A aba "Base Apontamento" do Indicadores Diário 2025 tem 379.792
+          # linhas × 25 colunas; com o heap padrão do Node o processo entra em
+          # thrashing de GC e não termina.
+          NODE_OPTIONS: --max-old-space-size=6144
         run: node build-database-central.js

@@ -73,7 +73,16 @@ export const TABLE_DEFS = [
     allowed: ["id", "grupo", "considerar"],
   },
   {
-    table: "apontamentos", fileKeywords: ["indicadores", "base_aparas"], sheetKeywords: ["base_maquina", "base_detalhe"],
+    // Fonte do TMR. Era a aba [Base Máquina_Embalagem], trocada por
+    // [Base Apontamento] em 2026-09-10 por decisão do usuário: a de
+    // Embalagem cobre só as 5 rebobinadeiras, então 11 das 16 máquinas
+    // apareciam com TMR 0%. Validado no Indicadores Diário 2026 (mesmo
+    // período, 2026-01-02 → 2026-08-17): 219.623 x 97.282 linhas,
+    // 18 x 5 recursos, e CLASSIFICAÇÃO DISP. preenchida em 99,9% das
+    // linhas. As duas abas divergem ~20% nas horas totais das 5 máquinas
+    // comuns; a Base Apontamento é a oficial e a de Embalagem não é mais
+    // lida. Ver docs/mapeamento/VALIDACAO_DASHBOARD.md.
+    table: "apontamentos", fileKeywords: ["indicadores", "base_aparas"], sheetKeywords: ["base_apontamento", "base_detalhe"],
     numeric: ["qtd_horas", "qtd_produzida", "desperdicio_acerto", "desperdicio_virando", "peso_bruto_bobina", "kg_perda"],
     date: { dt_producao: "date", hora_inicio: "timestamp", hora_fim: "timestamp" },
     allowed: [
@@ -81,6 +90,9 @@ export const TABLE_DEFS = [
       "qtd_produzida", "turno", "desperdicio_acerto", "desperdicio_virando", "peso_bruto_bobina", "tipo_perda",
       "kg_perda", "nome_operador", "tipo_produto", "cod_estrutura", "des_num_ordem", "cod_est", "processo",
       "classificacao", "nome_cliente",
+      // Só existem na Base Apontamento (a BASE_DETALHE dos Base Aparas
+      // não tem, e as linhas dela ficam com null).
+      "classificacao_disp", "classificacao_horas",
     ],
   },
 ];
@@ -166,7 +178,13 @@ export function detectTables(fileName) {
   );
 }
 
+// Match exato tem prioridade sobre "contém". O arquivo Indicadores Diário
+// tem "Base Apontamento" E "Base Apontamentos (kg)" — a segunda contém a
+// palavra-chave da primeira, e sem a prioridade a tabela apontamentos podia
+// acabar lendo a aba de kg dependendo da ordem das abas no arquivo.
 export function detectSheet(def, sheetNames) {
+  const exato = sheetNames.find((n) => def.sheetKeywords.includes(normalize(n)));
+  if (exato) return exato;
   return sheetNames.find((n) => def.sheetKeywords.some((k) => normalize(n).includes(k))) ?? sheetNames[0];
 }
 
