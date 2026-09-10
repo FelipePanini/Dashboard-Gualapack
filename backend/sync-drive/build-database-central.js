@@ -35,7 +35,7 @@ import {
   dedupeRows, detectTables, detectSheet, sheetToRows, coerceRow,
   driveClient, listFolderFiles, downloadFile, CENTRAL_FILE_NAME, DB_SHEET_NAME,
 } from "./lib.js";
-import { coletarBases, COLUNAS_ORIGEM } from "./collect-bases.js";
+import { coletarBases, COLUNAS_ORIGEM, totalDeLinhas } from "./collect-bases.js";
 import { BASES } from "./bases-catalog.js";
 
 const required = ["DRIVE_FOLDER_ID", "GOOGLE_SERVICE_ACCOUNT_JSON"];
@@ -68,6 +68,13 @@ function coletarBasesSeguro(nome, bytes, importadoEm) {
     return new Map();
   }
 }
+
+// Teto de linhas por aba na extração pro Supabase. 219.623 (Base Apontamento
+// de 2026) passa; 379.792 (a de 2025) não terminou de ser lida em 42 min.
+// Diferente do TETO_LINHAS_POR_ABA do collect-bases, que é amostragem de
+// inventário: aqui não dá pra truncar, porque a janela de retenção quer
+// justamente as linhas do FIM da aba — então ou lê inteira, ou pula.
+const TETO_LINHAS_TABELA = 250_000;
 
 const PENDENTES = [
   "DB_TMR (Gráficos Tendência.xlsx, abas TMR-*) — aguardando confirmar chave/granularidade mista (máquina x processo).",
@@ -118,19 +125,47 @@ async function collectTableRows(drive, files, importadoEm, porBase) {
     const usados = defs.filter((d) => DB_SHEET_NAME[d.table]);
     const abasPorDef = new Map(usados.map((d) => [d.table, detectSheet(d, sheetNames)]));
     const abas = [...new Set(abasPorDef.values())];
-    let workbook;
-    try {
-      workbook = XLSX.read(bytes, { type: "array", sheets: abas });
-    } catch (err) {
-      for (const def of usados) touch(def.table).erros.push(`${file.name}: falha ao ler (${err.message})`);
-      console.error(`[erro] "${file.name}": falha ao ler — ${err.message}`);
-      continue;
+
+    // Sondagem barata antes da leitura de verdade: sheetRows limita o PARSE
+    // (a parte cara), e "!fullref" continua trazendo o range real da aba,
+    // então dá pra saber o tamanho verdadeiro sem materializar tudo.
+    //
+    // Por que existe: a aba [Base Apontamento] do "Indicadores Diário -
+    // 2025.xlsx" tem 379.792 linhas e não terminou de ser lida em 42 min
+    // (o job morreu no timeout, sem gravar nada). A de 2026, com 219.623,
+    // leva ~70s. Acima do teto a aba é pulada e registrada no DB_CONTROLE —
+    // melhor perder set–dez/2025 de forma explícita do que derrubar o build
+    // inteiro e não gravar nem o que já tinha sido lido.
+    const sonda = XLSX.read(bytes, { type: "array", sheets: abas, sheetRows: 1 });
+    const grandeDemais = new Set();
+    for (const aba of abas) {
+      const n = totalDeLinhas(sonda.Sheets[aba]);
+      if (n !== null && n > TETO_LINHAS_TABELA) grandeDemais.add(aba);
+    }
+
+    const lidas = abas.filter((a) => !grandeDemais.has(a));
+    let workbook = { Sheets: {} };
+    if (lidas.length) {
+      try {
+        workbook = XLSX.read(bytes, { type: "array", sheets: lidas });
+      } catch (err) {
+        for (const def of usados) touch(def.table).erros.push(`${file.name}: falha ao ler (${err.message})`);
+        console.error(`[erro] "${file.name}": falha ao ler — ${err.message}`);
+        continue;
+      }
     }
 
     for (const def of usados) {
       const bucket = touch(def.table);
       try {
         const sheetName = abasPorDef.get(def.table);
+        if (grandeDemais.has(sheetName)) {
+          const n = totalDeLinhas(sonda.Sheets[sheetName]);
+          const msg = `aba "${sheetName}" pulada: ${n} linhas, acima do teto de ${TETO_LINHAS_TABELA}.`;
+          bucket.erros.push(`${file.name}: ${msg}`);
+          console.warn(`[pulado] "${file.name}": ${msg}`);
+          continue;
+        }
         const sheet = workbook.Sheets[sheetName];
         if (!sheet) {
           bucket.erros.push(`${file.name}: aba "${sheetName}" não veio na leitura.`);
@@ -160,7 +195,11 @@ async function collectTableRows(drive, files, importadoEm, porBase) {
         }
         if (rows.length === 0) continue;
 
-        bucket.rows.push(...rows.map((r) => ({ ...r, _source_file: file.name })));
+        // push(...array) passa cada linha como ARGUMENTO da chamada, e o V8
+        // limita isso a ~125 mil — a Base Apontamento de 2026 tem 219.623
+        // linhas e derrubava com "Maximum call stack size exceeded". Só
+        // apareceu na troca da fonte do TMR porque a aba antiga tinha 97 mil.
+        for (const r of rows) bucket.rows.push({ ...r, _source_file: file.name });
         bucket.arquivos.add(file.name);
         console.log(`[ok] "${file.name}" [${sheetName}] -> ${DB_SHEET_NAME[def.table]}: ${rows.length} linhas`);
       } catch (err) {
