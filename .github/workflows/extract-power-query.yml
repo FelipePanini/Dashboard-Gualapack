@@ -1,0 +1,30 @@
+name: Mapear origem SQL das planilhas (Power Query)
+
+# Ferramenta temporária: lê a definição do Power Query (servidor, banco,
+# tabela, filtros) direto de dentro de cada .xlsx, pra eliminar o passo
+# manual de exportar/subir planilha e ligar o Supabase direto no SQL
+# Server. Só leitura — não altera nenhum arquivo do Drive.
+on:
+  workflow_dispatch: {}
+
+jobs:
+  mapear:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: backend/sync-drive
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - run: npm install
+
+      - name: Extrair definição do Power Query
+        env:
+          DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
+          GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+        run: node extract-power-query.js
