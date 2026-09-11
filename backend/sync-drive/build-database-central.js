@@ -78,7 +78,9 @@ const TETO_LINHAS_TABELA = 250_000;
 
 const PENDENTES = [
   "DB_TMR (Gráficos Tendência.xlsx, abas TMR-*) — aguardando confirmar chave/granularidade mista (máquina x processo).",
-  "DB_ADERENCIA (Aderência Semanal.xlsx, aba ADERÊNCIA DIÁRIA) — aguardando confirmar chave única contra os dados reais.",
+  // DB_ADERENCIA promovida pra aderencia_programacao em 2026-09-11 — ver
+  // lib.js. Chave (num_ordem, maquina, dt_ini_plan) ainda não confirmada
+  // contra o dado real, mas troca-por-arquivo não depende disso.
 ];
 
 async function collectTableRows(drive, files, importadoEm, porBase) {

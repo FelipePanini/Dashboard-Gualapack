@@ -28,8 +28,13 @@ select
   coalesce(ap.horas_produzindo, 0)  as horas_produzindo,
   coalesce(ap.kg_perda_total, 0)    as kg_perda_total,
   coalesce(ap.peso_bruto_total, 0)  as peso_bruto_total,
-  coalesce(ad.km_planejado, 0)      as km_planejado,
-  coalesce(ad.km_realizado, 0)      as km_realizado
+  -- Nomes neutros de propósito: a fonte antiga (arquivo morto, "Histórico
+  -- Aderência Programação.xlsx") tinha esses campos rotulados como "km" e
+  -- chegou a mostrar 12,3 bilhões de "km" — número absurdo da fonte errada.
+  -- A fonte nova (ADERÊNCIA DIÁRIA) não confirma a unidade de qtd_planejada/
+  -- qtd_produzida ainda — não relabelar como km/m sem confirmar.
+  coalesce(ad.qtd_planejada, 0)      as qtd_planejada,
+  coalesce(ad.qtd_produzida, 0)      as qtd_produzida
 from public.maquinas m
 left join (
   select
@@ -44,13 +49,13 @@ left join (
 ) ap on ap.cod_recurso = m.id
 left join (
   select
-    recurso_ctr,
-    sum(qtd_planejado) as km_planejado,
-    sum(qtd_produzido)  as km_realizado
+    maquina,
+    sum(qtd_planejada) as qtd_planejada,
+    sum(qtd_produzida)  as qtd_produzida
   from public.aderencia_programacao
-  where recurso_ctr is not null
-  group by recurso_ctr
-) ad on ad.recurso_ctr = m.id
+  where maquina is not null
+  group by maquina
+) ad on ad.maquina = m.id
 where m.grupo in ('COATING','LAMINADORAS','FUNGICIDA','FLEXOGRAFIA','CORTADEIRAS','ROTOGRAVURA','HOT MELT');
 
 -- ----------------------------------------------------------------------------

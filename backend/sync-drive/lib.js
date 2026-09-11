@@ -33,10 +33,20 @@ export const TABLE_DEFS = [
     allowed: ["num_ordem", "dt_producao", "qtd_produzida", "cod_recurso", "qtd_horas", "classificacao", "descricao", "cod_estrutura", "turno", "cod_desc", "cod_apont"],
   },
   {
-    table: "aderencia_programacao", fileKeywords: ["historico_aderencia", "aderencia_programacao"], sheetKeywords: ["programacao_passado"],
-    numeric: ["qtd_produzido", "qtd_planejado", "meta_qtd_acerto", "qtd_acerto_real", "min_set_prog", "min_set_real", "qtd_prod_kg", "meta_mts_hora", "qtd_hor_p"],
-    date: { dt_saida_maquina: "timestamp" },
-    allowed: ["cod_cliente", "cod_estrutura", "recurso_ctr", "tipo_produto", "num_ordem", "dt_saida_maquina", "descricao", "cliente", "atividade", "qtd_produzido", "qtd_planejado", "meta_qtd_acerto", "qtd_acerto_real", "min_set_prog", "min_set_real", "qtd_prod_kg", "meta_mts_hora", "qtd_hor_p", "cilindro"],
+    // Fonte trocada em 2026-09-11: "Histórico Aderência Programação.xlsx"
+    // (fileKeywords antigos) não existe mais na pasta do Drive — é por
+    // isso que aderencia_programacao ficava órfã. A aba real é
+    // "ADERÊNCIA DIÁRIA" dentro de "Aderência Semanal.xlsx", já com
+    // planejado (qtd_planejada/dt_ini_plan) e realizado (qtd_produzida)
+    // cruzados na mesma linha — não precisa juntar duas fontes. Cabeçalhos
+    // confirmados na inspeção exaustiva de 2026-09-09 (ver bases-catalog.js
+    // DB_ADERENCIA_DIARIA). Chave candidata (num_ordem, maquina,
+    // dt_ini_plan) ainda não confirmada contra o dado real — troca por
+    // arquivo por enquanto, como as outras tabelas de log de evento.
+    table: "aderencia_programacao", fileKeywords: ["aderencia"], sheetKeywords: ["aderencia_diaria"],
+    numeric: ["qtd_planejada", "qtd_produzida", "ano"],
+    date: { dt_ini_plan: "date", dt_entrega: "date" },
+    allowed: ["num_ordem", "maquina", "dt_ini_plan", "qtd_planejada", "produto", "qtd_produzida", "ano", "base", "dt_entrega"],
   },
   {
     // A aba certa é "Conta Refugo " (com espaço no fim) — "Histórico Refugo"
@@ -107,7 +117,7 @@ export const RETENTION_MONTHS = 12;
 export const RETENTION_DATE_COL = {
   apontamentos: "dt_producao",
   aderencia_maquinas_diaria: "dt_producao",
-  aderencia_programacao: "dt_saida_maquina",
+  aderencia_programacao: "dt_ini_plan",
   refugo_producao: "dt_producao",
   producao_kg: "dt_producao",
 };
@@ -165,6 +175,7 @@ export const HEADER_ALIASES = {
                                       // realmente vem no Machine Card (texto quebrado em
                                       // duas linhas numa célula só); confirmado via log em
                                       // 2026-09-04, ver commit que adicionou esta linha.
+  dtentrega: "dt_entrega",       // "DtEntrega" na aba ADERÊNCIA DIÁRIA
 };
 
 // Um arquivo pode alimentar mais de uma tabela (ex: "Indicadores Diário"
@@ -269,6 +280,7 @@ export const DB_SHEET_NAME = {
   refugo_producao: "DB_REFUGO_PRODUCAO",
   tendencia_mensal: "DB_TENDENCIA",
   maquinas: "DB_MAQUINAS",
+  aderencia_programacao: "DB_ADERENCIA_DIARIA",
 };
 
 export async function downloadFile(drive, file) {

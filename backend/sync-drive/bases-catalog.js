@@ -310,21 +310,10 @@ export const BASES = [
   // Aderência Semanal.xlsx — 19 abas, NENHUMA usada hoje. A tabela
   // aderencia_programacao do Supabase está órfã (nenhum arquivo a alimenta).
   // --------------------------------------------------------------------------
-  {
-    sheet: "DB_ADERENCIA_DIARIA", origem: "ADERENCIA_DIARIA",
-    fileKeywords: ["aderencia"], sheetMatch: ["aderencia_diaria"],
-    headerRow: 0,
-    colunas: {
-      num_ordem: "num_ordem", maquina: "maquina", dt_ini_plan: "dt_ini_plan",
-      qtd_planejada: "qtd_planejada", produto: "produto",
-      qtd_produzida: "qtd_produzida", ano: "ano", base: "base", dtentrega: "dt_entrega",
-    },
-    numeric: ["qtd_planejada", "qtd_produzida", "ano"],
-    date: { dt_ini_plan: "date", dt_entrega: "date" },
-    granularidade: "1 linha por OP x máquina x data planejada",
-    classificacao: "PRINCIPAL",
-    observacao: "15.550 linhas. Planejado x produzido. Chave candidata (num_ordem, maquina, dt_ini_plan) AINDA NÃO CONFIRMADA contra o dado.",
-  },
+  // DB_ADERENCIA_DIARIA promovida pra tabela aderencia_programacao em
+  // 2026-09-11 (ver TABLE_DEFS em lib.js) — saiu do inventário porque já
+  // alimenta o Supabase; sem isso o build-database-central.js tentaria
+  // criar a mesma aba duas vezes.
   {
     sheet: "DB_ADERENCIA_SEMANAL", origem: "ADERENCIA_SEMANAL",
     fileKeywords: ["aderencia"], sheetMatch: ["aderencia_semanal"],

@@ -131,32 +131,59 @@ create index if not exists idx_aderencia_maq_source on public.aderencia_maquinas
 --    Mesma retenção de 12 meses e troca-por-arquivo da tabela apontamentos
 --    (por dt_saida_maquina / _source_file).
 -- ----------------------------------------------------------------------------
+-- Fonte trocada em 2026-09-11 — ver comentário no TABLE_DEFS de
+-- aderencia_programacao em backend/sync-drive/lib.js pro histórico
+-- completo. Colunas de baixo pra cima batem com a aba real "ADERÊNCIA
+-- DIÁRIA" de Aderência Semanal.xlsx, não com o arquivo morto antigo.
 create table if not exists public.aderencia_programacao (
-  id                bigint generated always as identity primary key,
-  _source_file      text,          -- nome do arquivo que gravou a linha
-  cod_cliente       text,
-  cod_estrutura     text,
-  recurso_ctr       text,
-  tipo_produto      text,
-  num_ordem         text,
-  dt_saida_maquina  timestamptz,
-  descricao         text,
-  cliente           text,
-  atividade         text,
-  qtd_produzido     numeric,
-  qtd_planejado     numeric,
-  meta_qtd_acerto   numeric,
-  qtd_acerto_real   numeric,
-  min_set_prog      numeric,
-  min_set_real      numeric,
-  qtd_prod_kg       numeric,
-  meta_mts_hora     numeric,
-  qtd_hor_p         numeric,
-  cilindro          text
+  id             bigint generated always as identity primary key,
+  _source_file   text,          -- nome do arquivo que gravou a linha
+  num_ordem      text,
+  maquina        text,
+  dt_ini_plan    date,
+  qtd_planejada  numeric,
+  produto        text,
+  qtd_produzida  numeric,
+  ano            numeric,
+  base           text,
+  dt_entrega     date
 );
 
-create index if not exists idx_aderencia_prog_data on public.aderencia_programacao (dt_saida_maquina desc);
+create index if not exists idx_aderencia_prog_data on public.aderencia_programacao (dt_ini_plan desc);
+create index if not exists idx_aderencia_prog_maquina on public.aderencia_programacao (maquina, dt_ini_plan desc);
 create index if not exists idx_aderencia_prog_source on public.aderencia_programacao (_source_file);
+
+-- Migração pra bancos que já têm a tabela com o esquema antigo (colunas
+-- do arquivo morto) — descarta e recria, porque a tabela está órfã hoje
+-- (nenhum arquivo alimenta ela desde que "Histórico Aderência
+-- Programação.xlsx" saiu da pasta do Drive), então não existe dado real
+-- pra perder.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'aderencia_programacao'
+      and column_name = 'recurso_ctr'
+  ) then
+    drop table public.aderencia_programacao;
+    create table public.aderencia_programacao (
+      id             bigint generated always as identity primary key,
+      _source_file   text,
+      num_ordem      text,
+      maquina        text,
+      dt_ini_plan    date,
+      qtd_planejada  numeric,
+      produto        text,
+      qtd_produzida  numeric,
+      ano            numeric,
+      base           text,
+      dt_entrega     date
+    );
+    create index idx_aderencia_prog_data on public.aderencia_programacao (dt_ini_plan desc);
+    create index idx_aderencia_prog_maquina on public.aderencia_programacao (maquina, dt_ini_plan desc);
+    create index idx_aderencia_prog_source on public.aderencia_programacao (_source_file);
+  end if;
+end $$;
 
 -- ----------------------------------------------------------------------------
 -- 6. Refugo/aparas — série histórica mensal (de "Refugo Aparas")
