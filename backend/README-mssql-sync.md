@@ -10,8 +10,8 @@ ver a conversa de 2026-09-11 ou `docs/mapeamento/`.
 SQL Server (rede interna da Gualapack, só VPN/rede corporativa)
         │
         ▼
-Seu PC — runner do GitHub Actions instalado como serviço do Windows,
-         rodando com o SEU usuário de domínio (login integrado)
+Seu PC — runner do GitHub Actions rodando em modo interativo
+         (sem precisar de admin — ver Passo 3)
         │
         ▼
 GitHub Actions — o workflow roda igual aos outros, só que a etapa que
@@ -54,11 +54,24 @@ Siga os passos **na ordem**.
 
 ---
 
-## Passo 1 — Instalar o Node.js (se ainda não tiver) (5 min)
+## Passo 1 — Node.js sem precisar de admin (5 min)
 
-1. Baixe em [nodejs.org](https://nodejs.org) a versão **LTS** (22.x) pra
-   Windows, instale com as opções padrão.
-2. Abra o PowerShell e confirme: `node --version` deve mostrar `v22...`.
+O instalador normal do Node pede permissão de administrador. Sem isso,
+use a versão **portátil** (zip, sem instalador — só descompacta e usa):
+
+1. Baixe o "Windows Binary (.zip)" da versão **LTS** em
+   [nodejs.org/en/download](https://nodejs.org/en/download) (role até
+   achar a linha com `.zip`, não o `.msi`).
+2. Descompacte em uma pasta sua, sem precisar de admin — por exemplo
+   `C:\Users\SEU_USUARIO\node`. Dentro dela tem o `node.exe` direto.
+3. Adiciona essa pasta ao PATH **só do seu usuário** (não pede admin,
+   diferente de mexer no PATH do sistema todo) — no PowerShell:
+   ```powershell
+   [Environment]::SetEnvironmentVariable("Path", $env:Path + ";C:\Users\SEU_USUARIO\node", "User")
+   ```
+4. Feche e abra o PowerShell de novo, confirme: `node --version` deve
+   mostrar `v22...`. Se não achar o comando, feche e abra de novo (o
+   PATH só atualiza em janelas novas).
 
 ## Passo 2 — (pulado) — sem driver nativo, sem instalação extra
 
@@ -67,24 +80,35 @@ o `npm install` do Passo 6 já traz tudo que falta.
 
 ## Passo 3 — Instalar o runner do GitHub Actions no seu PC (10 min)
 
+Instalar como **serviço do Windows** (o jeito "de fundo", que sobrevive
+a reinício) pede admin (`sc create` por baixo dos panos). Sem admin,
+o runner roda **em modo interativo** — uma janela aberta (pode
+minimizar) enquanto você quiser que o sync tenha chance de rodar. Isso
+já é coerente com o que você me disse antes: sem máquina dedicada, o
+job só roda quando seu PC está ligado e conectado mesmo.
+
 1. No repositório do GitHub, vá em **Settings → Actions → Runners** →
    **New self-hosted runner** → escolha **Windows** / **x64**.
 2. O GitHub mostra um bloco de comandos PowerShell pra copiar e colar —
-   siga exatamente o que aparecer lá (baixa o runner, extrai, configura).
-   Quando pedir **labels**, pode deixar o padrão (`self-hosted`,
-   `Windows`, `X64`).
-3. **NÃO** rode `run.cmd` ainda (isso deixaria o runner preso àquela
-   janela do PowerShell). Em vez disso, instale como **serviço do
-   Windows**, que é o que faz ele ficar rodando sozinho e reiniciar
-   com o PC:
+   siga exatamente o que aparecer lá (baixa o runner, extrai, roda
+   `.\config.cmd`). Isso **não** pede admin, só registra o runner com um
+   token de uso único. Quando pedir **labels**, pode deixar o padrão
+   (`self-hosted`, `Windows`, `X64`).
+3. Pra ligar o runner, roda (sem instalar como serviço):
    ```powershell
-   .\svc.cmd install
+   .\run.cmd
    ```
+   Deixa essa janela aberta (pode minimizar) — é ela que faz o runner
+   ficar "escutando" por jobs do GitHub. Fechando a janela, o runner
+   para; da próxima vez que quiser que o sync rode, roda `.\run.cmd` de
+   novo na mesma pasta.
 4. Confirme em **Settings → Actions → Runners** no GitHub que ele
-   aparece como **Idle** (verde). Como a autenticação no SQL Server vai
-   por NTLM explícito (usuário/senha no secret, Passo 6), o serviço pode
-   ficar rodando com a conta padrão (Local System) — não precisa mexer
-   em "Logon as" no `services.msc`.
+   aparece como **Idle** (verde) enquanto a janela estiver aberta.
+
+**Dica pra não ter que abrir isso na mão todo dia:** cria um atalho pro
+`run.cmd` na pasta **Inicializar** do Windows
+(`shell:startup` na caixa Executar) — daí ele abre sozinho toda vez que
+você liga o PC e faz login, sem precisar de admin pra isso.
 
 ## Passo 4 — Testar a conexão com o SQL Server manualmente (2 min)
 
@@ -135,7 +159,10 @@ o processo também na janela do runner, se estiver aberta.
 ## Passo 8 — Pronto, roda sozinho
 
 O `schedule` no workflow já está configurado pra rodar todo dia de
-madrugada, igual ao `sync-drive.yml`. Só depende do seu PC estar ligado e
-conectado na rede/VPN nesse horário — se não estiver, o job fica na fila
-e roda assim que o runner voltar a ficar online (não pula o dia
-silenciosamente, mas também não é garantido no horário exato).
+madrugada, igual ao `sync-drive.yml`. Como o runner é interativo (Passo
+3), ele só está "escutando" enquanto a janela do `run.cmd` estiver
+aberta — com o atalho na pasta Inicializar, isso acontece sozinho todo
+login. Se o PC estiver desligado ou a janela fechada no horário
+agendado, o job fica na fila e roda assim que o runner voltar a ficar
+online (não pula o dia silenciosamente, mas também não é garantido no
+horário exato).
