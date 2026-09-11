@@ -70,8 +70,18 @@ function findMashupPartName(zipPath) {
     const m = /<Override PartName="([^"]+)" ContentType="[^"]*dataMashup[^"]*"/i.exec(ct.toString("utf8"));
     if (m) return m[1].replace(/^\//, "");
   }
+  // Fallback: pode haver VÁRIOS customXml/itemN.xml (propriedades do
+  // documento, metadados do Excel etc.) — o run anterior pegou o item
+  // errado em todo arquivo ("item1" numa planilha, "item2" em outra) e
+  // todos falharam ao decodificar. Em vez de pegar o primeiro que bater
+  // no nome, abre cada um e confirma que o CONTEÚDO é mesmo um DataMashup.
   const entries = listEntries(zipPath);
-  return entries.find((e) => /customXml\/item\d+\.xml$/i.test(e)) ?? null;
+  const candidatos = entries.filter((e) => /customXml\/item\d+\.xml$/i.test(e));
+  for (const c of candidatos) {
+    const bytes = unzipEntry(zipPath, c);
+    if (bytes && /DataMashup/i.test(bytes.toString("utf8", 0, Math.min(bytes.length, 2000)))) return c;
+  }
+  return candidatos[0] ?? null;
 }
 
 function parseMashup(bytes) {
@@ -82,15 +92,21 @@ function parseMashup(bytes) {
   const asText = bytes.toString("utf8", 0, Math.min(bytes.length, 200));
   if (asText.includes("<DataMashup") || asText.startsWith("<?xml")) {
     const full = bytes.toString("utf8");
-    const m = /<DataMashup[^>]*>([^<]+)<\/DataMashup>/.exec(full);
-    if (!m) return null;
-    bin = Buffer.from(m[1], "base64");
+    const m = /<DataMashup[^>]*>([\s\S]+?)<\/DataMashup>/.exec(full);
+    if (!m) return { erro: `tag <DataMashup> não encontrada no XML (${full.length} chars, começa com: ${full.slice(0, 120)})` };
+    bin = Buffer.from(m[1].replace(/\s+/g, ""), "base64");
   }
-  if (bin.length < 8) return null;
+  if (bin.length < 8) return { erro: `binário curto demais (${bin.length} bytes)` };
+  const version = bin.readUInt32LE(0);
   const pkgLen = bin.readUInt32LE(4);
   const pkgBytes = bin.subarray(8, 8 + pkgLen);
-  if (pkgBytes.length < 4 || pkgBytes.toString("ascii", 0, 2) !== "PK") return null;
-  return pkgBytes;
+  if (pkgBytes.length < 4 || pkgBytes[0] !== 0x50 || pkgBytes[1] !== 0x4b) {
+    return {
+      erro: `pacote não começa com assinatura PK — version=${version} pkgLen=${pkgLen} binLen=${bin.length} ` +
+        `primeiros 24 bytes=${bin.subarray(0, 24).toString("hex")}`,
+    };
+  }
+  return { pkgBytes };
 }
 
 async function main() {
@@ -136,14 +152,14 @@ async function main() {
       continue;
     }
 
-    const pkgBytes = parseMashup(mashupBytes);
-    if (!pkgBytes) {
-      console.log("  [DataMashup em formato inesperado — não bateu com a estrutura conhecida]");
+    const resultado = parseMashup(mashupBytes);
+    if (resultado.erro) {
+      console.log(`  [DataMashup em formato inesperado: ${resultado.erro}]`);
       continue;
     }
 
     const pkgPath = path.join(tmp, "mashup.zip");
-    writeFileSync(pkgPath, pkgBytes);
+    writeFileSync(pkgPath, resultado.pkgBytes);
     const entradas = listEntries(pkgPath);
     const formulaEntry = entradas.find((e) => /Formulas\/Section\d+\.m$/i.test(e)) ?? "Formulas/Section1.m";
     const secaoM = unzipEntry(pkgPath, formulaEntry);
