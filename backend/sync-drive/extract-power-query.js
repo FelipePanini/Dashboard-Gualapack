@@ -1,0 +1,163 @@
+// ============================================================================
+// extract-power-query.js — lê a definição da consulta Power Query (Fonte,
+// filtros, junções) direto de dentro do .xlsx, sem precisar abrir no Excel.
+// ----------------------------------------------------------------------------
+// Um .xlsx é um zip. Quando a aba usa "Dados > Consultas e Conexões", o
+// código M por trás do editor visual (a mesma coisa que aparece em "Etapas
+// Aplicadas") fica guardado numa parte interna chamada "DataMashup" — um
+// blob binário: 4 bytes de versão + 4 bytes de tamanho (little-endian) +
+// um MINI-ZIP dentro do zip, com o arquivo "Formulas/Section1.m" contendo
+// o código M em texto puro. É esse texto que mostra Sql.Database(...) e
+// cada passo seguinte.
+//
+// Só leitura. Não grava em lugar nenhum, não altera nenhum arquivo do
+// Drive. Temporário: apagar depois de mapear as origens (ver conversa com
+// o usuário em 2026-09-11 sobre eliminar o upload manual de planilha).
+// ============================================================================
+
+import { execFileSync } from "node:child_process";
+import { writeFileSync, mkdtempSync, existsSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
+import { driveClient, listFolderFiles, downloadFile, normalize } from "./lib.js";
+
+const required = ["DRIVE_FOLDER_ID", "GOOGLE_SERVICE_ACCOUNT_JSON"];
+for (const key of required) {
+  if (!process.env[key]) {
+    console.error(`Faltando variável de ambiente: ${key}`);
+    process.exit(1);
+  }
+}
+
+// Arquivos que o usuário pediu pra mapear, na ordem pedida.
+const ALVOS = [
+  "Indicadores Diário - 2026.xlsx",
+  "Base Aparas - 2026.xlsx",
+  "08. SEQUENCIAMENTO DOS FARDOS DE APARAS JGR - Agosto 2026.xlsx",
+  "Refugo Aparas.xlsx",
+  "Refugo Produção.xlsx",
+  "Graficos Tendência.xlsx",
+  "Machine Card Oficial - Genérico.xlsx",
+];
+
+function unzipEntry(zipPath, entryName) {
+  // unzip trata [ ] ? * como wildcard na seleção de membro, mesmo passando
+  // o argumento direto (sem shell) — "[Content_Types].xml" precisa escapar
+  // os colchetes ou "caution: filename not matched" e sai sem erro real.
+  const escapado = entryName.replace(/([[\]?*])/g, "\\$1");
+  try {
+    return execFileSync("unzip", ["-p", zipPath, escapado], { maxBuffer: 1024 * 1024 * 64 });
+  } catch {
+    return null;
+  }
+}
+
+function listEntries(zipPath) {
+  try {
+    const out = execFileSync("unzip", ["-Z1", zipPath], { maxBuffer: 1024 * 1024 * 8 }).toString("utf8");
+    return out.split("\n").map((l) => l.trim()).filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+// Acha a parte do DataMashup: primeiro pelo Content_Types (correto,
+// independe de como o Excel nomeou o arquivo), com fallback pros nomes
+// que versões mais antigas do Excel costumam usar.
+function findMashupPartName(zipPath) {
+  const ct = unzipEntry(zipPath, "[Content_Types].xml");
+  if (ct) {
+    const m = /<Override PartName="([^"]+)" ContentType="[^"]*dataMashup[^"]*"/i.exec(ct.toString("utf8"));
+    if (m) return m[1].replace(/^\//, "");
+  }
+  const entries = listEntries(zipPath);
+  return entries.find((e) => /customXml\/item\d+\.xml$/i.test(e)) ?? null;
+}
+
+function parseMashup(bytes) {
+  // Duas formas conhecidas: (a) o próprio part já é o binário do
+  // DataMashup; (b) o part é um XML tipo <DataMashup>BASE64</DataMashup>
+  // (customXml, versões mais antigas do Excel).
+  let bin = bytes;
+  const asText = bytes.toString("utf8", 0, Math.min(bytes.length, 200));
+  if (asText.includes("<DataMashup") || asText.startsWith("<?xml")) {
+    const full = bytes.toString("utf8");
+    const m = /<DataMashup[^>]*>([^<]+)<\/DataMashup>/.exec(full);
+    if (!m) return null;
+    bin = Buffer.from(m[1], "base64");
+  }
+  if (bin.length < 8) return null;
+  const pkgLen = bin.readUInt32LE(4);
+  const pkgBytes = bin.subarray(8, 8 + pkgLen);
+  if (pkgBytes.length < 4 || pkgBytes.toString("ascii", 0, 2) !== "PK") return null;
+  return pkgBytes;
+}
+
+async function main() {
+  const drive = driveClient();
+  const files = await listFolderFiles(drive);
+  const tmp = mkdtempSync(path.join(tmpdir(), "pq-"));
+
+  for (const nomeAlvo of ALVOS) {
+    const file = files.find((f) => normalize(f.name) === normalize(nomeAlvo));
+    console.log(`\n${"=".repeat(78)}\n## ${nomeAlvo}`);
+    if (!file) {
+      console.log("  [não encontrado na pasta do Drive]");
+      continue;
+    }
+
+    const t0 = Date.now();
+    const bytes = await downloadFile(drive, file);
+    console.log(`  baixado: ${(bytes.length / 1024 / 1024).toFixed(1)} MB em ${Date.now() - t0}ms`);
+
+    const xlsxPath = path.join(tmp, "arquivo.xlsx");
+    writeFileSync(xlsxPath, bytes);
+
+    // Conexões "clássicas" (OLEDB/ODBC) às vezes trazem servidor/base em
+    // texto puro mesmo sem Power Query — vale sempre conferir.
+    const connections = unzipEntry(xlsxPath, "xl/connections.xml");
+    if (connections) {
+      console.log("\n  --- xl/connections.xml (conexões registradas) ---");
+      console.log("  " + connections.toString("utf8").replace(/></g, ">\n  <").slice(0, 4000));
+    } else {
+      console.log("\n  [sem xl/connections.xml — planilha sem conexão externa registrada, ou já é cópia estática]");
+    }
+
+    const mashupPart = findMashupPartName(xlsxPath);
+    if (!mashupPart) {
+      console.log("  [sem parte DataMashup — não usa Power Query, ou o Excel guardou de um jeito não previsto aqui]");
+      continue;
+    }
+    console.log(`  parte do DataMashup: "${mashupPart}"`);
+
+    const mashupBytes = unzipEntry(xlsxPath, mashupPart);
+    if (!mashupBytes) {
+      console.log("  [não consegui ler a parte do DataMashup]");
+      continue;
+    }
+
+    const pkgBytes = parseMashup(mashupBytes);
+    if (!pkgBytes) {
+      console.log("  [DataMashup em formato inesperado — não bateu com a estrutura conhecida]");
+      continue;
+    }
+
+    const pkgPath = path.join(tmp, "mashup.zip");
+    writeFileSync(pkgPath, pkgBytes);
+    const entradas = listEntries(pkgPath);
+    const formulaEntry = entradas.find((e) => /Formulas\/Section\d+\.m$/i.test(e)) ?? "Formulas/Section1.m";
+    const secaoM = unzipEntry(pkgPath, formulaEntry);
+    if (!secaoM) {
+      console.log(`  [não achei "${formulaEntry}" dentro do pacote — entradas encontradas: ${entradas.join(", ")}]`);
+      continue;
+    }
+
+    console.log(`\n  --- código M (${formulaEntry}) ---`);
+    console.log(secaoM.toString("utf8"));
+  }
+}
+
+main().catch((err) => {
+  console.error("Extração falhou:", err);
+  process.exit(1);
+});
