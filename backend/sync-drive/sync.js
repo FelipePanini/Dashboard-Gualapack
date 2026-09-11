@@ -31,7 +31,7 @@ import * as XLSX from "xlsx";
 import {
   RETENTION_MONTHS, RETENTION_DATE_COL, REPLACE_BY_SOURCE, DEDUPE_KEY,
   CONFLICT_COLUMNS, dedupeRows, driveClient, listFolderFiles, downloadFile,
-  CENTRAL_FILE_NAME, DB_SHEET_NAME,
+  CENTRAL_FILE_NAME, DB_SHEET_NAME, detectTables,
 } from "./lib.js";
 
 const required = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "DRIVE_FOLDER_ID", "GOOGLE_SERVICE_ACCOUNT_JSON"];
@@ -77,27 +77,19 @@ async function main() {
     const bytes = await downloadFile(drive, centralFile);
     const workbook = XLSX.read(bytes, { type: "array" });
 
+    // Listagem da pasta (só metadados, sem baixar nada) — usada abaixo pra
+    // limpar linhas órfãs das tabelas de troca-por-arquivo.
+    const allFiles = await listFolderFiles(drive);
+
     for (const [sheetName, table] of Object.entries(SHEET_TO_TABLE)) {
       const sheet = workbook.Sheets[sheetName];
-      if (!sheet) {
-        console.log(`[skip] aba "${sheetName}" não encontrada no arquivo central.`);
-        continue;
-      }
-
-      let rows = XLSX.utils.sheet_to_json(sheet, { defval: null });
-      if (rows.length === 0) {
-        console.log(`[skip] "${sheetName}" -> ${table}: aba vazia.`);
-        continue;
-      }
+      if (!sheet) console.log(`[skip] aba "${sheetName}" não encontrada no arquivo central.`);
+      let rows = sheet ? XLSX.utils.sheet_to_json(sheet, { defval: null }) : [];
 
       const keyCols = DEDUPE_KEY[table];
       if (keyCols) {
         const cols = keyCols.split(",");
         rows = rows.filter((r) => cols.every((c) => r[c] !== null && r[c] !== undefined));
-      }
-      if (rows.length === 0) {
-        console.log(`[skip] "${sheetName}" -> ${table}: nenhuma linha com chave válida.`);
-        continue;
       }
 
       const retentionCol = RETENTION_DATE_COL[table];
@@ -105,10 +97,6 @@ async function main() {
         const cutoff = new Date();
         cutoff.setMonth(cutoff.getMonth() - RETENTION_MONTHS);
         rows = rows.filter((r) => r[retentionCol] && new Date(r[retentionCol]) >= cutoff);
-      }
-      if (rows.length === 0) {
-        console.log(`[skip] "${sheetName}" -> ${table}: todas as linhas fora da janela de retenção (${RETENTION_MONTHS} meses).`);
-        continue;
       }
 
       const conflictCols = CONFLICT_COLUMNS[table];
@@ -124,6 +112,25 @@ async function main() {
           if (!porArquivo.has(key)) porArquivo.set(key, []);
           porArquivo.get(key).push(r);
         }
+
+        // Órfãos: um arquivo que ALIMENTAVA esta tabela (pelo nome, ainda
+        // presente na pasta) mas não trouxe nenhuma linha nesta rodada —
+        // aba pulada por tamanho, tudo filtrado pela retenção, etc. Sem
+        // isso, o delete abaixo só roda pros arquivos que aparecem NESTA
+        // rodada, e o que esse arquivo gravou numa carga anterior fica pra
+        // sempre. Foi exatamente o que aconteceu com "Indicadores Diário -
+        // 2025.xlsx" na troca do TMR: 46.084 linhas antigas (da aba
+        // Máquina_Embalagem, já abandonada) continuaram em "apontamentos"
+        // depois que a aba nova (Base Apontamento) passou a ser pulada por
+        // ter mais de 250 mil linhas — ver VALIDACAO_DASHBOARD.md.
+        const candidatos = allFiles.filter((f) => detectTables(f.name).some((d) => d.table === table));
+        for (const orfao of candidatos) {
+          if (porArquivo.has(orfao.name)) continue;
+          const { error: delErr, count } = await supabase.from(table).delete({ count: "exact" }).eq("_source_file", orfao.name);
+          if (delErr) throw new Error(`Erro limpando órfãos de ${table} ("${orfao.name}"): ${delErr.message}`);
+          if (count) console.log(`[limpeza] ${table}: removida(s) ${count} linha(s) órfã(s) de "${orfao.name}" (não contribuiu nesta rodada).`);
+        }
+
         for (const [sourceFile, fileRows] of porArquivo) {
           const { error: delErr } = await supabase.from(table).delete().eq("_source_file", sourceFile);
           if (delErr) throw new Error(`Erro limpando ${table} antes de recarregar "${sourceFile}": ${delErr.message}`);
@@ -135,6 +142,10 @@ async function main() {
           }
         }
       } else {
+        if (rows.length === 0) {
+          console.log(`[skip] "${sheetName}" -> ${table}: aba vazia ou sem linha válida.`);
+          continue;
+        }
         const toInsert = dedupeRows(rows, keyCols).map((r) => {
           const { _source_file, ...rest } = r; // não é coluna de negócio nessas tabelas
           return rest;
