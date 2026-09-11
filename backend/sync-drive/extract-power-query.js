@@ -64,22 +64,31 @@ function listEntries(zipPath) {
 // Acha a parte do DataMashup: primeiro pelo Content_Types (correto,
 // independe de como o Excel nomeou o arquivo), com fallback pros nomes
 // que versões mais antigas do Excel costumam usar.
+// O Excel grava alguns customXml/itemN.xml em UTF-16LE com BOM (FF FE) —
+// decodificar como UTF-8 dá "mojibake" (cada caractere ASCII intercalado
+// com um byte nulo) e nenhuma comparação de texto bate. Detecta o BOM e
+// usa a codificação certa; sem BOM, assume UTF-8 (o padrão OPC comum).
+function textoDoXml(bytes) {
+  if (bytes.length >= 2 && bytes[0] === 0xff && bytes[1] === 0xfe) return bytes.toString("utf16le", 2);
+  if (bytes.length >= 3 && bytes[0] === 0xef && bytes[1] === 0xbb && bytes[2] === 0xbf) return bytes.toString("utf8", 3);
+  return bytes.toString("utf8");
+}
+
 function findMashupPartName(zipPath) {
   const ct = unzipEntry(zipPath, "[Content_Types].xml");
   if (ct) {
-    const m = /<Override PartName="([^"]+)" ContentType="[^"]*dataMashup[^"]*"/i.exec(ct.toString("utf8"));
+    const m = /<Override PartName="([^"]+)" ContentType="[^"]*dataMashup[^"]*"/i.exec(textoDoXml(ct));
     if (m) return m[1].replace(/^\//, "");
   }
   // Fallback: pode haver VÁRIOS customXml/itemN.xml (propriedades do
-  // documento, metadados do Excel etc.) — o run anterior pegou o item
-  // errado em todo arquivo ("item1" numa planilha, "item2" em outra) e
-  // todos falharam ao decodificar. Em vez de pegar o primeiro que bater
-  // no nome, abre cada um e confirma que o CONTEÚDO é mesmo um DataMashup.
+  // documento, metadados do Excel etc.) — em vez de pegar o primeiro que
+  // bater no nome, abre cada um e confirma que o CONTEÚDO é mesmo um
+  // DataMashup.
   const entries = listEntries(zipPath);
   const candidatos = entries.filter((e) => /customXml\/item\d+\.xml$/i.test(e));
   for (const c of candidatos) {
     const bytes = unzipEntry(zipPath, c);
-    if (bytes && /DataMashup/i.test(bytes.toString("utf8", 0, Math.min(bytes.length, 2000)))) return c;
+    if (bytes && /DataMashup/i.test(textoDoXml(bytes).slice(0, 2000))) return c;
   }
   return candidatos[0] ?? null;
 }
@@ -87,11 +96,11 @@ function findMashupPartName(zipPath) {
 function parseMashup(bytes) {
   // Duas formas conhecidas: (a) o próprio part já é o binário do
   // DataMashup; (b) o part é um XML tipo <DataMashup>BASE64</DataMashup>
-  // (customXml, versões mais antigas do Excel).
+  // (customXml — o caso de todo arquivo real conferido em 2026-09-11,
+  // sempre em UTF-16LE com BOM).
   let bin = bytes;
-  const asText = bytes.toString("utf8", 0, Math.min(bytes.length, 200));
-  if (asText.includes("<DataMashup") || asText.startsWith("<?xml")) {
-    const full = bytes.toString("utf8");
+  const full = textoDoXml(bytes);
+  if (full.slice(0, 200).includes("<DataMashup") || full.startsWith("<?xml") || full.startsWith("﻿<?xml")) {
     const m = /<DataMashup[^>]*>([\s\S]+?)<\/DataMashup>/.exec(full);
     if (!m) return { erro: `tag <DataMashup> não encontrada no XML (${full.length} chars, começa com: ${full.slice(0, 120)})` };
     bin = Buffer.from(m[1].replace(/\s+/g, ""), "base64");
