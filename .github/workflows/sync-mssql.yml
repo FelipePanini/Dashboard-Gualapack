@@ -5,9 +5,8 @@ name: Carga direta do SQL Server (Metrics)
 # Ver backend/README-mssql-sync.md pro passo a passo de configuração.
 on:
   schedule:
-    # 06:30 UTC = 03:30 no horário de Brasília (UTC-3) — meia hora depois
-    # do sync-drive.yml, pra não competir se um dia rodarem na mesma hora.
-    - cron: "30 6 * * *"
+    # 12:00 UTC = 09:00 no horário de Brasília (UTC-3)
+    - cron: "0 12 * * *"
   workflow_dispatch: {} # permite rodar manualmente pela aba "Actions"
 
 jobs:
