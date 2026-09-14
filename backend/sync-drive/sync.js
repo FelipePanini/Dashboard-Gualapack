@@ -55,6 +55,25 @@ async function logFinish(id, status, detalhe, linhas) {
   await supabase.from("sync_log").update({ status, finished_at: new Date().toISOString(), detalhe, linhas_gravadas: linhas }).eq("id", id);
 }
 
+// O PostgREST/service_role tem statement_timeout de 8s (config de
+// "authenticator", herdada mesmo depois do SET ROLE) — um DELETE direto por
+// _source_file em tabela grande (ex.: apontamentos, ~220 mil linhas por
+// arquivo) estoura isso. Apaga em lotes por id, cada lote rápido o
+// suficiente pra nunca chegar perto do limite.
+async function deleteBySourceFile(table, sourceFile, batchSize = 5000) {
+  let total = 0;
+  while (true) {
+    const { data, error } = await supabase.from(table).select("id").eq("_source_file", sourceFile).limit(batchSize);
+    if (error) throw new Error(`Erro lendo ids pra limpar ${table} ("${sourceFile}"): ${error.message}`);
+    if (!data.length) break;
+    const { error: delErr } = await supabase.from(table).delete().in("id", data.map((r) => r.id));
+    if (delErr) throw new Error(`Erro limpando ${table} antes de recarregar "${sourceFile}": ${delErr.message}`);
+    total += data.length;
+    if (data.length < batchSize) break;
+  }
+  return total;
+}
+
 async function findCentralFile(drive) {
   const res = await drive.files.list({
     q: `'${process.env.DRIVE_FOLDER_ID}' in parents and trashed = false and name = '${CENTRAL_FILE_NAME}'`,
@@ -126,14 +145,12 @@ async function main() {
         const candidatos = allFiles.filter((f) => detectTables(f.name).some((d) => d.table === table));
         for (const orfao of candidatos) {
           if (porArquivo.has(orfao.name)) continue;
-          const { error: delErr, count } = await supabase.from(table).delete({ count: "exact" }).eq("_source_file", orfao.name);
-          if (delErr) throw new Error(`Erro limpando órfãos de ${table} ("${orfao.name}"): ${delErr.message}`);
+          const count = await deleteBySourceFile(table, orfao.name);
           if (count) console.log(`[limpeza] ${table}: removida(s) ${count} linha(s) órfã(s) de "${orfao.name}" (não contribuiu nesta rodada).`);
         }
 
         for (const [sourceFile, fileRows] of porArquivo) {
-          const { error: delErr } = await supabase.from(table).delete().eq("_source_file", sourceFile);
-          if (delErr) throw new Error(`Erro limpando ${table} antes de recarregar "${sourceFile}": ${delErr.message}`);
+          await deleteBySourceFile(table, sourceFile);
           for (let i = 0; i < fileRows.length; i += 500) {
             const chunk = fileRows.slice(i, i + 500);
             const { error } = await supabase.from(table).insert(chunk);
