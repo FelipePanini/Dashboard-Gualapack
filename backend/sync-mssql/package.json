@@ -1,0 +1,11 @@
+{
+  "name": "sync-mssql",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Carga direta do SQL Server (Metrics) pro Supabase — roda no runner self-hosted, dentro da rede da Gualapack. Ver backend/README-mssql-sync.md.",
+  "dependencies": {
+    "mssql": "^11.0.1",
+    "@supabase/supabase-js": "^2.45.4"
+  }
+}
