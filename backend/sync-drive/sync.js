@@ -60,17 +60,31 @@ async function logFinish(id, status, detalhe, linhas) {
 // _source_file em tabela grande (ex.: apontamentos, ~220 mil linhas por
 // arquivo) estoura isso. Apaga em lotes por id, cada lote rápido o
 // suficiente pra nunca chegar perto do limite.
-async function deleteBySourceFile(table, sourceFile, batchSize = 5000) {
+async function deleteBySourceFile(table, sourceFile, batchSize = 500) {
   let total = 0;
   while (true) {
     const { data, error } = await supabase.from(table).select("id").eq("_source_file", sourceFile).limit(batchSize);
     if (error) throw new Error(`Erro lendo ids pra limpar ${table} ("${sourceFile}"): ${error.message}`);
     if (!data.length) break;
+    // batchSize pequeno de propósito: um .in("id", ids) com milhares de ids
+    // vira uma URL gigante (DELETE do PostgREST manda o filtro na query
+    // string) — foi exatamente isso que causou duplicação silenciosa em
+    // "apontamentos" em 2026-09-14: o delete "estourava" o limite de
+    // tamanho de URL, mas em vez de dar erro claro ele simplesmente não
+    // apagava nada, e a carga seguinte inseria tudo de novo por cima.
     const { error: delErr } = await supabase.from(table).delete().in("id", data.map((r) => r.id));
     if (delErr) throw new Error(`Erro limpando ${table} antes de recarregar "${sourceFile}": ${delErr.message}`);
     total += data.length;
     if (data.length < batchSize) break;
   }
+
+  // Verificação final: se sobrou QUALQUER linha desse arquivo depois do
+  // loop, é sinal de que o delete não funcionou de verdade (do jeito que
+  // aconteceu antes) — falha alto e claro em vez de deixar duplicar de novo.
+  const { count, error: checkErr } = await supabase.from(table).select("id", { count: "exact", head: true }).eq("_source_file", sourceFile);
+  if (checkErr) throw new Error(`Erro verificando limpeza de ${table} ("${sourceFile}"): ${checkErr.message}`);
+  if (count > 0) throw new Error(`Limpeza de ${table} ("${sourceFile}") não removeu tudo: ainda sobraram ${count} linha(s) depois do loop de delete.`);
+
   return total;
 }
 
