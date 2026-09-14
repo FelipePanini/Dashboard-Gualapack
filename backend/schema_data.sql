@@ -149,15 +149,13 @@ create table if not exists public.aderencia_programacao (
   dt_entrega     date
 );
 
-create index if not exists idx_aderencia_prog_data on public.aderencia_programacao (dt_ini_plan desc);
-create index if not exists idx_aderencia_prog_maquina on public.aderencia_programacao (maquina, dt_ini_plan desc);
-create index if not exists idx_aderencia_prog_source on public.aderencia_programacao (_source_file);
-
 -- Migração pra bancos que já têm a tabela com o esquema antigo (colunas
 -- do arquivo morto) — descarta e recria, porque a tabela está órfã hoje
 -- (nenhum arquivo alimenta ela desde que "Histórico Aderência
 -- Programação.xlsx" saiu da pasta do Drive), então não existe dado real
--- pra perder.
+-- pra perder. Tem que rodar ANTES dos create index abaixo — "create table
+-- if not exists" não recria a tabela antiga sozinho, e os índices novos
+-- referenciam colunas que só existem depois desta migração.
 do $$
 begin
   if exists (
@@ -165,6 +163,9 @@ begin
     where table_schema = 'public' and table_name = 'aderencia_programacao'
       and column_name = 'recurso_ctr'
   ) then
+    -- v_maquinas_resumo depende desta tabela — cai junto e é recriada
+    -- por schema_views.sql (rode esse arquivo logo em seguida).
+    drop view if exists public.v_maquinas_resumo;
     drop table public.aderencia_programacao;
     create table public.aderencia_programacao (
       id             bigint generated always as identity primary key,
@@ -179,11 +180,12 @@ begin
       base           text,
       dt_entrega     date
     );
-    create index idx_aderencia_prog_data on public.aderencia_programacao (dt_ini_plan desc);
-    create index idx_aderencia_prog_maquina on public.aderencia_programacao (maquina, dt_ini_plan desc);
-    create index idx_aderencia_prog_source on public.aderencia_programacao (_source_file);
   end if;
 end $$;
+
+create index if not exists idx_aderencia_prog_data on public.aderencia_programacao (dt_ini_plan desc);
+create index if not exists idx_aderencia_prog_maquina on public.aderencia_programacao (maquina, dt_ini_plan desc);
+create index if not exists idx_aderencia_prog_source on public.aderencia_programacao (_source_file);
 
 -- ----------------------------------------------------------------------------
 -- 6. Refugo/aparas — série histórica mensal (de "Refugo Aparas")
