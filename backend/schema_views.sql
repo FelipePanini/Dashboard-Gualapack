@@ -164,11 +164,27 @@ limit 50;
 -- ----------------------------------------------------------------------------
 -- 7. Linha do tempo — apontamentos do dia mais recente com dado (não é
 --    "agora", é o último dia completo que a carga trouxe)
+--
+--    "having count(*) >= 20": os últimos 1-2 dias da planilha de origem
+--    costumam vir parciais (a base ainda está sendo preenchida quando o
+--    Excel é atualizado) — um dia normal tem 45-59 apontamentos, mas o
+--    dia mais recente às vezes chega com só 2. Sem esse filtro, MAX(data)
+--    pega esse dia quase vazio e a linha do tempo parece quebrada. Mesmo
+--    problema, mesma solução das views mensais de apara/refugo acima.
 -- ----------------------------------------------------------------------------
 create or replace view public.v_apontamentos_ultimo_dia
 with (security_invoker = true) as
 with ultimo_dia as (
-  select max(dt_producao) as d from public.apontamentos where dt_producao is not null
+  select dt_producao as d
+  from public.apontamentos
+  where dt_producao is not null
+    and hora_inicio is not null
+    and hora_fim is not null
+    and cod_recurso is not null
+  group by dt_producao
+  having count(*) >= 20
+  order by dt_producao desc
+  limit 1
 )
 select a.cod_recurso, a.cod_apont, a.cod_desc, a.hora_inicio, a.hora_fim, a.num_ordem
 from public.apontamentos a, ultimo_dia
