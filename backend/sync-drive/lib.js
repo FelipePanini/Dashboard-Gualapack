@@ -28,6 +28,19 @@ export const TABLE_DEFS = [
     allowed: ["codigo", "dp_fp", "refugo", "refile", "data", "numero", "qtd_bruta_kg", "qtd_liquida_kg", "nome", "classificacao", "tipo"],
   },
   {
+    // "Sequenciamento Acumulado 2026 Rev2.xlsx" [Percentual Scrap BI] — só
+    // este arquivo (fileKeywords "acumulado", exatamente o que fardos_aparas
+    // acima evita) tem essa aba: produção x refugo total já fechados por
+    // mês, exportados direto do Power BI da Gualapack. Não é o mesmo número
+    // que fardos_aparas/kg_perda (confirmado com o usuário em 2026-09-16 —
+    // escala ~4-5x maior, é produção geral, não só o que virou apara) — por
+    // isso é tabela própria, referência direta pro % mensal do BI, sem
+    // recalcular a partir de outras fontes.
+    table: "scrap_bi_mensal", fileKeywords: ["acumulado"], sheetKeywords: ["percentual_scrap_bi"],
+    numeric: ["producao", "refugo_total"], date: { data: "date" },
+    allowed: ["data", "producao", "refugo_total"],
+  },
+  {
     table: "aderencia_maquinas_diaria", fileKeywords: ["aderencia_maquinas", "aderenciamaquinas"], sheetKeywords: ["apontamentos_producao"],
     numeric: ["qtd_produzida", "qtd_horas"], date: { dt_producao: "date" },
     allowed: ["num_ordem", "dt_producao", "qtd_produzida", "cod_recurso", "qtd_horas", "classificacao", "descricao", "cod_estrutura", "turno", "cod_desc", "cod_apont"],
@@ -116,7 +129,7 @@ export const TABLE_DEFS = [
   },
 ];
 
-export const CONFLICT_COLUMNS = { refugo_aparas_historico: "data", tendencia_mensal: "mes,ano" };
+export const CONFLICT_COLUMNS = { refugo_aparas_historico: "data", tendencia_mensal: "mes,ano", scrap_bi_mensal: "data" };
 
 // Retenção: as tabelas de apontamento bruto (uma linha por evento de
 // máquina) crescem rápido e estouraram os 500 MB do plano free do
@@ -307,6 +320,7 @@ export const DB_SHEET_NAME = {
   tendencia_mensal: "DB_TENDENCIA",
   maquinas: "DB_MAQUINAS",
   aderencia_programacao: "DB_ADERENCIA_DIARIA",
+  scrap_bi_mensal: "DB_SCRAP_BI_MENSAL",
 };
 
 export async function downloadFile(drive, file) {

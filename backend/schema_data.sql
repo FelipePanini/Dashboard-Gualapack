@@ -269,6 +269,26 @@ create index if not exists idx_producao_kg_data on public.producao_kg (dt_produc
 create index if not exists idx_producao_kg_source on public.producao_kg (_source_file);
 
 -- ----------------------------------------------------------------------------
+-- 7b. Scrap % mensal, direto do Power BI da Gualapack (de "Sequenciamento
+--     Acumulado 2026 Rev2.xlsx", aba "Percentual Scrap BI") — produção e
+--     refugo total já fechados por mês. NÃO é o mesmo número que
+--     fardos_aparas/kg_perda de apontamentos (confirmado com o usuário em
+--     2026-09-16: escala ~4-5x maior, é produção geral das máquinas, não só
+--     o que virou apara) — existe como referência direta pro % que o BI já
+--     mostra, sem tentar recalcular a partir de outra fonte.
+-- ----------------------------------------------------------------------------
+create table if not exists public.scrap_bi_mensal (
+  id             bigint generated always as identity primary key,
+  _source_file   text,
+  data           date not null,
+  producao       numeric,
+  refugo_total   numeric,
+  unique (data)
+);
+
+create index if not exists idx_scrap_bi_mensal_data on public.scrap_bi_mensal (data desc);
+
+-- ----------------------------------------------------------------------------
 -- 8. RLS — leitura para qualquer usuário autenticado, escrita só via
 --    service_role (a função "ingest", nunca o navegador direto).
 -- ----------------------------------------------------------------------------
@@ -281,6 +301,7 @@ alter table public.refugo_aparas_historico    enable row level security;
 alter table public.tendencia_mensal           enable row level security;
 alter table public.refugo_producao            enable row level security;
 alter table public.producao_kg                enable row level security;
+alter table public.scrap_bi_mensal             enable row level security;
 
 do $$
 declare t text;
@@ -288,7 +309,7 @@ begin
   foreach t in array array[
     'maquinas','apontamentos','fardos_aparas','aderencia_maquinas_diaria',
     'aderencia_programacao','refugo_aparas_historico','tendencia_mensal',
-    'refugo_producao','producao_kg'
+    'refugo_producao','producao_kg','scrap_bi_mensal'
   ]
   loop
     -- drop antes de criar pra esse script poder ser rodado de novo sem

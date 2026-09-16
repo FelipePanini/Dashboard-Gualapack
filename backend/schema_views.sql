@@ -230,6 +230,23 @@ group by 1
 order by 1;
 
 -- ----------------------------------------------------------------------------
+-- 10. Scrap % mensal direto do Power BI (de scrap_bi_mensal — ver nota em
+--     schema_data.sql sobre não ser o mesmo número de fardos_aparas).
+--     "where producao > 0" pelo mesmo motivo das outras séries mensais:
+--     meses futuros/ainda não fechados vêm zerados na planilha.
+-- ----------------------------------------------------------------------------
+create or replace view public.v_scrap_bi_mensal
+with (security_invoker = true) as
+select
+  data as mes,
+  producao,
+  refugo_total,
+  case when producao > 0 then refugo_total / producao * 100 else null end as scrap_pct
+from public.scrap_bi_mensal
+where producao > 0
+order by data;
+
+-- ----------------------------------------------------------------------------
 -- Permissões — mesma regra das tabelas: leitura só para autenticado.
 -- Views com security_invoker=true precisam do GRANT explícito, mesmo já
 -- tendo RLS nas tabelas de origem, porque o Postgres checa privilégio na
@@ -245,5 +262,6 @@ grant select on
   public.v_ops_refugo,
   public.v_apontamentos_ultimo_dia,
   public.v_refugo_producao_maquina,
-  public.v_producao_kg_mensal
+  public.v_producao_kg_mensal,
+  public.v_scrap_bi_mensal
 to authenticated;
