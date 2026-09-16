@@ -18,13 +18,28 @@
 --    Só entram máquinas de produção de verdade (grupo físico) — o Machine
 --    Card mistura máquinas reais com categorias administrativas (GERAL,
 --    IMPRESSORAS, MANUTENÇÃO...) que não são recursos físicos.
+--
+--    "drop view" antes do "create": adicionamos horas_planejado/
+--    horas_disponiveis em 2026-09-16 e o Postgres não deixa "create or
+--    replace" mudar/inserir coluna no meio da lista de saída de uma view
+--    existente (só no fim) — precisa recriar.
 -- ----------------------------------------------------------------------------
-create or replace view public.v_maquinas_resumo
+drop view if exists public.v_maquinas_resumo;
+create view public.v_maquinas_resumo
 with (security_invoker = true) as
 select
   m.id,
   m.grupo,
   coalesce(ap.horas_totais, 0)      as horas_totais,
+  coalesce(ap.horas_planejado, 0)   as horas_planejado,
+  -- TMR = horas_produzindo / horas_disponiveis (não / horas_totais).
+  -- "PLANEJADO" (fim de turno, refeição, treinamento, manutenção
+  -- preventiva — ver classificacao_disp) não é tempo que a máquina
+  -- "deveria" estar rodando; incluir isso no denominador subestimava o TMR
+  -- em ~10-15 p.p. contra o Power BI da Gualapack (validado em 2026-09-16:
+  -- R18 saía 32%, o real é 44%; R12 saía 24%, o real é 62% — bateu exato
+  -- depois da correção).
+  coalesce(ap.horas_totais, 0) - coalesce(ap.horas_planejado, 0) as horas_disponiveis,
   coalesce(ap.horas_produzindo, 0)  as horas_produzindo,
   coalesce(ap.kg_perda_total, 0)    as kg_perda_total,
   coalesce(ap.peso_bruto_total, 0)  as peso_bruto_total,
@@ -39,8 +54,9 @@ from public.maquinas m
 left join (
   select
     cod_recurso,
-    sum(qtd_horas)                                    as horas_totais,
-    sum(qtd_horas) filter (where cod_apont = '20')    as horas_produzindo,
+    sum(qtd_horas)                                                 as horas_totais,
+    sum(qtd_horas) filter (where cod_apont = '20')                 as horas_produzindo,
+    sum(qtd_horas) filter (where classificacao_disp = 'PLANEJADO') as horas_planejado,
     sum(kg_perda)                                     as kg_perda_total,
     sum(peso_bruto_bobina)                            as peso_bruto_total
   from public.apontamentos

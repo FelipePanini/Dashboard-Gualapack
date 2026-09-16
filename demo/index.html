@@ -1412,6 +1412,13 @@ async function loadRealData(){
       const processo = GRUPO_PROCESSO[r.grupo] || "Outro";
       const horasTot = Number(r.horas_totais) || 0;
       const horasProd = Number(r.horas_produzindo) || 0;
+      // TMR = produzindo / DISPONÍVEL (horas_totais menos "PLANEJADO": fim
+      // de turno, refeição, treinamento — não é tempo que a máquina
+      // deveria estar rodando). Usar horas_totais aqui subestimava o TMR
+      // em ~10-15 p.p. contra o Power BI da Gualapack — ver v_maquinas_resumo
+      // em schema_views.sql. "Horas totais"/"Downtime" no drawer continuam
+      // usando horasTot puro, que é informação diferente (tempo total real).
+      const horasDisp = Number(r.horas_disponiveis) || horasTot;
       const pesoBruto = Number(r.peso_bruto_total) || 0;
       const kgPerda = Number(r.kg_perda_total) || 0;
       // v_maquinas_resumo expõe qtd_planejada/qtd_produzida (renomeado de
@@ -1422,7 +1429,7 @@ async function loadRealData(){
       const realKm = Number(r.qtd_produzida) || 0;
       return {
         id: r.id, nome: r.id, processo, rota: GRUPO_ROTA[r.grupo] || "—",
-        tmr: horasTot>0 ? Math.round(horasProd/horasTot*100) : 0,
+        tmr: horasDisp>0 ? Math.round(horasProd/horasDisp*100) : 0,
         vel: null, velRef: null, // sem coluna de velocidade em nenhuma base carregada
         aparas: pesoBruto>0 ? kgPerda/pesoBruto*100 : 0,
         horasProd: Math.round(horasProd), horasTot: Math.round(horasTot),
