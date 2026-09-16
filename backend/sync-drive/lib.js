@@ -156,23 +156,31 @@ export const REPLACE_BY_SOURCE = new Set([
 // dentro do mesmo lote, e planilhas reais têm linhas repetidas (ex: máquina
 // cadastrada duas vezes no Machine Card).
 //
+// build-database-central.js usa DEDUPE_KEY[table] em DOIS lugares com
+// significados diferentes — importante não confundir os dois:
+//   1) filtro por-arquivo: descarta a linha se QUALQUER coluna da chave vier
+//      nula (faz sentido pra chave natural curta tipo "id"/"data" — uma
+//      linha sem id/data é lixo mesmo);
+//   2) dedup final entre arquivos: agrupa por chave e mantém 1 linha.
+// "apontamentos" só quer o uso (2) — a maioria das linhas (TMR, paradas)
+// não tem tipo_perda/kg_perda, e colocar essas colunas em DEDUPE_KEY faria
+// o filtro (1) descartar quase tudo silenciosamente (foi exatamente o que
+// aconteceu em 2026-09-16: apontamentos foi a 0 linhas). Por isso
+// apontamentos usa MERGE_DEDUPE_KEY (abaixo), não DEDUPE_KEY.
+export const DEDUPE_KEY = { ...CONFLICT_COLUMNS, maquinas: "id" };
+
+// Só pro dedup final entre arquivos (uso 2 acima) — NÃO passa pelo filtro
+// "descarta se alguma coluna da chave for nula" de build-database-central.js.
+//
 // "apontamentos": mesmo evento de produção pode vir tanto de "Indicadores
 // Diário" (Base Apontamento) quanto de "Base Aparas - *.xlsx" (BASE_DETALHE)
 // — chave de conteúdo pra não contar o mesmo evento 2x (ver TABLE_DEFS).
-//
-// 2026-09-16, correção: a chave curta (num_ordem+cod_recurso+dt_producao+
-// hora_inicio+hora_fim+tipo_perda+kg_perda) colapsava também linhas SEM
-// refugo (tipo_perda/kg_perda nulos — a maioria dos apontamentos, TMR e
-// paradas normais) que só por coincidência compartilhavam OP/máquina/data/
-// horário — tratava eventos completamente diferentes como duplicata e
-// derrubou apontamentos de 244 mil pra 16 mil linhas. A chave certa é
-// quase todas as colunas de "allowed" (tudo, exceto classificacao_disp/
-// classificacao_horas — só essas duas legitimamente diferem entre a cópia
-// da Base Apontamento e a da BASE_DETALHE): só colapsa quando a linha é
-// IDÊNTICA em tudo o mais, nunca por coincidência de horário.
-export const DEDUPE_KEY = {
-  ...CONFLICT_COLUMNS,
-  maquinas: "id",
+// Precisa ser quase todas as colunas de "allowed" (tudo, exceto
+// classificacao_disp/classificacao_horas, que legitimamente só existem na
+// Base Apontamento): uma chave curta (ex: só num_ordem+tipo_perda+kg_perda)
+// colapsava também linhas SEM refugo que só por coincidência compartilhavam
+// OP/máquina/data/horário, tratando eventos diferentes como duplicata.
+export const MERGE_DEDUPE_KEY = {
   apontamentos: [
     "num_ordem", "cod_recurso", "cod_apont", "cod_desc", "dt_producao", "hora_inicio", "hora_fim",
     "qtd_horas", "qtd_produzida", "turno", "desperdicio_acerto", "desperdicio_virando",

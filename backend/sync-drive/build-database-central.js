@@ -31,7 +31,7 @@
 import * as XLSX from "xlsx";
 import { Readable } from "node:stream";
 import {
-  TABLE_DEFS, RETENTION_MONTHS, RETENTION_DATE_COL, DEDUPE_KEY,
+  TABLE_DEFS, RETENTION_MONTHS, RETENTION_DATE_COL, DEDUPE_KEY, MERGE_DEDUPE_KEY,
   dedupeRows, detectTables, detectSheet, sheetToRows, coerceRow,
   driveClient, listFolderFiles, downloadFile, CENTRAL_FILE_NAME, DB_SHEET_NAME,
 } from "./lib.js";
@@ -213,8 +213,11 @@ async function collectTableRows(drive, files, importadoEm, porBase) {
 
   // dedup final pras tabelas com chave natural (maquinas, tendencia_mensal,
   // refugo_aparas_historico) — pode ter vindo de mais de um arquivo/aba.
+  // MERGE_DEDUPE_KEY (apontamentos) é separado de propósito — não passa
+  // pelo filtro "descarta se alguma coluna da chave for nula" acima, só
+  // esse merge final (ver comentário em lib.js).
   for (const [table, bucket] of porTabela) {
-    const keyCols = DEDUPE_KEY[table];
+    const keyCols = DEDUPE_KEY[table] ?? MERGE_DEDUPE_KEY[table];
     if (keyCols) bucket.rows = dedupeRows(bucket.rows, keyCols);
   }
   return porTabela;
