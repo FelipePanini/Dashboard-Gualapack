@@ -2683,61 +2683,27 @@ if(footerNote){
   });
 })();
 
-/* ============ toggle "Ao vivo" — simula atualização em tempo real ============ */
+/* ============ indicador "Atualizado" — status da última carga real ============
+   Era um simulador de tempo real: a cada 4s pegava 1-2 KPIs na tela e somava
+   um número aleatório neles, só pra parecer que tava "ao vivo" (fase de
+   dados fictícios, antes do Supabase estar ligado). Com dado real isso
+   corrompia os números de verdade — removido. O botão agora só mostra se os
+   dados vieram do Supabase (USANDO_DADOS_REAIS) ou da referência, sem
+   inventar variação nenhuma. */
 (function(){
   const btn = document.getElementById("live-toggle");
   const dot = document.getElementById("live-dot");
   const label = document.getElementById("live-label");
-  let timer = null;
-  let live = true;
 
-  function jitterKpis(){
-    // Só 1 (às vezes 2) indicador chega "atualizado" a cada tick — como
-    // dados reais, que não mudam todos juntos no mesmo instante. O pulso
-    // vira aviso de verdade: só pisca quem de fato mudou.
-    // Só os KPIs da visão aberta — os das outras views estão fora de tela.
-    const cards = [...document.querySelectorAll(".view.active .kpi")];
-    if(!cards.length) return;
-    const updateCount = Math.random() < 0.7 ? 1 : 2;
-    const chosen = new Set();
-    while(chosen.size < Math.min(updateCount, cards.length)){
-      chosen.add(Math.floor(Math.random() * cards.length));
-    }
-    cards.forEach((card, i)=>{
-      if(!chosen.has(i)) return;
-      const el = card.querySelector(".kpi-value");
-      if(!el) return;
-      const m = el.textContent.match(/^(-?\d+(\.\d+)?)(.*)$/);
-      if(!m) return;
-      const num = parseFloat(m[1]);
-      const decimals = m[2] ? m[2].length-1 : 0;
-      const drift = (Math.random()-0.5) * (decimals ? 0.3 : 1);
-      const next = Math.max(0, num + drift);
-      el.textContent = next.toFixed(decimals) + m[3];
-      card.classList.add("pulse");
-      setTimeout(()=> card.classList.remove("pulse"), 550);
-    });
+  function refreshStatus(){
+    const real = window.USANDO_DADOS_REAIS === true;
+    btn.setAttribute("aria-pressed", String(real));
+    dot.style.background = real ? "var(--good)" : "var(--text-muted)";
+    dot.style.animationPlayState = real ? "running" : "paused";
+    label.textContent = real ? "Atualizado" : "Referência";
   }
-
-  function start(){
-    live = true;
-    btn.setAttribute("aria-pressed","true");
-    dot.style.background = "var(--good)";
-    dot.style.animationPlayState = "running";
-    label.textContent = "Ao vivo";
-    timer = setInterval(jitterKpis, 4000);
-  }
-  function stop(){
-    live = false;
-    btn.setAttribute("aria-pressed","false");
-    dot.style.background = "var(--text-muted)";
-    dot.style.animationPlayState = "paused";
-    label.textContent = "Pausado";
-    clearInterval(timer);
-  }
-
-  btn.addEventListener("click", ()=> live ? stop() : start());
-  start();
+  refreshStatus(); // sem listener de clique — não é mais um toggle, só status
+  window.refreshLiveStatus = refreshStatus; // chamado pelo boot() depois de loadRealData()
 })();
 
 /* ============ seletor de período ============ */
@@ -2812,6 +2778,7 @@ async function boot(){
   try{
     await loadRealData();
     renderDashboard();
+    if(window.refreshLiveStatus) window.refreshLiveStatus();
   }catch(err){
     // Erro aqui não pode deixar a página presa atrás do "auth-pending" pra
     // sempre — melhor mostrar o painel (mesmo que incompleto) do que uma
