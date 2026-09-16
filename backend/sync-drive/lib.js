@@ -175,18 +175,20 @@ export const DEDUPE_KEY = { ...CONFLICT_COLUMNS, maquinas: "id" };
 // "apontamentos": mesmo evento de produção pode vir tanto de "Indicadores
 // Diário" (Base Apontamento) quanto de "Base Aparas - *.xlsx" (BASE_DETALHE)
 // — chave de conteúdo pra não contar o mesmo evento 2x (ver TABLE_DEFS).
-// Precisa ser quase todas as colunas de "allowed" (tudo, exceto
-// classificacao_disp/classificacao_horas, que legitimamente só existem na
-// Base Apontamento): uma chave curta (ex: só num_ordem+tipo_perda+kg_perda)
-// colapsava também linhas SEM refugo que só por coincidência compartilhavam
-// OP/máquina/data/horário, tratando eventos diferentes como duplicata.
+//
+// 2026-09-16: tentei uma chave larga (quase todas as colunas de "allowed")
+// pra evitar colapsar eventos diferentes por coincidência de horário — mas
+// isso quebrou o dedup de verdade: BASE_DETALHE não tem qtd_horas/
+// peso_bruto_bobina/turno/etc. preenchidos (só os campos de refugo), então
+// a cópia dela nunca batia com a cópia completa da Base Apontamento pra
+// nenhuma dessas colunas, e as duas linhas continuavam como "diferentes".
+// A chave certa é só as colunas que EXISTEM nas duas fontes — essas 7 já
+// bastam pra identificar um evento de refugo sem ambiguidade prática (não
+// precisa reduzir mais pra evitar colisão com linha sem refugo: BASE_DETALHE
+// só contribui linha de refugo mesmo, nunca uma linha comum de TMR/parada
+// pra colidir por coincidência).
 export const MERGE_DEDUPE_KEY = {
-  apontamentos: [
-    "num_ordem", "cod_recurso", "cod_apont", "cod_desc", "dt_producao", "hora_inicio", "hora_fim",
-    "qtd_horas", "qtd_produzida", "turno", "desperdicio_acerto", "desperdicio_virando",
-    "peso_bruto_bobina", "tipo_perda", "kg_perda", "nome_operador", "tipo_produto",
-    "cod_estrutura", "des_num_ordem", "cod_est", "processo", "classificacao", "nome_cliente",
-  ].join(","),
+  apontamentos: "num_ordem,cod_recurso,dt_producao,hora_inicio,hora_fim,tipo_perda,kg_perda",
 };
 
 export function dedupeRows(rows, keyCols) {
