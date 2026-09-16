@@ -1391,17 +1391,20 @@ async function loadRealData(){
 
   const client = window.gualapackAuth;
   try{
-    const [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, refugoRes, opsRes, ganttRes] = await Promise.all([
+    const [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes] = await Promise.all([
       client.from("v_maquinas_resumo").select("*"),
       client.from("v_perda_por_motivo").select("*"),
       client.from("v_perda_por_classificacao").select("*"),
       client.from("v_downtime_por_status").select("*"),
       client.from("v_fardos_mensal").select("*"),
-      client.from("v_refugo_mensal").select("*"),
+      // v_scrap_bi_mensal (não v_refugo_mensal) — é o número que fecha igual
+      // ao Power BI da Gualapack (validado com o usuário em 2026-09-16);
+      // v_refugo_mensal (JGR) não batia. Ver schema_views.sql.
+      client.from("v_scrap_bi_mensal").select("*"),
       client.from("v_ops_refugo").select("*"),
       client.from("v_apontamentos_ultimo_dia").select("*"),
     ]);
-    const erro = [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, refugoRes, opsRes, ganttRes].find(r=>r.error);
+    const erro = [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes].find(r=>r.error);
     if(erro) throw erro.error;
     if(!maqRes.data || maqRes.data.length === 0) throw new Error("v_maquinas_resumo veio vazia");
 
@@ -1411,8 +1414,12 @@ async function loadRealData(){
       const horasProd = Number(r.horas_produzindo) || 0;
       const pesoBruto = Number(r.peso_bruto_total) || 0;
       const kgPerda = Number(r.kg_perda_total) || 0;
-      const planKm = Number(r.km_planejado) || 0;
-      const realKm = Number(r.km_realizado) || 0;
+      // v_maquinas_resumo expõe qtd_planejada/qtd_produzida (renomeado de
+      // km_planejado/km_realizado quando a fonte trocou pra ADERÊNCIA
+      // DIÁRIA em 2026-09-11) — planKm/realKm ficavam sempre 0 com o nome
+      // antigo, zerando a Aderência de toda máquina no card.
+      const planKm = Number(r.qtd_planejada) || 0;
+      const realKm = Number(r.qtd_produzida) || 0;
       return {
         id: r.id, nome: r.id, processo, rota: GRUPO_ROTA[r.grupo] || "—",
         tmr: horasTot>0 ? Math.round(horasProd/horasTot*100) : 0,
@@ -1438,12 +1445,13 @@ async function loadRealData(){
       return { nome: prettyCodigo(r.cod_desc).replace(/^\d+\s*-\s*/, ""), horas: Number(r.horas)||0, cor: c.cor, corDark: c.corDark };
     });
 
-    // Série mensal: junta fardos (apontado) e refugo/JGR (confirmado) pelo mês.
+    // Série mensal: junta fardos (apontado) e o fechamento oficial do Power
+    // BI (confirmado) pelo mês.
     const porMes = new Map();
     (fardosRes.data||[]).forEach(r=>{
       porMes.set(r.mes, { ...(porMes.get(r.mes)||{}), apontado: Number(r.apara_pct)||0 });
     });
-    (refugoRes.data||[]).forEach(r=>{
+    (scrapBiRes.data||[]).forEach(r=>{
       porMes.set(r.mes, { ...(porMes.get(r.mes)||{}), confirmado: Number(r.scrap_pct)||0 });
     });
     const mesesOrdenados = Array.from(porMes.keys()).sort().slice(-12);
