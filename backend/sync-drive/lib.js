@@ -159,10 +159,26 @@ export const REPLACE_BY_SOURCE = new Set([
 // "apontamentos": mesmo evento de produção pode vir tanto de "Indicadores
 // Diário" (Base Apontamento) quanto de "Base Aparas - *.xlsx" (BASE_DETALHE)
 // — chave de conteúdo pra não contar o mesmo evento 2x (ver TABLE_DEFS).
+//
+// 2026-09-16, correção: a chave curta (num_ordem+cod_recurso+dt_producao+
+// hora_inicio+hora_fim+tipo_perda+kg_perda) colapsava também linhas SEM
+// refugo (tipo_perda/kg_perda nulos — a maioria dos apontamentos, TMR e
+// paradas normais) que só por coincidência compartilhavam OP/máquina/data/
+// horário — tratava eventos completamente diferentes como duplicata e
+// derrubou apontamentos de 244 mil pra 16 mil linhas. A chave certa é
+// quase todas as colunas de "allowed" (tudo, exceto classificacao_disp/
+// classificacao_horas — só essas duas legitimamente diferem entre a cópia
+// da Base Apontamento e a da BASE_DETALHE): só colapsa quando a linha é
+// IDÊNTICA em tudo o mais, nunca por coincidência de horário.
 export const DEDUPE_KEY = {
   ...CONFLICT_COLUMNS,
   maquinas: "id",
-  apontamentos: "num_ordem,cod_recurso,dt_producao,hora_inicio,hora_fim,tipo_perda,kg_perda",
+  apontamentos: [
+    "num_ordem", "cod_recurso", "cod_apont", "cod_desc", "dt_producao", "hora_inicio", "hora_fim",
+    "qtd_horas", "qtd_produzida", "turno", "desperdicio_acerto", "desperdicio_virando",
+    "peso_bruto_bobina", "tipo_perda", "kg_perda", "nome_operador", "tipo_produto",
+    "cod_estrutura", "des_num_ordem", "cod_est", "processo", "classificacao", "nome_cliente",
+  ].join(","),
 };
 
 export function dedupeRows(rows, keyCols) {
