@@ -92,6 +92,15 @@ export const TABLE_DEFS = [
     // linhas. As duas abas divergem ~20% nas horas totais das 5 máquinas
     // comuns; a Base Apontamento é a oficial e a de Embalagem não é mais
     // lida. Ver docs/mapeamento/VALIDACAO_DASHBOARD.md.
+    //
+    // 2026-09-16: validação contra o Power BI da Gualapack achou
+    // apontamentos com kg_perda ~2x inflado — a mesma OP/motivo/kg/horário
+    // aparecia tanto em Base Apontamento quanto em BASE_DETALHE (dentro de
+    // "Base Aparas - *.xlsx"), e as duas entravam juntas. Tentei tirar
+    // "base_aparas" completamente, mas aí o kg_perda ficou ABAIXO do BI —
+    // BASE_DETALHE não é puro duplicado, tem refugo que falta na Base
+    // Apontamento. Corrigido com DEDUPE_KEY (abaixo) em vez de excluir
+    // fonte: mesma chave de evento em mais de um arquivo vira 1 linha só.
     table: "apontamentos", fileKeywords: ["indicadores", "base_aparas"], sheetKeywords: ["base_apontamento", "base_detalhe"],
     numeric: ["qtd_horas", "qtd_produzida", "desperdicio_acerto", "desperdicio_virando", "peso_bruto_bobina", "kg_perda"],
     date: { dt_producao: "date", hora_inicio: "timestamp", hora_fim: "timestamp" },
@@ -133,7 +142,15 @@ export const REPLACE_BY_SOURCE = new Set([
 // o Postgres rejeita um upsert que tenta atualizar a MESMA chave duas vezes
 // dentro do mesmo lote, e planilhas reais têm linhas repetidas (ex: máquina
 // cadastrada duas vezes no Machine Card).
-export const DEDUPE_KEY = { ...CONFLICT_COLUMNS, maquinas: "id" };
+//
+// "apontamentos": mesmo evento de produção pode vir tanto de "Indicadores
+// Diário" (Base Apontamento) quanto de "Base Aparas - *.xlsx" (BASE_DETALHE)
+// — chave de conteúdo pra não contar o mesmo evento 2x (ver TABLE_DEFS).
+export const DEDUPE_KEY = {
+  ...CONFLICT_COLUMNS,
+  maquinas: "id",
+  apontamentos: "num_ordem,cod_recurso,dt_producao,hora_inicio,hora_fim,tipo_perda,kg_perda",
+};
 
 export function dedupeRows(rows, keyCols) {
   if (!keyCols) return rows;
@@ -141,7 +158,16 @@ export function dedupeRows(rows, keyCols) {
   const map = new Map();
   for (const row of rows) {
     const key = cols.map((c) => String(row[c] ?? "")).join("|");
-    map.set(key, row); // a última ocorrência da chave vence
+    const existing = map.get(key);
+    // Entre duas linhas com a mesma chave, fica a mais completa (mais
+    // colunas preenchidas) — ex: "classificacao_disp" só existe na Base
+    // Apontamento, não na BASE_DETALHE, e não dá pra confiar na ordem de
+    // leitura dos arquivos do Drive pra garantir qual "vence" por último.
+    if (existing) {
+      const contarPreenchidas = (r) => Object.values(r).filter((v) => v !== null && v !== undefined && v !== "").length;
+      if (contarPreenchidas(existing) >= contarPreenchidas(row)) continue;
+    }
+    map.set(key, row); // a linha mais completa vence
   }
   return Array.from(map.values());
 }
