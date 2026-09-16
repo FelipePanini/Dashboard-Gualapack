@@ -87,6 +87,22 @@ export const TABLE_DEFS = [
     allowed: ["num_ordem", "cod_recurso", "dt_producao", "turno", "peso_bruto", "refugo", "descricao", "estrutura", "processo", "tipo_produto", "considerar", "planta", "maquina_real", "chave"],
   },
   {
+    // "Machine Card Oficial - *.xlsx" [PRODUCAO_METROS] — a ÚNICA base com
+    // produção em m² e largura real. Era inventário (bases-catalog.js) e
+    // virou tabela em 2026-09-16: é exatamente o que faltava pros KPIs de
+    // Produtividade (m²/h) e Velocidade (m/min), que estavam vazios no
+    // painel. Foi também o motivo original da tentativa de conexão direta
+    // com o SQL Server (abandonada) — o mesmo dado já chegava pela planilha
+    // do Machine Card, que é atualizada do mesmo jeito que as outras.
+    table: "producao_metros", fileKeywords: ["machine_card"], sheetKeywords: ["producao_metros"],
+    numeric: ["qtd_horas", "qtd_produzida_m", "producao_m2", "largura_real", "turno"],
+    date: { dt_producao: "date" },
+    allowed: [
+      "num_ordem", "cod_recurso", "dt_producao", "tipo_produto", "descricao", "operador",
+      "turno", "qtd_horas", "qtd_produzida_m", "producao_m2", "largura_real",
+    ],
+  },
+  {
     table: "tendencia_mensal", fileKeywords: ["tendencia", "grafico"], sheetKeywords: ["dados_prod"],
     numeric: ["ano", "volume_prod_corte_km", "lote_medio_km", "volume_prod_kg", "aparas_kg", "aparas_pct"], date: {},
     allowed: ["mes", "ano", "volume_prod_corte_km", "lote_medio_km", "volume_prod_kg", "aparas_kg", "aparas_pct"],
@@ -142,13 +158,14 @@ export const RETENTION_DATE_COL = {
   aderencia_programacao: "dt_ini_plan",
   refugo_producao: "dt_producao",
   producao_kg: "dt_producao",
+  producao_metros: "dt_producao",
 };
 
 // Essas tabelas não têm chave natural nas linhas (são log de eventos, não
 // cadastro) — a carga troca por arquivo em vez de tentar upsert. Ver sync.js.
 export const REPLACE_BY_SOURCE = new Set([
   "apontamentos", "aderencia_maquinas_diaria", "aderencia_programacao", "fardos_aparas",
-  "refugo_producao", "producao_kg",
+  "refugo_producao", "producao_kg", "producao_metros",
 ]);
 
 // Mesma chave, mas usada pra DEDUPLICAR a lista de linhas antes de gravar —
@@ -241,6 +258,11 @@ export const HEADER_ALIASES = {
                                       // duas linhas numa célula só); confirmado via log em
                                       // 2026-09-04, ver commit que adicionou esta linha.
   dtentrega: "dt_entrega",       // "DtEntrega" na aba ADERÊNCIA DIÁRIA
+  // Machine Card [PRODUCAO_METROS]: "Qtd Produzida (Metros)" e "Produção m²"
+  // (o "²" cai no normalize e vira só "producao_m", fácil de confundir com
+  // metros lineares — o alias deixa explícito que é m²).
+  qtd_produzida_metros: "qtd_produzida_m",
+  producao_m: "producao_m2",
 };
 
 // Um arquivo pode alimentar mais de uma tabela (ex: "Indicadores Diário"
@@ -347,6 +369,7 @@ export const DB_SHEET_NAME = {
   maquinas: "DB_MAQUINAS",
   aderencia_programacao: "DB_ADERENCIA_DIARIA",
   scrap_bi_mensal: "DB_SCRAP_BI_MENSAL",
+  producao_metros: "DB_PRODUCAO_METROS",
 };
 
 export async function downloadFile(drive, file) {

@@ -289,6 +289,35 @@ create table if not exists public.scrap_bi_mensal (
 create index if not exists idx_scrap_bi_mensal_data on public.scrap_bi_mensal (data desc);
 
 -- ----------------------------------------------------------------------------
+-- 7c. Produção em metros/m² por OP/máquina/dia (de "Machine Card Oficial -
+--     *.xlsx", aba PRODUCAO_METROS) — a única base com m² e LARGURA REAL.
+--     É o que alimenta os KPIs de Produtividade (m²/h) e Velocidade (m/min),
+--     que ficaram vazios no painel até 2026-09-16. Era inventário
+--     (bases-catalog.js) e foi promovida a tabela; a tentativa antiga de
+--     buscar isso direto no SQL Server foi abandonada justamente porque o
+--     mesmo dado já chega pela planilha do Machine Card.
+-- ----------------------------------------------------------------------------
+create table if not exists public.producao_metros (
+  id               bigint generated always as identity primary key,
+  _source_file     text,
+  num_ordem        text,
+  cod_recurso      text,
+  dt_producao      date,
+  tipo_produto     text,
+  descricao        text,
+  operador         text,
+  turno            numeric,
+  qtd_horas        numeric,
+  qtd_produzida_m  numeric,   -- metros lineares
+  producao_m2      numeric,   -- metros lineares x largura real
+  largura_real     numeric
+);
+
+create index if not exists idx_producao_metros_data on public.producao_metros (dt_producao desc);
+create index if not exists idx_producao_metros_recurso on public.producao_metros (cod_recurso, dt_producao desc);
+create index if not exists idx_producao_metros_source on public.producao_metros (_source_file);
+
+-- ----------------------------------------------------------------------------
 -- 8. RLS — leitura para qualquer usuário autenticado, escrita só via
 --    service_role (a função "ingest", nunca o navegador direto).
 -- ----------------------------------------------------------------------------
@@ -302,6 +331,7 @@ alter table public.tendencia_mensal           enable row level security;
 alter table public.refugo_producao            enable row level security;
 alter table public.producao_kg                enable row level security;
 alter table public.scrap_bi_mensal             enable row level security;
+alter table public.producao_metros             enable row level security;
 
 do $$
 declare t text;
@@ -309,7 +339,7 @@ begin
   foreach t in array array[
     'maquinas','apontamentos','fardos_aparas','aderencia_maquinas_diaria',
     'aderencia_programacao','refugo_aparas_historico','tendencia_mensal',
-    'refugo_producao','producao_kg','scrap_bi_mensal'
+    'refugo_producao','producao_kg','scrap_bi_mensal','producao_metros'
   ]
   loop
     -- drop antes de criar pra esse script poder ser rodado de novo sem

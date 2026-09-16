@@ -263,6 +263,40 @@ where producao > 0
 order by data;
 
 -- ----------------------------------------------------------------------------
+-- 11. Produtividade (m²/h) e velocidade (m/min), por máquina e por mês
+--     (de producao_metros — Machine Card [PRODUCAO_METROS]).
+--     qtd_horas aqui é só tempo de produção da OP (não inclui parada), então
+--     a velocidade sai direto de metros ÷ minutos, sem descontar nada.
+-- ----------------------------------------------------------------------------
+create or replace view public.v_produtividade_maquina
+with (security_invoker = true) as
+select
+  cod_recurso,
+  sum(producao_m2)                                              as producao_m2,
+  sum(qtd_produzida_m)                                          as producao_m,
+  sum(qtd_horas)                                                as horas,
+  case when sum(qtd_horas) > 0 then sum(producao_m2) / sum(qtd_horas) end       as produtividade_m2h,
+  case when sum(qtd_horas) > 0 then sum(qtd_produzida_m) / (sum(qtd_horas)*60) end as velocidade_m_min
+from public.producao_metros
+where cod_recurso is not null and dt_producao is not null
+group by cod_recurso;
+
+create or replace view public.v_produtividade_mensal
+with (security_invoker = true) as
+select
+  date_trunc('month', dt_producao)::date as mes,
+  sum(producao_m2)     as producao_m2,
+  sum(qtd_produzida_m) as producao_m,
+  sum(qtd_horas)       as horas,
+  case when sum(qtd_horas) > 0 then sum(producao_m2) / sum(qtd_horas) end       as produtividade_m2h,
+  case when sum(qtd_horas) > 0 then sum(qtd_produzida_m) / (sum(qtd_horas)*60) end as velocidade_m_min
+from public.producao_metros
+where dt_producao is not null
+group by 1
+having sum(qtd_horas) > 0
+order by 1;
+
+-- ----------------------------------------------------------------------------
 -- Permissões — mesma regra das tabelas: leitura só para autenticado.
 -- Views com security_invoker=true precisam do GRANT explícito, mesmo já
 -- tendo RLS nas tabelas de origem, porque o Postgres checa privilégio na
@@ -279,5 +313,7 @@ grant select on
   public.v_apontamentos_ultimo_dia,
   public.v_refugo_producao_maquina,
   public.v_producao_kg_mensal,
-  public.v_scrap_bi_mensal
+  public.v_scrap_bi_mensal,
+  public.v_produtividade_maquina,
+  public.v_produtividade_mensal
 to authenticated;

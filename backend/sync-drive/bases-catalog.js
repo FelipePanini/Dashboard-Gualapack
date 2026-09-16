@@ -260,23 +260,11 @@ export const BASES = [
   // --------------------------------------------------------------------------
   // Machine Card Oficial - 2025/Genérico.xlsx — 26 e 32 abas. Usávamos 1.
   // --------------------------------------------------------------------------
-  {
-    sheet: "DB_PRODUCAO_METROS", origem: "PRODUCAO_METROS",
-    fileKeywords: ["machine_card"], sheetMatch: ["producao_metros"],
-    headerRow: 0,
-    colunas: {
-      num_ordem: "num_ordem", cod_recurso: "cod_recurso", dt_producao: "dt_producao",
-      tipo_produto: "tipo_produto", descricao: "descricao", operador: "operador",
-      turno: "turno", qtd_horas: "qtd_horas",
-      qtd_produzida_metros: "qtd_produzida_m", producao_m: "producao_m2",
-      largura_real: "largura_real",
-    },
-    numeric: ["qtd_horas", "qtd_produzida_m", "producao_m2", "largura_real"],
-    date: { dt_producao: "date" },
-    granularidade: "1 linha por OP x recurso x dia",
-    classificacao: "PRINCIPAL",
-    observacao: "É a única base com PRODUÇÃO M² e LARGURA REAL. O KPI de produtividade (m²/h) do painel está vazio hoje por falta exatamente disso.",
-  },
+  // DB_PRODUCAO_METROS saiu do inventário em 2026-09-16 — virou tabela de
+  // produção (TABLE_DEFS em lib.js, alimenta producao_metros no Supabase e
+  // os KPIs de Produtividade m²/h e Velocidade m/min). Deixar nos dois
+  // lugares geraria aba duplicada no arquivo central, igual aconteceu com
+  // DB_ADERENCIA_DIARIA.
   {
     sheet: "DB_ABSENTEISMO", origem: "ABSENTEISMO",
     fileKeywords: ["machine_card"], sheetMatch: ["absenteismo"],
