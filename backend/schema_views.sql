@@ -267,33 +267,81 @@ order by data;
 --     (de producao_metros — Machine Card [PRODUCAO_METROS]).
 --     qtd_horas aqui é só tempo de produção da OP (não inclui parada), então
 --     a velocidade sai direto de metros ÷ minutos, sem descontar nada.
+--
+--     O join com maquinas + filtro de grupo é o MESMO de v_maquinas_resumo:
+--     a Machine Card traz recursos administrativos/lógicos que não estão no
+--     cadastro de máquinas (EMBALAGEM3, 01CORTESOLDA, REB 10L...) e distorcem
+--     o ranking — REB 10L aparecia com 0 h e produção, ou seja, produtividade
+--     "infinita". O having sum(qtd_horas) > 0 protege a divisão para sempre,
+--     inclusive quando a carga diária trouxer uma máquina nova sem horas.
+--
+--     velocidade_ref_m_min = melhor MÊS da própria máquina dentro da janela
+--     de retenção (producao_metros guarda 12 meses). Não é velocidade
+--     nominal de engenharia nem número do Power BI: é capacidade já
+--     demonstrada pela máquina, e se move sozinha conforme a base rola.
 -- ----------------------------------------------------------------------------
 create or replace view public.v_produtividade_maquina
 with (security_invoker = true) as
+with base as (
+  select p.cod_recurso, p.dt_producao, p.producao_m2, p.qtd_produzida_m, p.qtd_horas
+  from public.producao_metros p
+  join public.maquinas m on m.id = p.cod_recurso
+  where p.cod_recurso is not null and p.dt_producao is not null
+    and m.grupo in ('COATING','LAMINADORAS','FUNGICIDA','FLEXOGRAFIA','CORTADEIRAS','ROTOGRAVURA','HOT MELT')
+), total as (
+  select cod_recurso, sum(qtd_horas) as horas_total from base group by 1
+), mensal as (
+  select b.cod_recurso,
+         date_trunc('month', b.dt_producao) as mes,
+         sum(b.qtd_produzida_m) as metros,
+         sum(b.qtd_horas)       as horas
+  from base b
+  group by 1, 2
+), ref as (
+  -- So entram meses com volume real de producao. Sem esse corte, um mes
+  -- residual vira "melhor mes": REB 04 tinha 4 h em 2026-04 a 239 m/min
+  -- (contra ~75 nos meses cheios) e REVISORA 01, 1 h a 187 m/min. O corte e
+  -- relativo (5% das horas da propria maquina) com piso absoluto de 20 h,
+  -- entao acompanha maquina grande e maquina pequena sem ajuste manual.
+  select mn.cod_recurso, max(mn.metros / (mn.horas * 60)) as velocidade_ref_m_min
+  from mensal mn
+  join total t on t.cod_recurso = mn.cod_recurso
+  where mn.horas >= greatest(20, 0.05 * t.horas_total)
+  group by 1
+)
 select
-  cod_recurso,
-  sum(producao_m2)                                              as producao_m2,
-  sum(qtd_produzida_m)                                          as producao_m,
-  sum(qtd_horas)                                                as horas,
-  case when sum(qtd_horas) > 0 then sum(producao_m2) / sum(qtd_horas) end       as produtividade_m2h,
-  case when sum(qtd_horas) > 0 then sum(qtd_produzida_m) / (sum(qtd_horas)*60) end as velocidade_m_min
-from public.producao_metros
-where cod_recurso is not null and dt_producao is not null
-group by cod_recurso;
+  b.cod_recurso,
+  sum(b.producao_m2)                                                    as producao_m2,
+  sum(b.qtd_produzida_m)                                                as producao_m,
+  sum(b.qtd_horas)                                                      as horas,
+  case when sum(b.qtd_horas) > 0 then sum(b.producao_m2) / sum(b.qtd_horas) end         as produtividade_m2h,
+  case when sum(b.qtd_horas) > 0 then sum(b.qtd_produzida_m) / (sum(b.qtd_horas)*60) end as velocidade_m_min,
+  -- coalesce: maquina nova, sem nenhum mes acima do corte, cai na propria
+  -- media do periodo (100% da referencia) em vez de sumir do grafico.
+  coalesce(
+    max(r.velocidade_ref_m_min),
+    case when sum(b.qtd_horas) > 0 then sum(b.qtd_produzida_m) / (sum(b.qtd_horas)*60) end
+  )                                                                     as velocidade_ref_m_min
+from base b
+left join ref r on r.cod_recurso = b.cod_recurso
+group by b.cod_recurso
+having sum(b.qtd_horas) > 0;
 
 create or replace view public.v_produtividade_mensal
 with (security_invoker = true) as
 select
-  date_trunc('month', dt_producao)::date as mes,
-  sum(producao_m2)     as producao_m2,
-  sum(qtd_produzida_m) as producao_m,
-  sum(qtd_horas)       as horas,
-  case when sum(qtd_horas) > 0 then sum(producao_m2) / sum(qtd_horas) end       as produtividade_m2h,
-  case when sum(qtd_horas) > 0 then sum(qtd_produzida_m) / (sum(qtd_horas)*60) end as velocidade_m_min
-from public.producao_metros
-where dt_producao is not null
+  date_trunc('month', p.dt_producao)::date as mes,
+  sum(p.producao_m2)     as producao_m2,
+  sum(p.qtd_produzida_m) as producao_m,
+  sum(p.qtd_horas)       as horas,
+  case when sum(p.qtd_horas) > 0 then sum(p.producao_m2) / sum(p.qtd_horas) end       as produtividade_m2h,
+  case when sum(p.qtd_horas) > 0 then sum(p.qtd_produzida_m) / (sum(p.qtd_horas)*60) end as velocidade_m_min
+from public.producao_metros p
+join public.maquinas m on m.id = p.cod_recurso
+where p.dt_producao is not null
+  and m.grupo in ('COATING','LAMINADORAS','FUNGICIDA','FLEXOGRAFIA','CORTADEIRAS','ROTOGRAVURA','HOT MELT')
 group by 1
-having sum(qtd_horas) > 0
+having sum(p.qtd_horas) > 0
 order by 1;
 
 -- ----------------------------------------------------------------------------

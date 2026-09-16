@@ -1023,7 +1023,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
           <div class="panel-head">
             <div>
               <h2 class="panel-title">Velocidade média por máquina</h2>
-              <div class="panel-sub">m/min &middot; comparado à velocidade de referência de cada recurso</div>
+              <div class="panel-sub">m/min &middot; medido contra o melhor mês da própria máquina nos últimos 12 meses</div>
             </div>
           </div>
           <div id="velocidade-chart"></div>
@@ -1391,7 +1391,7 @@ async function loadRealData(){
 
   const client = window.gualapackAuth;
   try{
-    const [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes] = await Promise.all([
+    const [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes, prodRes] = await Promise.all([
       client.from("v_maquinas_resumo").select("*"),
       client.from("v_perda_por_motivo").select("*"),
       client.from("v_perda_por_classificacao").select("*"),
@@ -1403,10 +1403,19 @@ async function loadRealData(){
       client.from("v_scrap_bi_mensal").select("*"),
       client.from("v_ops_refugo").select("*"),
       client.from("v_apontamentos_ultimo_dia").select("*"),
+      client.from("v_produtividade_maquina").select("*"),
     ]);
     const erro = [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes].find(r=>r.error);
     if(erro) throw erro.error;
     if(!maqRes.data || maqRes.data.length === 0) throw new Error("v_maquinas_resumo veio vazia");
+
+    // Produtividade/velocidade vêm de producao_metros (Machine Card), base
+    // separada de apontamentos — por isso view à parte, casada por cod_recurso.
+    // prodRes fica fora do throw de erro acima de propósito: se a view ainda
+    // não existir no Supabase, o painel carrega igual, só sem velocidade.
+    const PROD_POR_MAQ = new Map(
+      (prodRes && !prodRes.error ? prodRes.data || [] : []).map(r=>[r.cod_recurso, r])
+    );
 
     MAQUINAS = maqRes.data.map(r=>{
       const processo = GRUPO_PROCESSO[r.grupo] || "Outro";
@@ -1427,10 +1436,16 @@ async function loadRealData(){
       // antigo, zerando a Aderência de toda máquina no card.
       const planKm = Number(r.qtd_planejada) || 0;
       const realKm = Number(r.qtd_produzida) || 0;
+      const prod = PROD_POR_MAQ.get(r.id) || null;
       return {
         id: r.id, nome: r.id, processo, rota: GRUPO_ROTA[r.grupo] || "—",
         tmr: horasDisp>0 ? Math.round(horasProd/horasDisp*100) : 0,
-        vel: null, velRef: null, // sem coluna de velocidade em nenhuma base carregada
+        // Velocidade medida = metros ÷ minutos de produção da OP (bate com o
+        // Power BI: REB 05 234 m/min aqui contra 233 lá, 2026-09-16).
+        // velRef NÃO é velocidade nominal de engenharia — é o melhor mês da
+        // própria máquina na janela de 12 meses (ver v_produtividade_maquina).
+        vel:    prod && prod.velocidade_m_min     != null ? Math.round(Number(prod.velocidade_m_min))     : null,
+        velRef: prod && prod.velocidade_ref_m_min != null ? Math.round(Number(prod.velocidade_ref_m_min)) : null,
         aparas: pesoBruto>0 ? kgPerda/pesoBruto*100 : 0,
         horasProd: Math.round(horasProd), horasTot: Math.round(horasTot),
         planKm: Math.round(planKm), realKm: Math.round(realKm),
@@ -1500,7 +1515,19 @@ async function loadRealData(){
     GANTT_POR_MAQUINA = porMaquina.size > 0 ? porMaquina : null;
 
     ADERENCIA_PROCESSO = calcAderenciaProcesso(MAQUINAS);
-    PRODUTIVIDADE = null; // m²/h — sem coluna equivalente em nenhuma base carregada
+    // Produtividade = m² ÷ HORAS DE MÁQUINA (tempo produzindo da OP).
+    // ATENÇÃO: não é o mesmo número do Power BI da Gualapack, e não dá pra
+    // ser: lá o divisor é "Horas Trabalhadas" da Folha de Ponto (horas de
+    // gente, somadas por operador/turno — ~2.900 h/mês numa máquina que só
+    // ocupa ~550 h de calendário). Enquanto não houver base de Folha de
+    // Ponto no Drive, o divisor honesto é o da máquina. O rótulo no card
+    // deixa isso explícito.
+    {
+      const linhas = [...PROD_POR_MAQ.values()];
+      const m2   = linhas.reduce((a,r)=>a+(Number(r.producao_m2)||0),0);
+      const hrs  = linhas.reduce((a,r)=>a+(Number(r.horas)||0),0);
+      PRODUTIVIDADE = hrs>0 ? m2/hrs : null;
+    }
 
     // Views novas (Fase 1 de correção de planilhas) — busca à parte e sem
     // travar o resto do painel se ainda não existirem (schema_views.sql
@@ -1827,8 +1854,8 @@ const kpisGerais = [
     delta:"tempo de máquina rodando", dir:"up", spark: wobble(tmrMedio, 3) },
 ];
 if(produtividade != null){
-  kpisGerais.push({ label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:1,
-    delta:"+6,2 m²/h vs. mês anterior", dir:"up", spark: wobble(produtividade, 8) });
+  kpisGerais.push({ label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:0,
+    delta:"m² ÷ horas de máquina produzindo", dir:"up", spark: wobble(produtividade, 8) });
 }
 kpisGerais.push({ label:"Aderência ao plano", value:aderMedia, suffix:"%", decimals:1,
     delta:"km lineares realizados ÷ planejados", dir: aderMedia>=90?"up":"down", spark: wobble(aderMedia, 4) });
@@ -2051,7 +2078,7 @@ hBarChart(document.getElementById("refugo-producao-chart"), REFUGO_PRODUCAO_MAQU
     { label:"TMR médio", value:tmrMedio, suffix:"%", decimals:1, delta:"horas produzindo ÷ horas totais", dir:"up", spark: wobble(tmrMedio,3) },
   ];
   if(produtividade != null){
-    kpisProd.push({ label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:1, delta:"m² por hora trabalhada", dir:"up", spark: wobble(produtividade,8) });
+    kpisProd.push({ label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:0, delta:"m² ÷ horas de máquina produzindo", dir:"up", spark: wobble(produtividade,8) });
   }
   if(velDisponivel){
     kpisProd.push({ label:"Velocidade média", value:velMedia, suffix:" m/min", decimals:0, delta:"média ponderada das máquinas", dir:"flat", spark: wobble(velMedia,14) });
@@ -2079,7 +2106,7 @@ hBarChart(document.getElementById("refugo-producao-chart"), REFUGO_PRODUCAO_MAQU
     const W=1120, rowH=30, gap=8, H=MAQUINAS.length*(rowH+gap);
     const labelW=110, valW=104, barMax=W-labelW-valW;
     const maxVel = Math.max(...MAQUINAS.map(m=>m.velRef));
-    holder.innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Velocidade média por máquina contra a referência">
+    holder.innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Velocidade média por máquina contra o melhor mês de cada uma">
       <style>.vrow:hover .vfill{ filter:brightness(1.12); } .vrow:hover .vbg{ fill:var(--glass-bg-strong); }</style>
       ${MAQUINAS.map((m,i)=>{
         const y=i*(rowH+gap);
@@ -2101,7 +2128,7 @@ hBarChart(document.getElementById("refugo-producao-chart"), REFUGO_PRODUCAO_MAQU
     holder.querySelectorAll(".vrow").forEach(g=>{
       const m = MAQUINAS[+g.dataset.i];
       g.addEventListener("mousemove", e=> attachTip(holder,
-        `<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br>${m.vel} m/min de ${m.velRef} m/min<br>${fmt1(m.vel/m.velRef*100)}% da referência`, e));
+        `<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br>${m.vel} m/min · melhor mês ${m.velRef} m/min<br>${fmt1(m.vel/m.velRef*100)}% do melhor mês`, e));
       g.addEventListener("mouseleave", ()=> clearTip(holder));
     });
   }
@@ -2563,7 +2590,7 @@ window.renderGanttForTheme = renderGantt;
         : `Ainda não tenho produtividade (m²/h) — nenhuma base carregada traz essa métrica. `;
       const partVelocidade = semVelocidade
         ? `Também não tenho velocidade (m/min) por máquina ainda.`
-        : `Nas velocidades, a maior perda contra a referência aparece na <b>${esc(MAQUINAS.slice().sort((a,b)=>(a.vel/a.velRef)-(b.vel/b.velRef))[0].nome)}</b>, rodando bem abaixo do nominal — normalmente é sintoma de material ou acerto, não da máquina em si.`;
+        : `Nas velocidades, a maior queda contra o próprio melhor mês aparece na <b>${esc(MAQUINAS.slice().sort((a,b)=>(a.vel/a.velRef)-(b.vel/b.velRef))[0].nome)}</b>, rodando bem abaixo do que ela já entregou — normalmente é sintoma de material ou acerto, não da máquina em si.`;
       return partProdutividade + partVelocidade;
     }
     if(q.includes("classific") || q.includes("produto") || q.includes("estrutura")){
