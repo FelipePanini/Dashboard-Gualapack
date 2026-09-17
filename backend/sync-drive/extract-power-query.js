@@ -30,15 +30,12 @@ for (const key of required) {
 }
 
 // Arquivos que o usuário pediu pra mapear, na ordem pedida.
-const ALVOS = [
-  "Indicadores Diário - 2026.xlsx",
-  "Base Aparas - 2026.xlsx",
-  "08. SEQUENCIAMENTO DOS FARDOS DE APARAS JGR - Agosto 2026.xlsx",
-  "Refugo Aparas.xlsx",
-  "Refugo Produção.xlsx",
-  "Graficos Tendência.xlsx",
-  "Machine Card Oficial - Genérico.xlsx",
-];
+// Antes isto era uma lista fixa de 7 arquivos. Agora varre a pasta inteira:
+// a pergunta que a ferramenta responde ("qual planilha puxa de onde") só
+// fecha se ela olhar todas. Fora da varredura fica só o arquivo que a nossa
+// própria automação gera — não é fonte, é saída, e tem 433 MB.
+const IGNORAR = [/^DATABASE_GUALAPACK/i];
+
 
 function unzipEntry(zipPath, entryName) {
   // unzip trata [ ] ? * como wildcard na seleção de membro, mesmo passando
@@ -123,13 +120,16 @@ async function main() {
   const files = await listFolderFiles(drive);
   const tmp = mkdtempSync(path.join(tmpdir(), "pq-"));
 
-  for (const nomeAlvo of ALVOS) {
-    const file = files.find((f) => normalize(f.name) === normalize(nomeAlvo));
+  const alvos = files
+    .filter((f) => /\.xlsx$/i.test(f.name) && !IGNORAR.some((re) => re.test(f.name)))
+    .sort((a, b) => a.name.localeCompare(b.name, "pt-BR"));
+  console.log(`Arquivos na pasta: ${files.length} · a inspecionar: ${alvos.length}\n`);
+
+  const resumo = [];
+
+  for (const file of alvos) {
+    const nomeAlvo = file.name;
     console.log(`\n${"=".repeat(78)}\n## ${nomeAlvo}`);
-    if (!file) {
-      console.log("  [não encontrado na pasta do Drive]");
-      continue;
-    }
 
     const t0 = Date.now();
     const bytes = await downloadFile(drive, file);
@@ -177,8 +177,38 @@ async function main() {
       continue;
     }
 
+    const textoM = secaoM.toString("utf8");
     console.log(`\n  --- código M (${formulaEntry}) ---`);
-    console.log(secaoM.toString("utf8"));
+    console.log(textoM);
+    resumo.push({ arquivo: nomeAlvo, m: textoM });
+  }
+
+  // ----------------------------------------------------------------------
+  // Resumo compacto: só quem é a fonte de cada consulta. O código M inteiro
+  // acima é grande demais pra ler de ponta a ponta; isto responde direto
+  // "qual planilha puxa de onde".
+  // ----------------------------------------------------------------------
+  console.log("\n\n" + "=".repeat(72));
+  console.log("RESUMO — FONTE DE CADA CONSULTA");
+  console.log("=".repeat(72));
+  for (const { arquivo, m } of resumo) {
+    console.log(`\n### ${arquivo}`);
+    const consultas = [...m.matchAll(/shared\s+(#"[^"]+"|[A-Za-z_][\w]*)\s*=\s*let([\s\S]*?)\n\s*in\b/g)];
+    if (consultas.length === 0) { console.log("  (nenhuma consulta reconhecida)"); continue; }
+    for (const [, nomeBruto, corpo] of consultas) {
+      const nome = nomeBruto.replace(/^#"|"$/g, "");
+      const sql = corpo.match(/Sql\.Database\("([^"]+)"\s*,\s*"([^"]+)"/);
+      const item = corpo.match(/\[Schema="([^"]+)",Item="([^"]+)"\]/);
+      const query = corpo.match(/Query="([^"]{0,140})/);
+      const xlsx = corpo.match(/File\.Contents\("([^"]+)"/);
+      let fonte;
+      if (sql && item)      fonte = `SQL  ${sql[2]}.dbo.${item[2]}`;
+      else if (sql && query) fonte = `SQL  ${sql[2]} (query inline) ${query[1].replace(/\s+/g, " ").slice(0, 90)}…`;
+      else if (sql)          fonte = `SQL  ${sql[2]}`;
+      else if (xlsx)         fonte = `XLSX ${xlsx[1].split(/[\\/]/).slice(-2).join("/")}`;
+      else                   fonte = "outra (derivada de outra consulta)";
+      console.log(`  ${nome.padEnd(30)} ${fonte}`);
+    }
   }
 }
 
