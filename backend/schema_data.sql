@@ -31,11 +31,11 @@ create table if not exists public.maquinas (
 --     tem que casar exatamente com apontamentos.cod_apont.
 -- ----------------------------------------------------------------------------
 create table if not exists public.classificacao_apontamento (
-  cod_apont                    text primary key,
-  descricao                    text,
-  classificacao_disponibilidade text,   -- PRODUZINDO / PLANEJADO / IMPRODUTIVO
-  classificacao_horas          text,
-  _source_file                 text
+  cod                text primary key,   -- zero-padded ('01','20'); casa com apontamentos.cod_apont
+  descricao          text,
+  classificacao_disp text,               -- classificação de DISPONIBILIDADE — é a base do TMR
+  classificacao      text,               -- classificação de HORAS
+  _source_file       text
 );
 
 -- ----------------------------------------------------------------------------
