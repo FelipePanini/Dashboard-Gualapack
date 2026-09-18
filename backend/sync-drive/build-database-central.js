@@ -51,10 +51,15 @@ for (const key of required) {
 function mesclarBases(destino, novo) {
   for (const [aba, b] of novo) {
     const atual = destino.get(aba) ?? { linhas: [], colunas: new Set(), origens: [], erros: [] };
-    atual.linhas.push(...b.linhas);
+    // Mesmo motivo do laço lá embaixo (ver o comentário sobre V8 na leitura
+    // das tabelas): push(...array) vira uma chamada com uma linha por
+    // argumento e o V8 estoura em ~125 mil com "Maximum call stack size
+    // exceeded". Aqui passou despercebido porque as abas de inventário eram
+    // pequenas — até a Base Apontamento de 2026 passar de 111 mil linhas.
+    for (const l of b.linhas) atual.linhas.push(l);
     b.colunas.forEach((c) => atual.colunas.add(c));
-    atual.origens.push(...b.origens);
-    atual.erros.push(...b.erros);
+    for (const o of b.origens) atual.origens.push(o);
+    for (const e of b.erros) atual.erros.push(e);
     destino.set(aba, atual);
   }
 }
