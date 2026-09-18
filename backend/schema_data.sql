@@ -18,6 +18,27 @@ create table if not exists public.maquinas (
 );
 
 -- ----------------------------------------------------------------------------
+-- 1b. Cadastro oficial de código de apontamento -> classificação
+--     (aba "Classificação Oficial" do Indicadores Diário, ~222 códigos).
+--
+--     É a definição do TMR. Antes a classificação vinha de uma COLUNA da aba
+--     Base Apontamento; em 2026-09-18 essa coluna sumiu da planilha (a aba
+--     caiu de 24 pra 22 colunas) e o TMR zerou em quase toda máquina, sem
+--     erro nenhum na carga. Lendo do cadastro, a conta passa a depender de
+--     uma tabela de códigos que muda raramente, e não do formato de uma aba.
+--
+--     cod_apont é texto de propósito: vem zero-padded ('01', '20', '40') e
+--     tem que casar exatamente com apontamentos.cod_apont.
+-- ----------------------------------------------------------------------------
+create table if not exists public.classificacao_apontamento (
+  cod_apont                    text primary key,
+  descricao                    text,
+  classificacao_disponibilidade text,   -- PRODUZINDO / PLANEJADO / IMPRODUTIVO
+  classificacao_horas          text,
+  _source_file                 text
+);
+
+-- ----------------------------------------------------------------------------
 -- 2. Apontamentos — eventos brutos de produção (de "Indicadores Diário" /
 --    "Base Aparas"). É a maior e mais importante tabela — cada linha é um
 --    evento de máquina (produzindo, parada, refugo, setup...).
@@ -332,6 +353,7 @@ alter table public.refugo_producao            enable row level security;
 alter table public.producao_kg                enable row level security;
 alter table public.scrap_bi_mensal             enable row level security;
 alter table public.producao_metros             enable row level security;
+alter table public.classificacao_apontamento   enable row level security;
 
 do $$
 declare t text;
@@ -339,7 +361,8 @@ begin
   foreach t in array array[
     'maquinas','apontamentos','fardos_aparas','aderencia_maquinas_diaria',
     'aderencia_programacao','refugo_aparas_historico','tendencia_mensal',
-    'refugo_producao','producao_kg','scrap_bi_mensal','producao_metros'
+    'refugo_producao','producao_kg','scrap_bi_mensal','producao_metros',
+    'classificacao_apontamento'
   ]
   loop
     -- drop antes de criar pra esse script poder ser rodado de novo sem

@@ -112,6 +112,21 @@ export const TABLE_DEFS = [
     allowed: ["id", "grupo", "considerar"],
   },
   {
+    // Cadastro oficial que liga código de apontamento -> classificação de
+    // disponibilidade. Promovido de inventário para tabela em 2026-09-18.
+    //
+    // Motivo: o TMR lia a classificação de uma COLUNA da aba Base
+    // Apontamento ("CLASSIFICAÇÃO DISP."), e essa coluna simplesmente sumiu
+    // da planilha nesse dia — a aba caiu de 24 pra 22 colunas. Resultado:
+    // classificacao_disp ficou NULL nas 178 mil linhas e o TMR zerou em
+    // quase toda máquina, sem nenhum erro na carga. Lendo o cadastro em vez
+    // da coluna, o TMR passa a depender de ~222 códigos que mudam raramente,
+    // e não do formato de uma aba que alguém edita toda semana.
+    table: "classificacao_apontamento", fileKeywords: ["indicadores"], sheetKeywords: ["classificacao_apont"],
+    numeric: [], date: {},
+    allowed: ["cod_apont", "descricao", "classificacao_disponibilidade", "classificacao_horas"],
+  },
+  {
     // Fonte do TMR. Era a aba [Base Máquina_Embalagem], trocada por
     // [Base Apontamento] em 2026-09-10 por decisão do usuário: a de
     // Embalagem cobre só as 5 rebobinadeiras, então 11 das 16 máquinas
@@ -145,7 +160,7 @@ export const TABLE_DEFS = [
   },
 ];
 
-export const CONFLICT_COLUMNS = { refugo_aparas_historico: "data", tendencia_mensal: "mes,ano", scrap_bi_mensal: "data" };
+export const CONFLICT_COLUMNS = { refugo_aparas_historico: "data", tendencia_mensal: "mes,ano", scrap_bi_mensal: "data", classificacao_apontamento: "cod_apont" };
 
 // Retenção: as tabelas de apontamento bruto (uma linha por evento de
 // máquina) crescem rápido e estouraram os 500 MB do plano free do
@@ -370,6 +385,7 @@ export const DB_SHEET_NAME = {
   aderencia_programacao: "DB_ADERENCIA_DIARIA",
   scrap_bi_mensal: "DB_SCRAP_BI_MENSAL",
   producao_metros: "DB_PRODUCAO_METROS",
+  classificacao_apontamento: "DB_CLASSIFICACAO_APONT",
 };
 
 export async function downloadFile(drive, file) {
