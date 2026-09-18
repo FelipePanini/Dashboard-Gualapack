@@ -28,15 +28,38 @@ export const TABLE_DEFS = [
     allowed: ["codigo", "dp_fp", "refugo", "refile", "data", "numero", "qtd_bruta_kg", "qtd_liquida_kg", "nome", "classificacao", "tipo"],
   },
   {
+    // "Sequenciamento Acumulado 2026 Rev2.xlsx" [Percentual Scrap BI] — só
+    // este arquivo (fileKeywords "acumulado", exatamente o que fardos_aparas
+    // acima evita) tem essa aba: produção x refugo total já fechados por
+    // mês, exportados direto do Power BI da Gualapack. Não é o mesmo número
+    // que fardos_aparas/kg_perda (confirmado com o usuário em 2026-09-16 —
+    // escala ~4-5x maior, é produção geral, não só o que virou apara) — por
+    // isso é tabela própria, referência direta pro % mensal do BI, sem
+    // recalcular a partir de outras fontes.
+    table: "scrap_bi_mensal", fileKeywords: ["acumulado"], sheetKeywords: ["percentual_scrap_bi"],
+    numeric: ["producao", "refugo_total"], date: { data: "date" },
+    allowed: ["data", "producao", "refugo_total"],
+  },
+  {
     table: "aderencia_maquinas_diaria", fileKeywords: ["aderencia_maquinas", "aderenciamaquinas"], sheetKeywords: ["apontamentos_producao"],
     numeric: ["qtd_produzida", "qtd_horas"], date: { dt_producao: "date" },
     allowed: ["num_ordem", "dt_producao", "qtd_produzida", "cod_recurso", "qtd_horas", "classificacao", "descricao", "cod_estrutura", "turno", "cod_desc", "cod_apont"],
   },
   {
-    table: "aderencia_programacao", fileKeywords: ["historico_aderencia", "aderencia_programacao"], sheetKeywords: ["programacao_passado"],
-    numeric: ["qtd_produzido", "qtd_planejado", "meta_qtd_acerto", "qtd_acerto_real", "min_set_prog", "min_set_real", "qtd_prod_kg", "meta_mts_hora", "qtd_hor_p"],
-    date: { dt_saida_maquina: "timestamp" },
-    allowed: ["cod_cliente", "cod_estrutura", "recurso_ctr", "tipo_produto", "num_ordem", "dt_saida_maquina", "descricao", "cliente", "atividade", "qtd_produzido", "qtd_planejado", "meta_qtd_acerto", "qtd_acerto_real", "min_set_prog", "min_set_real", "qtd_prod_kg", "meta_mts_hora", "qtd_hor_p", "cilindro"],
+    // Fonte trocada em 2026-09-11: "Histórico Aderência Programação.xlsx"
+    // (fileKeywords antigos) não existe mais na pasta do Drive — é por
+    // isso que aderencia_programacao ficava órfã. A aba real é
+    // "ADERÊNCIA DIÁRIA" dentro de "Aderência Semanal.xlsx", já com
+    // planejado (qtd_planejada/dt_ini_plan) e realizado (qtd_produzida)
+    // cruzados na mesma linha — não precisa juntar duas fontes. Cabeçalhos
+    // confirmados na inspeção exaustiva de 2026-09-09 (ver bases-catalog.js
+    // DB_ADERENCIA_DIARIA). Chave candidata (num_ordem, maquina,
+    // dt_ini_plan) ainda não confirmada contra o dado real — troca por
+    // arquivo por enquanto, como as outras tabelas de log de evento.
+    table: "aderencia_programacao", fileKeywords: ["aderencia"], sheetKeywords: ["aderencia_diaria"],
+    numeric: ["qtd_planejada", "qtd_produzida", "ano"],
+    date: { dt_ini_plan: "date", dt_entrega: "date" },
+    allowed: ["num_ordem", "maquina", "dt_ini_plan", "qtd_planejada", "produto", "qtd_produzida", "ano", "base", "dt_entrega"],
   },
   {
     // A aba certa é "Conta Refugo " (com espaço no fim) — "Histórico Refugo"
@@ -64,6 +87,22 @@ export const TABLE_DEFS = [
     allowed: ["num_ordem", "cod_recurso", "dt_producao", "turno", "peso_bruto", "refugo", "descricao", "estrutura", "processo", "tipo_produto", "considerar", "planta", "maquina_real", "chave"],
   },
   {
+    // "Machine Card Oficial - *.xlsx" [PRODUCAO_METROS] — a ÚNICA base com
+    // produção em m² e largura real. Era inventário (bases-catalog.js) e
+    // virou tabela em 2026-09-16: é exatamente o que faltava pros KPIs de
+    // Produtividade (m²/h) e Velocidade (m/min), que estavam vazios no
+    // painel. Foi também o motivo original da tentativa de conexão direta
+    // com o SQL Server (abandonada) — o mesmo dado já chegava pela planilha
+    // do Machine Card, que é atualizada do mesmo jeito que as outras.
+    table: "producao_metros", fileKeywords: ["machine_card"], sheetKeywords: ["producao_metros"],
+    numeric: ["qtd_horas", "qtd_produzida_m", "producao_m2", "largura_real", "turno"],
+    date: { dt_producao: "date" },
+    allowed: [
+      "num_ordem", "cod_recurso", "dt_producao", "tipo_produto", "descricao", "operador",
+      "turno", "qtd_horas", "qtd_produzida_m", "producao_m2", "largura_real",
+    ],
+  },
+  {
     table: "tendencia_mensal", fileKeywords: ["tendencia", "grafico"], sheetKeywords: ["dados_prod"],
     numeric: ["ano", "volume_prod_corte_km", "lote_medio_km", "volume_prod_kg", "aparas_kg", "aparas_pct"], date: {},
     allowed: ["mes", "ano", "volume_prod_corte_km", "lote_medio_km", "volume_prod_kg", "aparas_kg", "aparas_pct"],
@@ -73,7 +112,40 @@ export const TABLE_DEFS = [
     allowed: ["id", "grupo", "considerar"],
   },
   {
-    table: "apontamentos", fileKeywords: ["indicadores", "base_aparas"], sheetKeywords: ["base_maquina", "base_detalhe"],
+    // Cadastro oficial que liga código de apontamento -> classificação de
+    // disponibilidade. Promovido de inventário para tabela em 2026-09-18.
+    //
+    // Motivo: o TMR lia a classificação de uma COLUNA da aba Base
+    // Apontamento ("CLASSIFICAÇÃO DISP."), e essa coluna simplesmente sumiu
+    // da planilha nesse dia — a aba caiu de 24 pra 22 colunas. Resultado:
+    // classificacao_disp ficou NULL nas 178 mil linhas e o TMR zerou em
+    // quase toda máquina, sem nenhum erro na carga. Lendo o cadastro em vez
+    // da coluna, o TMR passa a depender de ~222 códigos que mudam raramente,
+    // e não do formato de uma aba que alguém edita toda semana.
+    table: "classificacao_apontamento", fileKeywords: ["indicadores"], sheetKeywords: ["classificacao_apont"],
+    numeric: [], date: {},
+    allowed: ["cod_apont", "descricao", "classificacao_disponibilidade", "classificacao_horas"],
+  },
+  {
+    // Fonte do TMR. Era a aba [Base Máquina_Embalagem], trocada por
+    // [Base Apontamento] em 2026-09-10 por decisão do usuário: a de
+    // Embalagem cobre só as 5 rebobinadeiras, então 11 das 16 máquinas
+    // apareciam com TMR 0%. Validado no Indicadores Diário 2026 (mesmo
+    // período, 2026-01-02 → 2026-08-17): 219.623 x 97.282 linhas,
+    // 18 x 5 recursos, e CLASSIFICAÇÃO DISP. preenchida em 99,9% das
+    // linhas. As duas abas divergem ~20% nas horas totais das 5 máquinas
+    // comuns; a Base Apontamento é a oficial e a de Embalagem não é mais
+    // lida. Ver docs/mapeamento/VALIDACAO_DASHBOARD.md.
+    //
+    // 2026-09-16: validação contra o Power BI da Gualapack achou
+    // apontamentos com kg_perda ~2x inflado — a mesma OP/motivo/kg/horário
+    // aparecia tanto em Base Apontamento quanto em BASE_DETALHE (dentro de
+    // "Base Aparas - *.xlsx"), e as duas entravam juntas. Tentei tirar
+    // "base_aparas" completamente, mas aí o kg_perda ficou ABAIXO do BI —
+    // BASE_DETALHE não é puro duplicado, tem refugo que falta na Base
+    // Apontamento. Corrigido com DEDUPE_KEY (abaixo) em vez de excluir
+    // fonte: mesma chave de evento em mais de um arquivo vira 1 linha só.
+    table: "apontamentos", fileKeywords: ["indicadores", "base_aparas"], sheetKeywords: ["base_apontamento", "base_detalhe"],
     numeric: ["qtd_horas", "qtd_produzida", "desperdicio_acerto", "desperdicio_virando", "peso_bruto_bobina", "kg_perda"],
     date: { dt_producao: "date", hora_inicio: "timestamp", hora_fim: "timestamp" },
     allowed: [
@@ -81,11 +153,14 @@ export const TABLE_DEFS = [
       "qtd_produzida", "turno", "desperdicio_acerto", "desperdicio_virando", "peso_bruto_bobina", "tipo_perda",
       "kg_perda", "nome_operador", "tipo_produto", "cod_estrutura", "des_num_ordem", "cod_est", "processo",
       "classificacao", "nome_cliente",
+      // Só existem na Base Apontamento (a BASE_DETALHE dos Base Aparas
+      // não tem, e as linhas dela ficam com null).
+      "classificacao_disp", "classificacao_horas",
     ],
   },
 ];
 
-export const CONFLICT_COLUMNS = { refugo_aparas_historico: "data", tendencia_mensal: "mes,ano" };
+export const CONFLICT_COLUMNS = { refugo_aparas_historico: "data", tendencia_mensal: "mes,ano", scrap_bi_mensal: "data", classificacao_apontamento: "cod_apont" };
 
 // Retenção: as tabelas de apontamento bruto (uma linha por evento de
 // máquina) crescem rápido e estouraram os 500 MB do plano free do
@@ -95,23 +170,58 @@ export const RETENTION_MONTHS = 12;
 export const RETENTION_DATE_COL = {
   apontamentos: "dt_producao",
   aderencia_maquinas_diaria: "dt_producao",
-  aderencia_programacao: "dt_saida_maquina",
+  aderencia_programacao: "dt_ini_plan",
   refugo_producao: "dt_producao",
   producao_kg: "dt_producao",
+  producao_metros: "dt_producao",
 };
 
 // Essas tabelas não têm chave natural nas linhas (são log de eventos, não
 // cadastro) — a carga troca por arquivo em vez de tentar upsert. Ver sync.js.
 export const REPLACE_BY_SOURCE = new Set([
   "apontamentos", "aderencia_maquinas_diaria", "aderencia_programacao", "fardos_aparas",
-  "refugo_producao", "producao_kg",
+  "refugo_producao", "producao_kg", "producao_metros",
 ]);
 
 // Mesma chave, mas usada pra DEDUPLICAR a lista de linhas antes de gravar —
 // o Postgres rejeita um upsert que tenta atualizar a MESMA chave duas vezes
 // dentro do mesmo lote, e planilhas reais têm linhas repetidas (ex: máquina
 // cadastrada duas vezes no Machine Card).
+//
+// build-database-central.js usa DEDUPE_KEY[table] em DOIS lugares com
+// significados diferentes — importante não confundir os dois:
+//   1) filtro por-arquivo: descarta a linha se QUALQUER coluna da chave vier
+//      nula (faz sentido pra chave natural curta tipo "id"/"data" — uma
+//      linha sem id/data é lixo mesmo);
+//   2) dedup final entre arquivos: agrupa por chave e mantém 1 linha.
+// "apontamentos" só quer o uso (2) — a maioria das linhas (TMR, paradas)
+// não tem tipo_perda/kg_perda, e colocar essas colunas em DEDUPE_KEY faria
+// o filtro (1) descartar quase tudo silenciosamente (foi exatamente o que
+// aconteceu em 2026-09-16: apontamentos foi a 0 linhas). Por isso
+// apontamentos usa MERGE_DEDUPE_KEY (abaixo), não DEDUPE_KEY.
 export const DEDUPE_KEY = { ...CONFLICT_COLUMNS, maquinas: "id" };
+
+// Só pro dedup final entre arquivos (uso 2 acima) — NÃO passa pelo filtro
+// "descarta se alguma coluna da chave for nula" de build-database-central.js.
+//
+// "apontamentos": mesmo evento de produção pode vir tanto de "Indicadores
+// Diário" (Base Apontamento) quanto de "Base Aparas - *.xlsx" (BASE_DETALHE)
+// — chave de conteúdo pra não contar o mesmo evento 2x (ver TABLE_DEFS).
+//
+// 2026-09-16: tentei uma chave larga (quase todas as colunas de "allowed")
+// pra evitar colapsar eventos diferentes por coincidência de horário — mas
+// isso quebrou o dedup de verdade: BASE_DETALHE não tem qtd_horas/
+// peso_bruto_bobina/turno/etc. preenchidos (só os campos de refugo), então
+// a cópia dela nunca batia com a cópia completa da Base Apontamento pra
+// nenhuma dessas colunas, e as duas linhas continuavam como "diferentes".
+// A chave certa é só as colunas que EXISTEM nas duas fontes — essas 7 já
+// bastam pra identificar um evento de refugo sem ambiguidade prática (não
+// precisa reduzir mais pra evitar colisão com linha sem refugo: BASE_DETALHE
+// só contribui linha de refugo mesmo, nunca uma linha comum de TMR/parada
+// pra colidir por coincidência).
+export const MERGE_DEDUPE_KEY = {
+  apontamentos: "num_ordem,cod_recurso,dt_producao,hora_inicio,hora_fim,tipo_perda,kg_perda",
+};
 
 export function dedupeRows(rows, keyCols) {
   if (!keyCols) return rows;
@@ -119,7 +229,16 @@ export function dedupeRows(rows, keyCols) {
   const map = new Map();
   for (const row of rows) {
     const key = cols.map((c) => String(row[c] ?? "")).join("|");
-    map.set(key, row); // a última ocorrência da chave vence
+    const existing = map.get(key);
+    // Entre duas linhas com a mesma chave, fica a mais completa (mais
+    // colunas preenchidas) — ex: "classificacao_disp" só existe na Base
+    // Apontamento, não na BASE_DETALHE, e não dá pra confiar na ordem de
+    // leitura dos arquivos do Drive pra garantir qual "vence" por último.
+    if (existing) {
+      const contarPreenchidas = (r) => Object.values(r).filter((v) => v !== null && v !== undefined && v !== "").length;
+      if (contarPreenchidas(existing) >= contarPreenchidas(row)) continue;
+    }
+    map.set(key, row); // a linha mais completa vence
   }
   return Array.from(map.values());
 }
@@ -153,6 +272,12 @@ export const HEADER_ALIASES = {
                                       // realmente vem no Machine Card (texto quebrado em
                                       // duas linhas numa célula só); confirmado via log em
                                       // 2026-09-04, ver commit que adicionou esta linha.
+  dtentrega: "dt_entrega",       // "DtEntrega" na aba ADERÊNCIA DIÁRIA
+  // Machine Card [PRODUCAO_METROS]: "Qtd Produzida (Metros)" e "Produção m²"
+  // (o "²" cai no normalize e vira só "producao_m", fácil de confundir com
+  // metros lineares — o alias deixa explícito que é m²).
+  qtd_produzida_metros: "qtd_produzida_m",
+  producao_m: "producao_m2",
 };
 
 // Um arquivo pode alimentar mais de uma tabela (ex: "Indicadores Diário"
@@ -166,7 +291,13 @@ export function detectTables(fileName) {
   );
 }
 
+// Match exato tem prioridade sobre "contém". O arquivo Indicadores Diário
+// tem "Base Apontamento" E "Base Apontamentos (kg)" — a segunda contém a
+// palavra-chave da primeira, e sem a prioridade a tabela apontamentos podia
+// acabar lendo a aba de kg dependendo da ordem das abas no arquivo.
 export function detectSheet(def, sheetNames) {
+  const exato = sheetNames.find((n) => def.sheetKeywords.includes(normalize(n)));
+  if (exato) return exato;
   return sheetNames.find((n) => def.sheetKeywords.some((k) => normalize(n).includes(k))) ?? sheetNames[0];
 }
 
@@ -251,6 +382,10 @@ export const DB_SHEET_NAME = {
   refugo_producao: "DB_REFUGO_PRODUCAO",
   tendencia_mensal: "DB_TENDENCIA",
   maquinas: "DB_MAQUINAS",
+  aderencia_programacao: "DB_ADERENCIA_DIARIA",
+  scrap_bi_mensal: "DB_SCRAP_BI_MENSAL",
+  producao_metros: "DB_PRODUCAO_METROS",
+  classificacao_apontamento: "DB_CLASSIFICACAO_APONT",
 };
 
 export async function downloadFile(drive, file) {

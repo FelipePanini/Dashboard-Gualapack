@@ -18,6 +18,27 @@ create table if not exists public.maquinas (
 );
 
 -- ----------------------------------------------------------------------------
+-- 1b. Cadastro oficial de código de apontamento -> classificação
+--     (aba "Classificação Oficial" do Indicadores Diário, ~222 códigos).
+--
+--     É a definição do TMR. Antes a classificação vinha de uma COLUNA da aba
+--     Base Apontamento; em 2026-09-18 essa coluna sumiu da planilha (a aba
+--     caiu de 24 pra 22 colunas) e o TMR zerou em quase toda máquina, sem
+--     erro nenhum na carga. Lendo do cadastro, a conta passa a depender de
+--     uma tabela de códigos que muda raramente, e não do formato de uma aba.
+--
+--     cod_apont é texto de propósito: vem zero-padded ('01', '20', '40') e
+--     tem que casar exatamente com apontamentos.cod_apont.
+-- ----------------------------------------------------------------------------
+create table if not exists public.classificacao_apontamento (
+  cod_apont                    text primary key,
+  descricao                    text,
+  classificacao_disponibilidade text,   -- PRODUZINDO / PLANEJADO / IMPRODUTIVO
+  classificacao_horas          text,
+  _source_file                 text
+);
+
+-- ----------------------------------------------------------------------------
 -- 2. Apontamentos — eventos brutos de produção (de "Indicadores Diário" /
 --    "Base Aparas"). É a maior e mais importante tabela — cada linha é um
 --    evento de máquina (produzindo, parada, refugo, setup...).
@@ -59,8 +80,20 @@ create table if not exists public.apontamentos (
   cod_est             text,
   processo            text,          -- 'Impressão', 'Laminação', 'Corte'...
   classificacao       text,          -- família de produto
-  nome_cliente         text
+  nome_cliente         text,
+  -- Só existem na aba [Base Apontamento] (fonte do TMR desde 2026-09-10).
+  -- classificacao_disp: PLANEJADO / IMPRODUTIVO / PRODUZINDO — é a
+  -- classificação oficial de disponibilidade da própria origem. Hoje o TMR
+  -- ainda é calculado por cod_apont = '20'; as duas concordam (48.888
+  -- eventos PRODUZINDO x 48.830 com cod_apont '20' em 2026), então a coluna
+  -- fica gravada para conferência antes de virar a regra do cálculo.
+  classificacao_disp   text,
+  classificacao_horas  text
 );
+
+-- Migração para bancos que já têm a tabela criada (idempotente).
+alter table public.apontamentos add column if not exists classificacao_disp  text;
+alter table public.apontamentos add column if not exists classificacao_horas text;
 
 create index if not exists idx_apontamentos_data on public.apontamentos (dt_producao desc);
 create index if not exists idx_apontamentos_recurso on public.apontamentos (cod_recurso, dt_producao desc);
@@ -119,31 +152,60 @@ create index if not exists idx_aderencia_maq_source on public.aderencia_maquinas
 --    Mesma retenção de 12 meses e troca-por-arquivo da tabela apontamentos
 --    (por dt_saida_maquina / _source_file).
 -- ----------------------------------------------------------------------------
+-- Fonte trocada em 2026-09-11 — ver comentário no TABLE_DEFS de
+-- aderencia_programacao em backend/sync-drive/lib.js pro histórico
+-- completo. Colunas de baixo pra cima batem com a aba real "ADERÊNCIA
+-- DIÁRIA" de Aderência Semanal.xlsx, não com o arquivo morto antigo.
 create table if not exists public.aderencia_programacao (
-  id                bigint generated always as identity primary key,
-  _source_file      text,          -- nome do arquivo que gravou a linha
-  cod_cliente       text,
-  cod_estrutura     text,
-  recurso_ctr       text,
-  tipo_produto      text,
-  num_ordem         text,
-  dt_saida_maquina  timestamptz,
-  descricao         text,
-  cliente           text,
-  atividade         text,
-  qtd_produzido     numeric,
-  qtd_planejado     numeric,
-  meta_qtd_acerto   numeric,
-  qtd_acerto_real   numeric,
-  min_set_prog      numeric,
-  min_set_real      numeric,
-  qtd_prod_kg       numeric,
-  meta_mts_hora     numeric,
-  qtd_hor_p         numeric,
-  cilindro          text
+  id             bigint generated always as identity primary key,
+  _source_file   text,          -- nome do arquivo que gravou a linha
+  num_ordem      text,
+  maquina        text,
+  dt_ini_plan    date,
+  qtd_planejada  numeric,
+  produto        text,
+  qtd_produzida  numeric,
+  ano            numeric,
+  base           text,
+  dt_entrega     date
 );
 
-create index if not exists idx_aderencia_prog_data on public.aderencia_programacao (dt_saida_maquina desc);
+-- Migração pra bancos que já têm a tabela com o esquema antigo (colunas
+-- do arquivo morto) — descarta e recria, porque a tabela está órfã hoje
+-- (nenhum arquivo alimenta ela desde que "Histórico Aderência
+-- Programação.xlsx" saiu da pasta do Drive), então não existe dado real
+-- pra perder. Tem que rodar ANTES dos create index abaixo — "create table
+-- if not exists" não recria a tabela antiga sozinho, e os índices novos
+-- referenciam colunas que só existem depois desta migração.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'aderencia_programacao'
+      and column_name = 'recurso_ctr'
+  ) then
+    -- v_maquinas_resumo depende desta tabela — cai junto e é recriada
+    -- por schema_views.sql (rode esse arquivo logo em seguida).
+    drop view if exists public.v_maquinas_resumo;
+    drop table public.aderencia_programacao;
+    create table public.aderencia_programacao (
+      id             bigint generated always as identity primary key,
+      _source_file   text,
+      num_ordem      text,
+      maquina        text,
+      dt_ini_plan    date,
+      qtd_planejada  numeric,
+      produto        text,
+      qtd_produzida  numeric,
+      ano            numeric,
+      base           text,
+      dt_entrega     date
+    );
+  end if;
+end $$;
+
+create index if not exists idx_aderencia_prog_data on public.aderencia_programacao (dt_ini_plan desc);
+create index if not exists idx_aderencia_prog_maquina on public.aderencia_programacao (maquina, dt_ini_plan desc);
 create index if not exists idx_aderencia_prog_source on public.aderencia_programacao (_source_file);
 
 -- ----------------------------------------------------------------------------
@@ -228,6 +290,55 @@ create index if not exists idx_producao_kg_data on public.producao_kg (dt_produc
 create index if not exists idx_producao_kg_source on public.producao_kg (_source_file);
 
 -- ----------------------------------------------------------------------------
+-- 7b. Scrap % mensal, direto do Power BI da Gualapack (de "Sequenciamento
+--     Acumulado 2026 Rev2.xlsx", aba "Percentual Scrap BI") — produção e
+--     refugo total já fechados por mês. NÃO é o mesmo número que
+--     fardos_aparas/kg_perda de apontamentos (confirmado com o usuário em
+--     2026-09-16: escala ~4-5x maior, é produção geral das máquinas, não só
+--     o que virou apara) — existe como referência direta pro % que o BI já
+--     mostra, sem tentar recalcular a partir de outra fonte.
+-- ----------------------------------------------------------------------------
+create table if not exists public.scrap_bi_mensal (
+  id             bigint generated always as identity primary key,
+  _source_file   text,
+  data           date not null,
+  producao       numeric,
+  refugo_total   numeric,
+  unique (data)
+);
+
+create index if not exists idx_scrap_bi_mensal_data on public.scrap_bi_mensal (data desc);
+
+-- ----------------------------------------------------------------------------
+-- 7c. Produção em metros/m² por OP/máquina/dia (de "Machine Card Oficial -
+--     *.xlsx", aba PRODUCAO_METROS) — a única base com m² e LARGURA REAL.
+--     É o que alimenta os KPIs de Produtividade (m²/h) e Velocidade (m/min),
+--     que ficaram vazios no painel até 2026-09-16. Era inventário
+--     (bases-catalog.js) e foi promovida a tabela; a tentativa antiga de
+--     buscar isso direto no SQL Server foi abandonada justamente porque o
+--     mesmo dado já chega pela planilha do Machine Card.
+-- ----------------------------------------------------------------------------
+create table if not exists public.producao_metros (
+  id               bigint generated always as identity primary key,
+  _source_file     text,
+  num_ordem        text,
+  cod_recurso      text,
+  dt_producao      date,
+  tipo_produto     text,
+  descricao        text,
+  operador         text,
+  turno            numeric,
+  qtd_horas        numeric,
+  qtd_produzida_m  numeric,   -- metros lineares
+  producao_m2      numeric,   -- metros lineares x largura real
+  largura_real     numeric
+);
+
+create index if not exists idx_producao_metros_data on public.producao_metros (dt_producao desc);
+create index if not exists idx_producao_metros_recurso on public.producao_metros (cod_recurso, dt_producao desc);
+create index if not exists idx_producao_metros_source on public.producao_metros (_source_file);
+
+-- ----------------------------------------------------------------------------
 -- 8. RLS — leitura para qualquer usuário autenticado, escrita só via
 --    service_role (a função "ingest", nunca o navegador direto).
 -- ----------------------------------------------------------------------------
@@ -240,6 +351,9 @@ alter table public.refugo_aparas_historico    enable row level security;
 alter table public.tendencia_mensal           enable row level security;
 alter table public.refugo_producao            enable row level security;
 alter table public.producao_kg                enable row level security;
+alter table public.scrap_bi_mensal             enable row level security;
+alter table public.producao_metros             enable row level security;
+alter table public.classificacao_apontamento   enable row level security;
 
 do $$
 declare t text;
@@ -247,7 +361,8 @@ begin
   foreach t in array array[
     'maquinas','apontamentos','fardos_aparas','aderencia_maquinas_diaria',
     'aderencia_programacao','refugo_aparas_historico','tendencia_mensal',
-    'refugo_producao','producao_kg'
+    'refugo_producao','producao_kg','scrap_bi_mensal','producao_metros',
+    'classificacao_apontamento'
   ]
   loop
     -- drop antes de criar pra esse script poder ser rodado de novo sem
