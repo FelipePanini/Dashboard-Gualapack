@@ -243,19 +243,13 @@ export const BASES = [
     classificacao: "PRINCIPAL",
     observacao: "3.668 linhas. Meta diária por máquina. NÃO mapeada — o painel não tem meta por máquina hoje.",
   },
-  {
-    sheet: "DB_CLASSIFICACAO_APONT", origem: "CADASTRO_CLASSIFICACAO_APONT",
-    fileKeywords: ["indicadores"], sheetMatch: ["classificacao_oficial"],
-    headerRow: 0,
-    colunas: {
-      cod: "cod_apont", descricao: "descricao",
-      classificacao_disp: "classificacao_disponibilidade", classificacao: "classificacao_horas",
-    },
-    numeric: [], date: {},
-    granularidade: "1 linha por código de apontamento (cadastro oficial)",
-    classificacao: "AUXILIAR",
-    observacao: "112 códigos. Liga cod_apont a SETUP/INICIALIZAÇÃO/INATIVIDADE/IMPRODUTIVO — é a definição oficial do TMR. Usar a versão 'Oficial': o código vem zero-padded ('01'), igual ao das bases de evento; a aba 'Classificação' usa '1' e não casaria.",
-  },
+  // DB_CLASSIFICACAO_APONT saiu daqui em 2026-09-18: virou tabela de verdade
+  // (classificacao_apontamento), definida em lib.js/TABLE_DEFS. Manter nos
+  // dois lugares faz as duas rotas escreverem na MESMA aba com cabeçalhos
+  // diferentes — a do catálogo carrega colunas de rastreabilidade
+  // (arquivo_origem, aba_origem...) que não existem na tabela, e a carga
+  // quebra com "Could not find the 'aba_origem' column". Mesmo problema que
+  // DB_PRODUCAO_METROS teve. Uma aba, uma rota.
 
   // --------------------------------------------------------------------------
   // Machine Card Oficial - 2025/Genérico.xlsx — 26 e 32 abas. Usávamos 1.
