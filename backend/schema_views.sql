@@ -53,15 +53,27 @@ select
 from public.maquinas m
 left join (
   select
-    cod_recurso,
-    sum(qtd_horas)                                                 as horas_totais,
-    sum(qtd_horas) filter (where cod_apont = '20')                 as horas_produzindo,
-    sum(qtd_horas) filter (where classificacao_disp = 'PLANEJADO') as horas_planejado,
-    sum(kg_perda)                                     as kg_perda_total,
-    sum(peso_bruto_bobina)                            as peso_bruto_total
-  from public.apontamentos
-  where cod_recurso is not null
-  group by cod_recurso
+    a.cod_recurso,
+    -- A classificação sai do CADASTRO de códigos (classificacao_apontamento),
+    -- não mais da coluna da planilha. Em 2026-09-18 a aba Base Apontamento
+    -- perdeu a coluna CLASSIFICAÇÃO DISP. (caiu de 24 pra 22 colunas) e
+    -- horas_planejado virou 0 em toda máquina: o TMR desabou sem nenhum
+    -- erro na carga. O coalesce mantém a coluna como primeira opção
+    -- enquanto ela existir e cai no cadastro quando vier vazia — funciona
+    -- nos dois formatos, e nenhum dos dois sozinho derruba o cálculo.
+    sum(a.qtd_horas)                                   as horas_totais,
+    sum(a.qtd_horas) filter (
+      where coalesce(a.classificacao_disp, c.classificacao_disp) = 'PRODUZINDO'
+    )                                                  as horas_produzindo,
+    sum(a.qtd_horas) filter (
+      where coalesce(a.classificacao_disp, c.classificacao_disp) = 'PLANEJADO'
+    )                                                  as horas_planejado,
+    sum(a.kg_perda)                                    as kg_perda_total,
+    sum(a.peso_bruto_bobina)                           as peso_bruto_total
+  from public.apontamentos a
+  left join public.classificacao_apontamento c on c.cod = a.cod_apont
+  where a.cod_recurso is not null
+  group by a.cod_recurso
 ) ap on ap.cod_recurso = m.id
 left join (
   select
