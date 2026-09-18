@@ -122,9 +122,14 @@ export const TABLE_DEFS = [
     // quase toda máquina, sem nenhum erro na carga. Lendo o cadastro em vez
     // da coluna, o TMR passa a depender de ~222 códigos que mudam raramente,
     // e não do formato de uma aba que alguém edita toda semana.
-    table: "classificacao_apontamento", fileKeywords: ["indicadores"], sheetKeywords: ["classificacao_apont"],
+    // A aba é "Classificação Oficial" (não "Classificação" pura: naquela o
+    // código vem sem zero à esquerda — '1' em vez de '01' — e não casaria
+    // com apontamentos.cod_apont). Os nomes aqui são os cabeçalhos CRUS da
+    // planilha; renomear exigiria alias global, e "classificacao" já é
+    // usada por apontamentos com outro sentido.
+    table: "classificacao_apontamento", fileKeywords: ["indicadores"], sheetKeywords: ["classificacao_oficial"],
     numeric: [], date: {},
-    allowed: ["cod_apont", "descricao", "classificacao_disponibilidade", "classificacao_horas"],
+    allowed: ["cod", "descricao", "classificacao_disp", "classificacao"],
   },
   {
     // Fonte do TMR. Era a aba [Base Máquina_Embalagem], trocada por
@@ -160,7 +165,7 @@ export const TABLE_DEFS = [
   },
 ];
 
-export const CONFLICT_COLUMNS = { refugo_aparas_historico: "data", tendencia_mensal: "mes,ano", scrap_bi_mensal: "data", classificacao_apontamento: "cod_apont" };
+export const CONFLICT_COLUMNS = { refugo_aparas_historico: "data", tendencia_mensal: "mes,ano", scrap_bi_mensal: "data", classificacao_apontamento: "cod" };
 
 // Retenção: as tabelas de apontamento bruto (uma linha por evento de
 // máquina) crescem rápido e estouraram os 500 MB do plano free do
