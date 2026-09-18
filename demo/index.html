@@ -1391,7 +1391,7 @@ async function loadRealData(){
 
   const client = window.gualapackAuth;
   try{
-    const [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes, prodRes] = await Promise.all([
+    const [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes, prodRes, statusRes] = await Promise.all([
       client.from("v_maquinas_resumo").select("*"),
       client.from("v_perda_por_motivo").select("*"),
       client.from("v_perda_por_classificacao").select("*"),
@@ -1404,6 +1404,7 @@ async function loadRealData(){
       client.from("v_ops_refugo").select("*"),
       client.from("v_apontamentos_ultimo_dia").select("*"),
       client.from("v_produtividade_maquina").select("*"),
+      client.from("v_dados_status").select("*"),
     ]);
     const erro = [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes].find(r=>r.error);
     if(erro) throw erro.error;
@@ -1413,6 +1414,16 @@ async function loadRealData(){
     // separada de apontamentos — por isso view à parte, casada por cod_recurso.
     // prodRes fica fora do throw de erro acima de propósito: se a view ainda
     // não existir no Supabase, o painel carrega igual, só sem velocidade.
+    // Até quando o dado vai. O painel não tinha como saber que estava
+    // atrasado: a carga roda todo dia e termina com "sucesso" mesmo relendo
+    // planilha velha — em 18/09 a base estava parada em 31/08 e nada na tela
+    // dizia isso. Fora do throw de propósito: view nova não pode derrubar o
+    // painel inteiro.
+    window.DADOS_STATUS = (statusRes && !statusRes.error ? statusRes.data || [] : [])
+      .filter(r => r.ate)
+      .sort((a, b) => String(b.ate).localeCompare(String(a.ate)));
+    window.DADOS_ATE = window.DADOS_STATUS.length ? window.DADOS_STATUS[0].ate : null;
+
     const PROD_POR_MAQ = new Map(
       (prodRes && !prodRes.error ? prodRes.data || [] : []).map(r=>[r.cod_recurso, r])
     );
@@ -1473,7 +1484,13 @@ async function loadRealData(){
     (fardosRes.data||[]).forEach(r=>{
       porMes.set(r.mes, { ...(porMes.get(r.mes)||{}), apontado: Number(r.apara_pct)||0 });
     });
+    // O mês corrente entra parcial na planilha de fechamento (em 18/09 tinha
+    // 141 mil de produção contra ~345 mil de um mês cheio) e o KPI pega o
+    // último mês com valor — mostrava setembro pela metade, 18,22%, como se
+    // fosse fechado, contra 17,14% de agosto. Parece piora e não é.
+    const mesCorrente = new Date().toISOString().slice(0, 7);
     (scrapBiRes.data||[]).forEach(r=>{
+      if(String(r.mes).slice(0, 7) >= mesCorrente) return;
       porMes.set(r.mes, { ...(porMes.get(r.mes)||{}), confirmado: Number(r.scrap_pct)||0 });
     });
     const mesesOrdenados = Array.from(porMes.keys()).sort().slice(-12);
@@ -1841,7 +1858,14 @@ function renderDashboard(){
 const ultimoValido = arr => { for(let i=arr.length-1;i>=0;i--) if(arr[i]!=null) return arr[i]; return null; };
 const aparasMedia   = ultimoValido(APARAS_MENSAL.apontado);
 const confirmMedia  = ultimoValido(APARAS_MENSAL.confirmado);
-const tmrMedio      = MAQUINAS.reduce((a,m)=>a+m.tmr,0)/MAQUINAS.length;
+// Máquina sem hora apontada no período entra como TMR 0% e derruba a
+// média de quem está rodando — a REB 03 (cadastrada e parada) e, desde que
+// a planilha passou a trazer só as rebobinadeiras, mais 10 outras. Média só
+// de quem tem hora; as paradas continuam aparecendo no gráfico por máquina,
+// que é onde o "0%" é informação e não ruído.
+const MAQ_ATIVAS    = MAQUINAS.filter(m=>m.horasTot > 0);
+const baseTmr       = MAQ_ATIVAS.length ? MAQ_ATIVAS : MAQUINAS;
+const tmrMedio      = baseTmr.reduce((a,m)=>a+m.tmr,0)/baseTmr.length;
 const aderMedia     = ADERENCIA_PROCESSO.reduce((a,p)=>a+p.pct,0)/ADERENCIA_PROCESSO.length;
 const produtividade = PRODUTIVIDADE; // m²/h — null quando nenhuma base carregada traz essa métrica
 const perdaTotalKg  = TIPOS_PERDA.reduce((a,t)=>a+t.kg,0);
@@ -2637,9 +2661,19 @@ if(dataTag){
   dataTag.title = USANDO_DADOS_REAIS
     ? "Indicadores, máquinas e motivos de perda vêm das bases reais de Produção, sincronizadas diariamente."
     : "Indicadores, máquinas e motivos de perda vêm dos BIs de Produção. Os valores numéricos são de referência até a conexão com a fonte de dados.";
+  const _ate = window.DADOS_ATE ? new Date(window.DADOS_ATE + "T00:00:00") : null;
+  const _atraso = _ate ? Math.floor((Date.now() - _ate.getTime()) / 86400000) : null;
+  const _ateTxt = _ate ? _ate.toLocaleDateString("pt-BR", { day:"2-digit", month:"2-digit" }) : null;
   dataTag.innerHTML = USANDO_DADOS_REAIS
-    ? `<span class="dot"></span>Dados reais &middot; sincronizado diariamente`
+    ? (_ateTxt
+        ? `<span class="dot"></span>Dados até ${_ateTxt}` + (_atraso > 2 ? ` &middot; ${_atraso} dias atrás` : "")
+        : `<span class="dot"></span>Dados reais &middot; sincronizado diariamente`)
     : `<span class="dot"></span>Estrutura dos BIs &middot; valores de referência`;
+  if(USANDO_DADOS_REAIS && _atraso > 2){
+    dataTag.style.borderColor = "var(--warning)";
+    dataTag.title = `A carga rodou, mas a planilha de origem não é atualizada há ${_atraso} dias. `
+      + `O painel está mostrando dado de ${_ateTxt}.`;
+  }
 }
 const footerNote = document.getElementById("footer-note");
 if(footerNote){
@@ -2734,6 +2768,23 @@ if(footerNote){
     btn.setAttribute("aria-pressed", String(real));
     dot.style.background = real ? "var(--good)" : "var(--text-muted)";
     dot.style.animationPlayState = real ? "running" : "paused";
+    // "Atualizado" era sempre verde quando o dado vinha do Supabase, mesmo
+    // com a base parada há 18 dias. Agora o rótulo diz a data e fica âmbar
+    // quando o dado envelhece — carga que roda não é dado que chega.
+    const ate = window.DADOS_ATE ? new Date(window.DADOS_ATE + "T00:00:00") : null;
+    const atraso = ate ? Math.floor((Date.now() - ate.getTime()) / 86400000) : null;
+    if(real && ate){
+      const velho = atraso > 2;
+      dot.style.background = velho ? "var(--warning)" : "var(--good)";
+      dot.style.animationPlayState = velho ? "paused" : "running";
+      label.textContent = velho
+        ? `Dado de ${ate.toLocaleDateString("pt-BR",{ day:"2-digit", month:"2-digit" })}`
+        : "Atualizado";
+      btn.title = velho
+        ? `A última carga foi bem-sucedida, mas leu planilha de ${atraso} dias atrás.`
+        : "Dados sincronizados com a base real.";
+      return;
+    }
     label.textContent = real ? "Atualizado" : "Referência";
   }
   refreshStatus(); // sem listener de clique — não é mais um toggle, só status

@@ -357,6 +357,24 @@ having sum(p.qtd_horas) > 0
 order by 1;
 
 -- ----------------------------------------------------------------------------
+-- 12. Até quando cada base tem dado
+--
+--     O painel não tinha como saber que estava atrasado: a carga roda todo
+--     dia e termina com "sucesso" mesmo relendo planilha velha. Em 18/09 as
+--     bases estavam paradas em 31/08 e nada na tela dizia isso. Esta view é
+--     o que o selo do topo e o indicador de status leem para mostrar a data
+--     do dado, e ficar âmbar quando ele envelhece.
+-- ----------------------------------------------------------------------------
+create or replace view public.v_dados_status
+with (security_invoker = true) as
+select 'apontamentos'     as base, max(dt_producao) as ate from public.apontamentos
+union all select 'producao_metros',        max(dt_producao) from public.producao_metros
+union all select 'producao_kg',            max(dt_producao) from public.producao_kg
+union all select 'refugo_producao',        max(dt_producao) from public.refugo_producao
+union all select 'aderencia',              max(dt_ini_plan) from public.aderencia_programacao
+union all select 'fardos_aparas',          max(data)        from public.fardos_aparas;
+
+-- ----------------------------------------------------------------------------
 -- Permissões — mesma regra das tabelas: leitura só para autenticado.
 -- Views com security_invoker=true precisam do GRANT explícito, mesmo já
 -- tendo RLS nas tabelas de origem, porque o Postgres checa privilégio na
@@ -375,5 +393,6 @@ grant select on
   public.v_producao_kg_mensal,
   public.v_scrap_bi_mensal,
   public.v_produtividade_maquina,
-  public.v_produtividade_mensal
+  public.v_produtividade_mensal,
+  public.v_dados_status
 to authenticated;
