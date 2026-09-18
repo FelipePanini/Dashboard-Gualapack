@@ -243,40 +243,22 @@ export const BASES = [
     classificacao: "PRINCIPAL",
     observacao: "3.668 linhas. Meta diária por máquina. NÃO mapeada — o painel não tem meta por máquina hoje.",
   },
-  {
-    sheet: "DB_CLASSIFICACAO_APONT", origem: "CADASTRO_CLASSIFICACAO_APONT",
-    fileKeywords: ["indicadores"], sheetMatch: ["classificacao_oficial"],
-    headerRow: 0,
-    colunas: {
-      cod: "cod_apont", descricao: "descricao",
-      classificacao_disp: "classificacao_disponibilidade", classificacao: "classificacao_horas",
-    },
-    numeric: [], date: {},
-    granularidade: "1 linha por código de apontamento (cadastro oficial)",
-    classificacao: "AUXILIAR",
-    observacao: "112 códigos. Liga cod_apont a SETUP/INICIALIZAÇÃO/INATIVIDADE/IMPRODUTIVO — é a definição oficial do TMR. Usar a versão 'Oficial': o código vem zero-padded ('01'), igual ao das bases de evento; a aba 'Classificação' usa '1' e não casaria.",
-  },
+  // DB_CLASSIFICACAO_APONT saiu daqui em 2026-09-18: virou tabela de verdade
+  // (classificacao_apontamento), definida em lib.js/TABLE_DEFS. Manter nos
+  // dois lugares faz as duas rotas escreverem na MESMA aba com cabeçalhos
+  // diferentes — a do catálogo carrega colunas de rastreabilidade
+  // (arquivo_origem, aba_origem...) que não existem na tabela, e a carga
+  // quebra com "Could not find the 'aba_origem' column". Mesmo problema que
+  // DB_PRODUCAO_METROS teve. Uma aba, uma rota.
 
   // --------------------------------------------------------------------------
   // Machine Card Oficial - 2025/Genérico.xlsx — 26 e 32 abas. Usávamos 1.
   // --------------------------------------------------------------------------
-  {
-    sheet: "DB_PRODUCAO_METROS", origem: "PRODUCAO_METROS",
-    fileKeywords: ["machine_card"], sheetMatch: ["producao_metros"],
-    headerRow: 0,
-    colunas: {
-      num_ordem: "num_ordem", cod_recurso: "cod_recurso", dt_producao: "dt_producao",
-      tipo_produto: "tipo_produto", descricao: "descricao", operador: "operador",
-      turno: "turno", qtd_horas: "qtd_horas",
-      qtd_produzida_metros: "qtd_produzida_m", producao_m: "producao_m2",
-      largura_real: "largura_real",
-    },
-    numeric: ["qtd_horas", "qtd_produzida_m", "producao_m2", "largura_real"],
-    date: { dt_producao: "date" },
-    granularidade: "1 linha por OP x recurso x dia",
-    classificacao: "PRINCIPAL",
-    observacao: "É a única base com PRODUÇÃO M² e LARGURA REAL. O KPI de produtividade (m²/h) do painel está vazio hoje por falta exatamente disso.",
-  },
+  // DB_PRODUCAO_METROS saiu do inventário em 2026-09-16 — virou tabela de
+  // produção (TABLE_DEFS em lib.js, alimenta producao_metros no Supabase e
+  // os KPIs de Produtividade m²/h e Velocidade m/min). Deixar nos dois
+  // lugares geraria aba duplicada no arquivo central, igual aconteceu com
+  // DB_ADERENCIA_DIARIA.
   {
     sheet: "DB_ABSENTEISMO", origem: "ABSENTEISMO",
     fileKeywords: ["machine_card"], sheetMatch: ["absenteismo"],
@@ -310,21 +292,10 @@ export const BASES = [
   // Aderência Semanal.xlsx — 19 abas, NENHUMA usada hoje. A tabela
   // aderencia_programacao do Supabase está órfã (nenhum arquivo a alimenta).
   // --------------------------------------------------------------------------
-  {
-    sheet: "DB_ADERENCIA_DIARIA", origem: "ADERENCIA_DIARIA",
-    fileKeywords: ["aderencia"], sheetMatch: ["aderencia_diaria"],
-    headerRow: 0,
-    colunas: {
-      num_ordem: "num_ordem", maquina: "maquina", dt_ini_plan: "dt_ini_plan",
-      qtd_planejada: "qtd_planejada", produto: "produto",
-      qtd_produzida: "qtd_produzida", ano: "ano", base: "base", dtentrega: "dt_entrega",
-    },
-    numeric: ["qtd_planejada", "qtd_produzida", "ano"],
-    date: { dt_ini_plan: "date", dt_entrega: "date" },
-    granularidade: "1 linha por OP x máquina x data planejada",
-    classificacao: "PRINCIPAL",
-    observacao: "15.550 linhas. Planejado x produzido. Chave candidata (num_ordem, maquina, dt_ini_plan) AINDA NÃO CONFIRMADA contra o dado.",
-  },
+  // DB_ADERENCIA_DIARIA promovida pra tabela aderencia_programacao em
+  // 2026-09-11 (ver TABLE_DEFS em lib.js) — saiu do inventário porque já
+  // alimenta o Supabase; sem isso o build-database-central.js tentaria
+  // criar a mesma aba duas vezes.
   {
     sheet: "DB_ADERENCIA_SEMANAL", origem: "ADERENCIA_SEMANAL",
     fileKeywords: ["aderencia"], sheetMatch: ["aderencia_semanal"],
