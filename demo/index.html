@@ -759,6 +759,58 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 .drawer-facas-item{ display:flex; justify-content:space-between; align-items:center; padding:9px 0; border-bottom:1px solid var(--glass-border); font-size:12.5px; }
 .drawer-facas-item:last-child{ border-bottom:none; }
 
+/* ---------- seletor de período (calendário) ---------- */
+.period-overlay{
+  position:fixed; inset:0; z-index:60; background:rgba(7,10,14,0.4); backdrop-filter:blur(3px);
+  display:flex; align-items:center; justify-content:center; padding:16px;
+  opacity:0; pointer-events:none; transition:opacity .25s var(--ease);
+}
+.period-overlay.open{ opacity:1; pointer-events:auto; }
+.period-popup{
+  width:100%; max-width:360px; background:var(--glass-bg-strong); backdrop-filter:blur(30px) saturate(180%);
+  -webkit-backdrop-filter:blur(30px) saturate(180%); border:1px solid var(--glass-border); border-radius:16px;
+  box-shadow:var(--glass-shadow); padding:18px 18px 16px;
+  transform:scale(.94) translateY(8px); transition:transform .28s var(--ease);
+}
+.period-overlay.open .period-popup{ transform:scale(1) translateY(0); }
+
+.period-tabs{ display:flex; gap:4px; padding:4px; border-radius:99px; background:var(--surface-sunken); border:1px solid var(--border); margin-bottom:14px; }
+.period-tabs button{
+  flex:1; font-family:inherit; font-size:12.5px; font-weight:600; padding:7px 0; border-radius:99px; border:1px solid transparent;
+  cursor:pointer; background:transparent; color:var(--text-secondary); transition:background .2s var(--ease), color .2s var(--ease);
+}
+.period-tabs button[aria-pressed="true"]{ background:linear-gradient(155deg, var(--series-3), var(--accent) 65%, var(--series-1)); color:var(--accent-ink); }
+
+.period-cal-head{ display:flex; align-items:center; justify-content:space-between; margin-bottom:10px; }
+.period-cal-head button{ background:none; border:none; color:var(--text-secondary); font-size:1.05rem; cursor:pointer; padding:3px 9px; border-radius:6px; line-height:1; }
+.period-cal-head button:hover{ background:var(--surface-sunken); color:var(--text-primary); }
+.period-cal-titulo{ font-weight:700; font-size:13px; color:var(--text-primary); text-transform:capitalize; }
+
+.period-cal-dow, .period-cal-grid{ display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+.period-cal-dow span{ font-size:10px; text-align:center; color:var(--text-muted); padding-bottom:4px; text-transform:uppercase; }
+.period-day{
+  aspect-ratio:1; display:flex; align-items:center; justify-content:center; font-size:12.5px; font-family:inherit;
+  border-radius:7px; cursor:pointer; color:var(--text-primary); background:transparent; border:1px solid transparent;
+  transition:background .15s var(--ease);
+}
+.period-day:hover{ background:var(--surface-sunken); }
+.period-day.out{ color:var(--text-muted); opacity:.45; }
+.period-day.today{ border-color:var(--border-strong); }
+.period-day.sel, .period-day.range-edge{ background:linear-gradient(155deg, var(--series-3), var(--accent) 65%, var(--series-1)); color:var(--accent-ink); font-weight:700; }
+.period-day.range{ background:var(--accent-soft); }
+
+.period-mes-grid{ display:grid; grid-template-columns:repeat(3,1fr); gap:7px; }
+.period-mes-item{
+  padding:10px 6px; text-align:center; border-radius:9px; cursor:pointer; font-size:12.5px; font-family:inherit;
+  background:var(--surface-sunken); border:1px solid var(--border); color:var(--text-primary); text-transform:capitalize;
+}
+.period-mes-item:hover{ border-color:var(--border-strong); }
+.period-mes-item.sel{ background:linear-gradient(155deg, var(--series-3), var(--accent) 65%, var(--series-1)); color:var(--accent-ink); font-weight:700; border-color:transparent; }
+
+.period-nota{ font-size:11px; line-height:1.5; color:var(--text-muted); margin:12px 2px 0; }
+.period-foot{ display:flex; justify-content:space-between; align-items:center; margin-top:14px; gap:10px; }
+.period-info{ font-size:12px; color:var(--text-secondary); }
+
 @media (max-width: 1080px){
   .grid-2{ grid-template-columns: 1fr; }
   .machine-grid{ grid-template-columns: repeat(2,1fr); }
@@ -862,11 +914,9 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
       </div>
       <div class="topbar-right">
         <span class="tag-demo" id="data-source-tag" title="Indicadores, máquinas e motivos de perda vêm dos BIs de Produção. Os valores numéricos são de referência até a conexão com a fonte de dados."><span class="dot"></span>Estrutura dos BIs &middot; valores de referência</span>
-        <select class="pill-select" id="period-select" aria-label="Período">
-          <option value="14" selected>Últimos 14 dias</option>
-          <option value="7">Últimos 7 dias</option>
-          <option value="30">Este mês</option>
-        </select>
+        <button class="pill-select" id="period-btn" type="button" aria-haspopup="dialog" aria-expanded="false">
+          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" style="margin-right:5px; vertical-align:-2px;"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3v3.2M16 3v3.2"/></svg><span id="period-label">Este mês</span>
+        </button>
         <button class="icon-btn" id="live-toggle" aria-pressed="true"><span class="live-dot" id="live-dot"></span><span id="live-label">Ao vivo</span></button>
         <button class="icon-btn theme-toggle" id="theme-toggle" type="button" title="Trocar tema" aria-label="Trocar tema">
           <svg id="theme-icon-sun" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8L6 18M18 6l1.8-1.8"/></svg>
@@ -1151,6 +1201,45 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
   <div class="drawer-body" id="drawer-body"></div>
 </aside>
 
+<div class="period-overlay" id="period-overlay" hidden>
+  <div class="period-popup" role="dialog" aria-modal="true" aria-label="Escolher período">
+    <div class="period-tabs" role="group" aria-label="Tipo de período">
+      <button type="button" data-modo="dia" aria-pressed="false">Dia</button>
+      <button type="button" data-modo="semana" aria-pressed="false">Semana</button>
+      <button type="button" data-modo="mes" aria-pressed="true">Mês</button>
+    </div>
+
+    <div id="period-cal-wrap">
+      <div class="period-cal-head">
+        <button type="button" id="period-cal-prev" aria-label="Mês anterior">‹</button>
+        <span class="period-cal-titulo" id="period-cal-titulo"></span>
+        <button type="button" id="period-cal-next" aria-label="Próximo mês">›</button>
+      </div>
+      <div class="period-cal-dow" id="period-cal-dow"></div>
+      <div class="period-cal-grid" id="period-cal-grid"></div>
+    </div>
+
+    <div id="period-mes-wrap" hidden>
+      <div class="period-cal-head">
+        <button type="button" id="period-ano-prev" aria-label="Ano anterior">‹</button>
+        <span class="period-cal-titulo" id="period-ano-titulo"></span>
+        <button type="button" id="period-ano-next" aria-label="Próximo ano">›</button>
+      </div>
+      <div class="period-mes-grid" id="period-mes-grid"></div>
+    </div>
+
+    <p class="period-nota">O resumo por máquina, perdas e produtividade seguem este período. As séries mensais (Aparas, Scrap, Produção em kg) continuam mostrando os últimos 12 meses de contexto.</p>
+
+    <div class="period-foot">
+      <span class="period-info" id="period-info"></span>
+      <div style="display:flex; gap:8px;">
+        <button type="button" class="icon-btn" id="period-cancelar">Cancelar</button>
+        <button type="button" class="primary-btn" id="period-confirmar" disabled>Aplicar</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div class="assistant">
   <div class="assistant-panel" id="assistant-panel" hidden>
     <div class="assistant-head">
@@ -1384,26 +1473,41 @@ function applyFallback(){
 /* Carrega as views reais do Supabase. Se der qualquer problema (rede, view
    ainda não criada, tabela vazia), cai no fallback inteiro — nunca mistura
    as duas fontes numa mesma tela. */
-async function loadRealData(){
+// yyyy-mm-dd local (não usar toISOString — ela converte pra UTC e pode
+// voltar um dia, dependendo da hora e do fuso do navegador).
+function isoDate(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
+
+async function loadRealData(periodoDe, periodoAte){
   const cfg = window.SUPABASE_CONFIG;
   const configured = cfg && !cfg.url.includes("SEU-PROJETO") && window.gualapackAuth;
   if(!configured){ applyFallback(); return; }
 
   const client = window.gualapackAuth;
+  // p_ate é EXCLUSIVO (bate com o "< p_ate" das funções no banco) — pra
+  // incluir o dia inteiro de "hoje", quem chama já manda periodoAte como
+  // amanhã, não hoje.
+  const pDe  = periodoDe ? isoDate(periodoDe) : null;
+  const pAte = periodoAte ? isoDate(periodoAte) : null;
   try{
     const [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes, prodRes, statusRes] = await Promise.all([
-      client.from("v_maquinas_resumo").select("*"),
-      client.from("v_perda_por_motivo").select("*"),
-      client.from("v_perda_por_classificacao").select("*"),
-      client.from("v_downtime_por_status").select("*"),
+      // Resumo por máquina, perdas, downtime, ops e produtividade agora são
+      // FUNÇÕES parametrizadas por período (p_de/p_ate) — é o que o
+      // seletor de datas do topo filtra de verdade. As séries mensais
+      // (fardos, scrap, kg, gantt do último dia, frescor) continuam vindo
+      // de view sem filtro: são contexto de 12 meses / snapshot do último
+      // dia, não "o painel neste período".
+      client.rpc("rpc_maquinas_resumo", { p_de: pDe, p_ate: pAte }),
+      client.rpc("rpc_perda_por_motivo", { p_de: pDe, p_ate: pAte }),
+      client.rpc("rpc_perda_por_classificacao", { p_de: pDe, p_ate: pAte }),
+      client.rpc("rpc_downtime_por_status", { p_de: pDe, p_ate: pAte }),
       client.from("v_fardos_mensal").select("*"),
       // v_scrap_bi_mensal (não v_refugo_mensal) — é o número que fecha igual
       // ao Power BI da Gualapack (validado com o usuário em 2026-09-16);
       // v_refugo_mensal (JGR) não batia. Ver schema_views.sql.
       client.from("v_scrap_bi_mensal").select("*"),
-      client.from("v_ops_refugo").select("*"),
+      client.rpc("rpc_ops_refugo", { p_de: pDe, p_ate: pAte }),
       client.from("v_apontamentos_ultimo_dia").select("*"),
-      client.from("v_produtividade_maquina").select("*"),
+      client.rpc("rpc_produtividade_maquina", { p_de: pDe, p_ate: pAte }),
       client.from("v_dados_status").select("*"),
     ]);
     const erro = [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes].find(r=>r.error);
@@ -1924,11 +2028,6 @@ renderKpis(document.getElementById("kpi-row"), kpisGerais);
   });
   render();
 
-  window.setDashboardPeriod = function(dias){
-    janela = dias<=7 ? 6 : dias<=14 ? 12 : 12;
-    if(sub) sub.textContent = `% sobre peso bruto REBs · últimos ${janela} meses`;
-    render();
-  };
   window.rerenderAparas = render;
 })();
 
@@ -2432,7 +2531,11 @@ window.renderGanttForTheme = renderGantt;
         const dc = (ci+ei) % 3 !== 0;
         linhas.push({
           cliente: cli,
-          classe: CLASSIFICACOES[(ci+ei) % CLASSIFICACOES.length].nome,
+          // guarda contra CLASSIFICACOES vazia: com o filtro de datas dá pra
+          // escolher um dia sem nenhum apontamento classificado, e
+          // "% 0" (módulo por zero) vira NaN — CLASSIFICACOES[NaN] é
+          // undefined e travava a tabela de WIP inteira.
+          classe: (CLASSIFICACOES[(ci+ei) % CLASSIFICACOES.length] || {nome:"—"}).nome,
           etapa: et.nome,
           carteira: Math.round(metros*0.42),
           metros, dc
@@ -2791,15 +2894,6 @@ if(footerNote){
   window.refreshLiveStatus = refreshStatus; // chamado pelo boot() depois de loadRealData()
 })();
 
-/* ============ seletor de período ============ */
-(function(){
-  const select = document.getElementById("period-select");
-  select.addEventListener("change", ()=>{
-    const days = parseInt(select.value, 10);
-    if(window.setDashboardPeriod) window.setDashboardPeriod(days);
-  });
-})();
-
 /* ============ paralaxe sutil no fundo líquido ============ */
 (function(){
   if(window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -2854,16 +2948,188 @@ if(footerNote){
   });
 })();
 
+/* ============ seletor de período (calendário) ============
+   Substitui o dropdown "14 dias / 7 dias / este mês", que nunca filtrava
+   o painel de verdade (só ajustava a janela de um gráfico). Agora troca
+   de período de fato: grava ?de=&ate= na URL e recarrega a página — full
+   reload de propósito, não um refetch in-place, pra não correr risco de
+   duplicar os ~24 addEventListener que renderDashboard() registra a cada
+   chamada (ela foi desenhada pra rodar uma vez por carregamento). A sessão
+   do Supabase persiste em localStorage, então o reload não desloga
+   ninguém — só o boot() roda de novo com o período novo. */
+(function(){
+  const MESES_NOME = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+  const DOW = ["dom","seg","ter","qua","qui","sex","sáb"];
+
+  function addDays(d,n){ const r=new Date(d); r.setDate(r.getDate()+n); return r; }
+  function inicioSemana(d){ const r=new Date(d); r.setDate(r.getDate()-r.getDay()); return r; }
+  function fimSemana(d){ return addDays(inicioSemana(d),6); }
+  function mesmoDia(a,b){ return a && b && a.getFullYear()===b.getFullYear() && a.getMonth()===b.getMonth() && a.getDate()===b.getDate(); }
+  function fmtCurto(d){ return d.toLocaleDateString("pt-BR",{day:"2-digit",month:"2-digit"}); }
+
+  // (de, ateExclusivo) -> texto pro botão. Reconhece dia/semana/mês pelo
+  // formato do intervalo, sem precisar guardar em qual aba ele foi
+  // escolhido — assim funciona igual pra um período vindo da URL.
+  window.rotuloPeriodo = function(de, ateExclusivo){
+    const ateInc = addDays(ateExclusivo, -1);
+    if(mesmoDia(de, ateInc)) return fmtCurto(de);
+    if(de.getDate()===1){
+      const fimMes = new Date(de.getFullYear(), de.getMonth()+1, 0);
+      if(mesmoDia(ateInc, fimMes)) return MESES_NOME[de.getMonth()].slice(0,3)+"/"+String(de.getFullYear()).slice(-2);
+    }
+    return fmtCurto(de) + " – " + fmtCurto(ateInc);
+  };
+
+  const overlay = document.getElementById("period-overlay");
+  const btn = document.getElementById("period-btn");
+  const label = document.getElementById("period-label");
+  const btnCancelar = document.getElementById("period-cancelar");
+  const btnConfirmar = document.getElementById("period-confirmar");
+  const info = document.getElementById("period-info");
+  if(!overlay || !btn) return;
+
+  let modo = "mes";
+  let viewMes = new Date().getMonth(), viewAno = new Date().getFullYear();
+  let anoGrid = new Date().getFullYear();
+  let pendDia = null, pendSemanaAncora = null, pendMes = null;
+
+  function abrir(){
+    overlay.hidden = false;
+    btn.setAttribute("aria-expanded","true");
+    document.body.classList.add("no-scroll");
+    requestAnimationFrame(()=> requestAnimationFrame(()=> overlay.classList.add("open")));
+    renderTudo();
+  }
+  function fechar(){
+    overlay.classList.remove("open");
+    btn.setAttribute("aria-expanded","false");
+    document.body.classList.remove("no-scroll");
+    setTimeout(()=>{ if(!overlay.classList.contains("open")) overlay.hidden = true; }, 300);
+  }
+  btn.addEventListener("click", abrir);
+  btnCancelar.addEventListener("click", fechar);
+  overlay.addEventListener("click", e=>{ if(e.target===overlay) fechar(); });
+  document.addEventListener("keydown", e=>{ if(e.key==="Escape" && overlay.classList.contains("open")) fechar(); });
+
+  document.querySelectorAll(".period-tabs button").forEach(tab=>{
+    tab.addEventListener("click", ()=>{
+      modo = tab.dataset.modo;
+      document.querySelectorAll(".period-tabs button").forEach(b=> b.setAttribute("aria-pressed", String(b===tab)));
+      document.getElementById("period-cal-wrap").hidden = (modo==="mes");
+      document.getElementById("period-mes-wrap").hidden = (modo!=="mes");
+      renderTudo();
+    });
+  });
+
+  document.getElementById("period-cal-prev").addEventListener("click", ()=>{ viewMes--; if(viewMes<0){viewMes=11;viewAno--;} renderCalendario(); });
+  document.getElementById("period-cal-next").addEventListener("click", ()=>{ viewMes++; if(viewMes>11){viewMes=0;viewAno++;} renderCalendario(); });
+  document.getElementById("period-ano-prev").addEventListener("click", ()=>{ anoGrid--; renderMesGrid(); });
+  document.getElementById("period-ano-next").addEventListener("click", ()=>{ anoGrid++; renderMesGrid(); });
+
+  function renderTudo(){ if(modo==="mes") renderMesGrid(); else renderCalendario(); atualizaConfirmar(); }
+
+  const dowRow = document.getElementById("period-cal-dow");
+  dowRow.innerHTML = DOW.map(d=>`<span>${d}</span>`).join("");
+
+  function renderCalendario(){
+    document.getElementById("period-cal-titulo").textContent = MESES_NOME[viewMes] + " " + viewAno;
+    const grid = document.getElementById("period-cal-grid");
+    const primeiro = new Date(viewAno, viewMes, 1);
+    const inicio = addDays(primeiro, -primeiro.getDay());
+    let semIni=null, semFim=null;
+    if(modo==="semana" && pendSemanaAncora){ semIni=inicioSemana(pendSemanaAncora); semFim=fimSemana(pendSemanaAncora); }
+    let html = "";
+    for(let i=0;i<42;i++){
+      const d = addDays(inicio,i);
+      const out = d.getMonth()!==viewMes;
+      const cls = ["period-day"];
+      if(out) cls.push("out");
+      if(mesmoDia(d,new Date())) cls.push("today");
+      if(modo==="dia" && mesmoDia(d,pendDia)) cls.push("sel");
+      if(modo==="semana" && semIni && d>=semIni && d<=semFim) cls.push(mesmoDia(d,semIni)||mesmoDia(d,semFim) ? "range-edge" : "range");
+      html += `<button type="button" class="${cls.join(" ")}" data-iso="${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}">${d.getDate()}</button>`;
+    }
+    grid.innerHTML = html;
+    grid.querySelectorAll(".period-day").forEach(elBtn=>{
+      elBtn.addEventListener("click", ()=>{
+        const d = new Date(elBtn.dataset.iso + "T00:00:00");
+        if(modo==="dia") pendDia = d; else pendSemanaAncora = d;
+        renderCalendario(); atualizaConfirmar();
+      });
+    });
+  }
+
+  function renderMesGrid(){
+    document.getElementById("period-ano-titulo").textContent = String(anoGrid);
+    const grid = document.getElementById("period-mes-grid");
+    grid.innerHTML = MESES_NOME.map((m,i)=>{
+      const sel = pendMes && pendMes.ano===anoGrid && pendMes.mes===i;
+      return `<div class="period-mes-item${sel?" sel":""}" data-mes="${i}">${m.slice(0,3)}</div>`;
+    }).join("");
+    grid.querySelectorAll(".period-mes-item").forEach(el=>{
+      el.addEventListener("click", ()=>{ pendMes = { ano: anoGrid, mes: +el.dataset.mes }; renderMesGrid(); atualizaConfirmar(); });
+    });
+  }
+
+  function atualizaConfirmar(){
+    const pronto = (modo==="dia" && pendDia) || (modo==="semana" && pendSemanaAncora) || (modo==="mes" && pendMes);
+    btnConfirmar.disabled = !pronto;
+    if(!pronto){ info.textContent = ""; return; }
+    if(modo==="dia") info.textContent = fmtCurto(pendDia);
+    else if(modo==="semana") info.textContent = fmtCurto(inicioSemana(pendSemanaAncora)) + " – " + fmtCurto(fimSemana(pendSemanaAncora));
+    else info.textContent = MESES_NOME[pendMes.mes] + " de " + pendMes.ano;
+  }
+
+  btnConfirmar.addEventListener("click", ()=>{
+    let de, ate;
+    if(modo==="dia"){ de=pendDia; ate=addDays(pendDia,1); }
+    else if(modo==="semana"){ de=inicioSemana(pendSemanaAncora); ate=addDays(fimSemana(pendSemanaAncora),1); }
+    else{ de=new Date(pendMes.ano,pendMes.mes,1); ate=new Date(pendMes.ano,pendMes.mes+1,1); }
+    const url = new URL(location.href);
+    url.searchParams.set("de", isoDate(de));
+    url.searchParams.set("ate", isoDate(ate));
+    location.href = url.toString();
+  });
+
+  // rótulo inicial, antes do primeiro loadRealData responder — evita o
+  // botão mostrar "Este mês" (texto fixo do HTML) se a URL já tinha outro
+  // período vindo de um link compartilhado.
+  const usp = new URLSearchParams(location.search);
+  if(usp.get("de") && usp.get("ate")){
+    try{
+      label.textContent = window.rotuloPeriodo(new Date(usp.get("de")+"T00:00:00"), new Date(usp.get("ate")+"T00:00:00"));
+    }catch(e){}
+  }
+})();
+
 /* ============ carga inicial ============ */
 function whenSessionReady(cb){
   if(window.__GUALAPACK_SESSION_READY__){ cb(); return; }
   document.addEventListener("gualapack-session-ready", cb, { once:true });
 }
+
+// Período: lê ?de=&ate= da URL (o que o popup grava ao confirmar); sem
+// isso (primeira visita), o padrão é o mês corrente até hoje.
+function periodoDaUrl(){
+  const usp = new URLSearchParams(location.search);
+  const de = usp.get("de"), ate = usp.get("ate");
+  if(de && ate){
+    const dDe = new Date(de+"T00:00:00"), dAte = new Date(ate+"T00:00:00");
+    if(!isNaN(dDe) && !isNaN(dAte)) return { de:dDe, ate:dAte };
+  }
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  return { de: new Date(hoje.getFullYear(), hoje.getMonth(), 1), ate: addDaysGlobal(hoje,1) };
+}
+function addDaysGlobal(d,n){ const r=new Date(d); r.setDate(r.getDate()+n); return r; }
+
 async function boot(){
+  const { de, ate } = periodoDaUrl();
   try{
-    await loadRealData();
+    await loadRealData(de, ate);
     renderDashboard();
     if(window.refreshLiveStatus) window.refreshLiveStatus();
+    const labelEl = document.getElementById("period-label");
+    if(labelEl && window.rotuloPeriodo) labelEl.textContent = window.rotuloPeriodo(de, ate);
   }catch(err){
     // Erro aqui não pode deixar a página presa atrás do "auth-pending" pra
     // sempre — melhor mostrar o painel (mesmo que incompleto) do que uma
