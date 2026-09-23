@@ -74,12 +74,14 @@ function coletarBasesSeguro(nome, bytes, importadoEm) {
   }
 }
 
-// Teto de linhas por aba na extração pro Supabase. 219.623 (Base Apontamento
-// de 2026) passa; 379.792 (a de 2025) não terminou de ser lida em 42 min.
+// Teto de linhas por aba na extração pro Supabase. A Base Apontamento de
+// 2026 cresce ~1.000 linhas/dia (250.050 em 18/09, ~350 mil no fim do ano);
+// 379.792 (a de 2025) não terminou de ser lida em 42 min e segue pulada.
+// Em 18/09 o teto antigo (250 mil) pulou a de 2026 e zerou as horas do ano.
 // Diferente do TETO_LINHAS_POR_ABA do collect-bases, que é amostragem de
 // inventário: aqui não dá pra truncar, porque a janela de retenção quer
 // justamente as linhas do FIM da aba — então ou lê inteira, ou pula.
-const TETO_LINHAS_TABELA = 250_000;
+const TETO_LINHAS_TABELA = 360_000;
 
 const PENDENTES = [
   "DB_TMR (Gráficos Tendência.xlsx, abas TMR-*) — aguardando confirmar chave/granularidade mista (máquina x processo).",
