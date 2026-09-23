@@ -825,7 +825,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 // Guarda de autenticação. Roda antes de qualquer dado ser desenhado: sem
 // sessão Supabase válida, redireciona pro login e nunca mostra o painel.
 // Isso é só a camada de UX — a segurança de verdade está no RLS do banco
-// (backend/schema.sql), que rejeita as queries mesmo se alguém pular essa
+// (backend/sql/schema.sql), que rejeita as queries mesmo se alguém pular essa
 // tela chamando a API diretamente sem sessão.
 // ---------------------------------------------------------------------------
 (function(){
@@ -1273,14 +1273,14 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
    ----------------------------------------------------------------------------
    As tabelas reais (apontamentos, fardos_aparas, aderência...) têm centenas
    de milhares de linhas — este arquivo nunca faz select nelas direto. Ele lê
-   views agregadas (backend/schema_views.sql), que já entregam os totais
+   views agregadas (backend/sql/schema_views.sql), que já entregam os totais
    prontos. Se o backend não estiver configurado (preview local) ou a carga
    real falhar por qualquer motivo, cai automaticamente nos dados de
    referência abaixo — o painel nunca fica com uma tela quebrada ou metade
    real/metade fictícia.
 
    Nomes de status de apontamento e suas cores oficiais vieram dos .pbix
-   (ver docs/estrutura-bi.md) — são metadado de exibição, não dado
+   (ver docs/mapeamento/estrutura-bi.md) — são metadado de exibição, não dado
    variável, por isso continuam fixos aqui independente da fonte.
    ========================================================================== */
 
@@ -1333,7 +1333,8 @@ function prettyCodigo(raw){
 }
 
 /* Dados de referência — usados só se o backend não estiver configurado ou a
-   carga real falhar. Mesma estrutura dos BIs (ver docs/estrutura-bi.md). */
+   carga real falhar. Mesma estrutura dos BIs (ver docs/mapeamento/estrutura-bi.md).
+   Quando isso acontece, o selo do topo troca pra "valores de referência". */
 const FALLBACK = {
   MAQUINAS: [
     { id:"COATING01", nome:"COATING 01", processo:"Coating",   rota:"—",     tmr:71, vel:186, velRef:210, aparas:4.1, horasProd:412, horasTot:580 },
@@ -1398,7 +1399,6 @@ const FALLBACK = {
     { nome:"PCP",                 horas: 22.2, cor:"#9400D3" },
     { nome:"Refeição Autorizada", horas: 14.8, cor:"#FA8072" },
   ],
-  GANTT_SEGMENTS_RANDOM: true, // sem base real — o Gantt sorteia segmentos plausíveis, como sempre fez
   REFUGO_PRODUCAO_MAQUINA: [
     { maquina:"RT01",   kg_perda: 8420, motivo:"01_Falha_Impressao" },
     { maquina:"REB 05", kg_perda: 6180, motivo:"08_Refile" },
@@ -1413,10 +1413,8 @@ const FALLBACK = {
   ],
 };
 /* Etapas de WIP e carteira — nenhuma tabela real disso foi conectada ainda
-   (não veio nenhum BI de WIP/Carteira na carga). Fica isolado da view
-   "Aparas & Refugo" de propósito, pra não misturar classificação real com
-   proporção fictícia — ver aviso na própria aba WIP & Carteira. */
-const WIP_CLASSIFICACOES_DEMO = FALLBACK.CLASSIFICACOES;
+   (não veio nenhum BI de WIP/Carteira na carga). Números de referência, com
+   aviso na própria aba WIP & Carteira. */
 const WIP_ETAPAS = [
   { nome:"IMPRESSO",           metros: 486200, dc: 318400 },
   { nome:"WIP INTERMEDIÁRIO",  metros: 312700, dc: 224900 },
@@ -1489,7 +1487,7 @@ async function loadRealData(periodoDe, periodoAte){
   const pDe  = periodoDe ? isoDate(periodoDe) : null;
   const pAte = periodoAte ? isoDate(periodoAte) : null;
   try{
-    const [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes, prodRes, statusRes] = await Promise.all([
+    const [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes, prodRes, statusRes, refugoProdRes, producaoKgRes] = await Promise.all([
       // Resumo por máquina, perdas, downtime, ops e produtividade agora são
       // FUNÇÕES parametrizadas por período (p_de/p_ate) — é o que o
       // seletor de datas do topo filtra de verdade. As séries mensais
@@ -1509,6 +1507,11 @@ async function loadRealData(periodoDe, periodoAte){
       client.from("v_apontamentos_ultimo_dia").select("*"),
       client.rpc("rpc_produtividade_maquina", { p_de: pDe, p_ate: pAte }),
       client.from("v_dados_status").select("*"),
+      // Refugo por máquina e produção em kg: tratados à parte lá embaixo
+      // (erro nelas não derruba o painel), mas pedidos junto com o resto —
+      // antes eram uma segunda rodada que só começava depois desta.
+      client.from("v_refugo_producao_maquina").select("*"),
+      client.from("v_producao_kg_mensal").select("*"),
     ]);
     const erro = [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes].find(r=>r.error);
     if(erro) throw erro.error;
@@ -1650,14 +1653,9 @@ async function loadRealData(periodoDe, periodoAte){
       PRODUTIVIDADE = hrs>0 ? m2/hrs : null;
     }
 
-    // Views novas (Fase 1 de correção de planilhas) — busca à parte e sem
-    // travar o resto do painel se ainda não existirem (schema_views.sql
-    // precisa ser rodado de novo no Supabase pra criá-las).
+    // Refugo por máquina / produção em kg — erro aqui não trava o resto do
+    // painel, só esses dois gráficos caem na referência.
     try{
-      const [refugoProdRes, producaoKgRes] = await Promise.all([
-        client.from("v_refugo_producao_maquina").select("*"),
-        client.from("v_producao_kg_mensal").select("*"),
-      ]);
       if(refugoProdRes.error) throw refugoProdRes.error;
       if(producaoKgRes.error) throw producaoKgRes.error;
       REFUGO_PRODUCAO_MAQUINA = (refugoProdRes.data||[]).slice(0,12).map(r=>({
@@ -2064,6 +2062,9 @@ renderMotivoChart();
       const area = path + ` L${w-2},${h-2} L2,${h-2} Z`;
       const st = tmrStatus(m.tmr);
       const cor = statusCor[st];
+      // id do gradiente sem espaço: "url(#mg-REB 05)" é referência inválida e
+      // o navegador pinta a área de preto (acontecia em toda REB e no Coating).
+      const gradId = String(m.id).replace(/[^A-Za-z0-9_-]+/g, "-");
       return `
       <div class="machine-card glass-live st-${st}" data-maq="${m.id}" tabindex="0" role="button">
         <div class="machine-top">
@@ -2076,11 +2077,11 @@ renderMotivoChart();
         <div class="machine-hero">
           <div class="machine-oee"><span class="v mono">${m.tmr}%</span><span class="l">TMR</span></div>
           <svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-            <defs><linearGradient id="mg-${m.id}" x1="0" y1="0" x2="0" y2="1">
+            <defs><linearGradient id="mg-${gradId}" x1="0" y1="0" x2="0" y2="1">
               <stop offset="0%" stop-color="${cor}" stop-opacity="0.35"/>
               <stop offset="100%" stop-color="${cor}" stop-opacity="0"/>
             </linearGradient></defs>
-            <path d="${area}" fill="url(#mg-${m.id})"/>
+            <path d="${area}" fill="url(#mg-${gradId})"/>
             <path d="${path}" fill="none" stroke="${cor}" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/>
           </svg>
         </div>
@@ -2333,11 +2334,14 @@ function renderGantt(){
 
   const segsPorMaq = MAQUINAS.map(m=>{
     // Máquina com segmentos reais carregados (último dia com apontamento) —
-    // usa eles. Sem isso pra essa máquina (ex: parada o dia todo, sem
-    // apontamento nenhum), sorteia uma linha plausível — mesmo comportamento
-    // de sempre, só como fallback por máquina em vez de tudo ou nada.
+    // usa eles.
     const real = GANTT_POR_MAQUINA && GANTT_POR_MAQUINA.get(m.id);
     if(real && real.length) return real;
+    // Com dado real, máquina sem apontamento no dia fica com a linha vazia.
+    // Antes sorteava barras aqui também — mostrava produção/parada que não
+    // aconteceu, com o selo de "dado real" no topo. O sorteio abaixo só vale
+    // no modo de referência (selo "valores de referência").
+    if(USANDO_DADOS_REAIS) return [];
 
     const segs = [];
     let t = 0;

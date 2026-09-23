@@ -4,7 +4,11 @@
 // Chamada direto do navegador (client.functions.invoke), com a sessão do
 // usuário logado. Verifica que quem chama é admin (role = 'admin' em
 // profiles), depois faz o parse da aba enviada (SheetJS) e upsert na tabela
-// escolhida — ver backend/README-dados.md pro mapeamento planilha -> tabela.
+// escolhida — ver docs/guias/upload-manual.md pro mapeamento planilha -> tabela.
+//
+// LEGADO: caminho de antes da carga automática (backend/sync-drive). As
+// regras de tabela/coluna daqui são uma cópia que NÃO acompanha lib.js — não
+// cobre scrap_bi_mensal, producao_metros nem classificacao_apontamento.
 //
 // Corpo esperado (POST):
 //   {

@@ -1,3 +1,8 @@
+## Projeto
+
+Antes de mudar qualquer coisa, leia no `README.md` as seções "Linha de
+raciocínio" e "Regras do projeto". Elas valem pra toda sessão.
+
 ## graphify
 
 This project has a knowledge graph at graphify-out/ with god nodes, community structure, and cross-file relationships.

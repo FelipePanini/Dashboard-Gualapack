@@ -1,29 +1,20 @@
 // ============================================================================
-// sync.js — carga diária no Supabase, a partir do arquivo central
-// (DATABASE_GUALAPACK.xlsx, no Google Drive).
+// sync.js — ETAPA 2 da carga diária: DATABASE_GUALAPACK.xlsx -> Supabase.
 // ----------------------------------------------------------------------------
-// Arquitetura (decidida com o usuário em 2026-09-09):
-//
-//   BASES ORIGINAIS (Drive)
-//         |
-//   build-database-central.js — lê os originais, escreve as abas DB_
+//   build-database-central.js (ETAPA 1) — planilhas originais -> arquivo central
 //         |
 //   DATABASE_GUALAPACK.xlsx (Drive)
 //         |
-//   ESTE SCRIPT — lê SÓ esse arquivo, decide INSERT/troca-por-arquivo/upsert
+//   ESTE SCRIPT — lê SÓ esse arquivo, decide troca-por-arquivo/upsert
 //         |
 //   SUPABASE
 //
-// Antes deste corte, este script lia os 21 arquivos originais direto — ver
-// histórico no git (commit anterior a 2026-09-09) se precisar comparar.
-// A lógica de coerção de tipos e checagem de chave já rodou dentro de
-// build-database-central.js; aqui os valores já vêm prontos (datas em ISO,
-// números como número) — só falta decidir como gravar em cada tabela.
+// A coerção de tipos e a checagem de chave já rodaram no build; aqui os
+// valores já chegam prontos (datas em ISO, números como número) — só falta
+// decidir como gravar em cada tabela.
 //
-// Duas tabelas do TABLE_DEFS (aderencia_maquinas_diaria, aderencia_programacao)
-// não têm aba própria no arquivo central ainda — e não tinham nenhum arquivo
-// de origem real nesta pasta do Drive mesmo antes do corte (confirmado em
-// 2026-09-09), então não é uma regressão: já estavam sem dado real.
+// aderencia_maquinas_diaria não tem aba no arquivo central: o arquivo de
+// origem dela não existe mais na pasta do Drive.
 // ============================================================================
 
 import { createClient } from "@supabase/supabase-js";
@@ -31,7 +22,7 @@ import * as XLSX from "xlsx";
 import {
   RETENTION_MONTHS, RETENTION_DATE_COL, REPLACE_BY_SOURCE, DEDUPE_KEY,
   CONFLICT_COLUMNS, dedupeRows, driveClient, listFolderFiles, downloadFile,
-  CENTRAL_FILE_NAME, DB_SHEET_NAME, detectTables,
+  CENTRAL_FILE_NAME, DB_SHEET_NAME, detectTables, lerFalhasDoControle, juntarArquivos,
 } from "./lib.js";
 
 const required = ["SUPABASE_URL", "SUPABASE_SERVICE_ROLE_KEY", "DRIVE_FOLDER_ID", "GOOGLE_SERVICE_ACCOUNT_JSON"];
@@ -108,7 +99,15 @@ async function main() {
     const drive = driveClient();
     const centralFile = await findCentralFile(drive);
     const bytes = await downloadFile(drive, centralFile);
-    const workbook = XLSX.read(bytes, { type: "array" });
+    // Só as abas que o sync usa. O arquivo central também carrega ~27 abas
+    // de inventário (uma delas com 170 mil linhas) que nunca vão pro
+    // Supabase — ler o arquivo inteiro gastava memória e tempo à toa.
+    const workbook = XLSX.read(bytes, { type: "array", sheets: [...Object.keys(SHEET_TO_TABLE), "DB_CONTROLE"] });
+
+    // Arquivos que falharam no build, por aba. Esses NÃO têm o dado antigo
+    // apagado abaixo — ver lerFalhasDoControle em lib.js.
+    const controle = workbook.Sheets.DB_CONTROLE ? XLSX.utils.sheet_to_json(workbook.Sheets.DB_CONTROLE, { defval: null }) : [];
+    const falhasPorAba = lerFalhasDoControle(controle);
 
     // Listagem da pasta (só metadados, sem baixar nada) — usada abaixo pra
     // limpar linhas órfãs das tabelas de troca-por-arquivo.
@@ -147,21 +146,30 @@ async function main() {
         }
 
         // Órfãos: um arquivo que ALIMENTAVA esta tabela (pelo nome, ainda
-        // presente na pasta) mas não trouxe nenhuma linha nesta rodada —
-        // aba pulada por tamanho, tudo filtrado pela retenção, etc. Sem
-        // isso, o delete abaixo só roda pros arquivos que aparecem NESTA
-        // rodada, e o que esse arquivo gravou numa carga anterior fica pra
-        // sempre. Foi exatamente o que aconteceu com "Indicadores Diário -
-        // 2025.xlsx" na troca do TMR: 46.084 linhas antigas (da aba
-        // Máquina_Embalagem, já abandonada) continuaram em "apontamentos"
-        // depois que a aba nova (Base Apontamento) passou a ser pulada por
-        // ter mais de 250 mil linhas — ver VALIDACAO_DASHBOARD.md.
+        // presente na pasta) mas não trouxe nenhuma linha nesta rodada. Sem
+        // essa limpeza, o delete abaixo só roda pros arquivos que aparecem
+        // NESTA rodada, e o que o arquivo gravou antes fica pra sempre (foi o
+        // caso das 46.084 linhas da aba Máquina_Embalagem, já abandonada —
+        // ver VALIDACAO_DASHBOARD.md).
+        //
+        // Exceção: arquivo que FALHOU no build (aba pulada por tamanho, erro
+        // de leitura...). Zero linhas ali não quer dizer "não tem mais dado",
+        // quer dizer "não deu pra ler hoje" — apagar zeraria o painel, como
+        // aconteceu com as horas de 2026 em 18/09. O dado anterior fica.
+        const falharam = falhasPorAba.get(sheetName) ?? new Set();
+        const mantidos = [];
         const candidatos = allFiles.filter((f) => detectTables(f.name).some((d) => d.table === table));
         for (const orfao of candidatos) {
           if (porArquivo.has(orfao.name)) continue;
+          if (falharam.has(orfao.name)) {
+            mantidos.push(orfao.name);
+            console.warn(`[mantido] ${table}: "${orfao.name}" falhou no build — linhas da carga anterior mantidas.`);
+            continue;
+          }
           const count = await deleteBySourceFile(table, orfao.name);
           if (count) console.log(`[limpeza] ${table}: removida(s) ${count} linha(s) órfã(s) de "${orfao.name}" (não contribuiu nesta rodada).`);
         }
+        if (mantidos.length) resumo.push(`${table}: dado anterior mantido de ${juntarArquivos(mantidos)} (falha no build)`);
 
         for (const [sourceFile, fileRows] of porArquivo) {
           await deleteBySourceFile(table, sourceFile);

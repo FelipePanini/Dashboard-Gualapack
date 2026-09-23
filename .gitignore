@@ -1,5 +1,5 @@
 node_modules/
 .env
 *.env
+# chave da conta de serviço do Google — só existe como GitHub Secret
 service-account.json
-backend/vps-sync/service-account.json

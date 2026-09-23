@@ -1,5 +1,11 @@
 # Contexto do projeto — Painel de Produção Gualapack
 
+> **Retrato histórico de 2026-09-14.** Várias coisas mudaram depois (a
+> produtividade m²/h foi ligada, o TMR passou a usar o cadastro de
+> classificação, o filtro de datas virou calendário, a carga passou a rodar
+> sozinha todo dia). O estado atual está no [README da raiz](../../README.md).
+> Nomes de servidor, IPs e caminhos pessoais foram omitidos em 2026-09-23.
+>
 > Resumo gerado em 2026-09-14 pra alimentar outra sessão de IA (ou outro
 > assistente) com o histórico completo até aqui, incluindo decisões,
 > descartes e o porquê de cada um. Escrito pra quem NÃO participou da
@@ -254,8 +260,8 @@ extração** — o resultado já está consolidado abaixo.
 
 ### Servidor SQL Server único
 
-`sbrjag-db.br.gpk.gpk-grp.local` — **mesma máquina** que também atende
-pelo IP `192.168.1.8` (confirmado pelo usuário). Banco: `Metrics`.
+Servidor SQL Server interno da Gualapack (nome de rede e IP omitidos deste
+repositório público — ficam com a TI). Banco: `Metrics`.
 **Só alcançável de dentro da rede/VPN da Gualapack** — não é resolvível
 da internet pública, então GitHub Actions normal (nuvem) não alcança.
 
@@ -278,12 +284,12 @@ Views/tabelas usadas nas consultas mapeadas:
 | `apontamentos` (principal) | SQL Server, `View_usr_apontamentos_999999`, aba "Base Apontamento" | ✅ já ligado (via Excel refresh + Drive, não conexão direta) |
 | `apontamentos` (alternativa) | mesma view, aba "BASE_APARAS"/"BASE_DETALHE" | ✅ já ligado |
 | `producao_kg` | mesma view, aba "Base Apontamentos (kg)" | ✅ já ligado |
-| `refugo_producao` | SQL Server, servidor pelo IP `192.168.1.8` (= mesma máquina), consulta nativa `SELECT ... FROM Apontamentos WHERE CodApont = 40` | ✅ já ligado |
+| `refugo_producao` | SQL Server, mesmo servidor (acessado pelo IP), consulta nativa `SELECT ... FROM Apontamentos WHERE CodApont = 40` | ✅ já ligado |
 | `aderencia_programacao` | Aderência Semanal.xlsx, aba **"ADERÊNCIA DIÁRIA"** (planejado × produzido já cruzados, 15.550 linhas) | ✅ ligado em 2026-09-11 (ver seção 8) — **falta rodar 2 SQLs no Supabase** |
 | Produtividade m²/h (`producao_metros`) | Machine Card Oficial.xlsx, aba/consulta "Produção" — junta a view principal com `EstrProcessos` (largura) | 🔴 **adiado de propósito (Opção 5, seção 10)** |
-| `maquinas` (DIM_EQTOS) | **NÃO é SQL Server** — `Excel.Workbook(File.Contents("C:\...\OneDrive - Gualapack Group\Arquivos de Gabriel Areliano - Dados de Produção\08 - Tabelas Padrões\DIM_EQTOS & GRUPO EQTO.xlsx"))`, arquivo no OneDrive corporativo do `leonardo.oliveira@gualapack.com` | ✅ já ligado — chega embutido dentro do Machine Card quando alguém atualiza o Excel, sem precisarmos de acesso direto ao OneDrive |
+| `maquinas` (DIM_EQTOS) | **NÃO é SQL Server** — `Excel.Workbook(File.Contents(...\DIM_EQTOS & GRUPO EQTO.xlsx))`, arquivo numa pasta do OneDrive corporativo da área de Produção (caminho e dono omitidos) | ✅ já ligado — chega embutido dentro do Machine Card quando alguém atualiza o Excel, sem precisarmos de acesso direto ao OneDrive |
 | "Classificação" (Machine Card) | Idem, outro arquivo na mesma pasta: `Classificação_Apontamentos.xlsx` | Não ligado ao Supabase ainda, mesmo caminho de acesso do item acima quando for a vez |
-| Absenteísmo / MOD / MOI / Rateio | OneDrive corporativo, `...Arquivos de Gabriel Areliano - KPIs\Consolidação_Dados\2. Informações\Absenteísmo.xlsx` | Não ligado ainda; mesmo caminho (chega embutido no Machine Card) |
+| Absenteísmo / MOD / MOI / Rateio | OneDrive corporativo, pasta de KPIs, `Absenteísmo.xlsx` (caminho omitido) | Não ligado ainda; mesmo caminho (chega embutido no Machine Card) |
 | `fardos_aparas` | Planilha estática (Sequenciamento mensal), sem Power Query | ✅ já ligado — não tem "fonte SQL" pra puxar, é mantida na mão mesmo |
 | `tendencia_mensal` | Graficos Tendência.xlsx, estática, sem Power Query | Existe mas sai vazia no build — não investigado ainda (ver seção 11) |
 | `refugo_aparas_historico` | Refugo Aparas.xlsx — tem `DataMashup` mas o código M vem **vazio**, sem `xl/connections.xml` — consulta órfã/abandonada | ✅ já ligado (via planilha estática mantida na mão) |

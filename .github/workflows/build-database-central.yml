@@ -1,11 +1,19 @@
 name: Montar base central (DATABASE_GUALAPACK.xlsx)
 
-# Etapa A da arquitetura combinada: consolida as bases originais do Drive
-# num único arquivo (DATABASE_GUALAPACK.xlsx), gravado de volta no Drive.
-# Só workflow_dispatch por enquanto — roda manualmente até validarmos o
-# arquivo gerado; depois disso entra num schedule antes do sync-drive.yml.
+# ETAPA 1 da carga diária: lê as planilhas originais da pasta do Drive e
+# grava o DATABASE_GUALAPACK.xlsx de volta na mesma pasta. Quando termina com
+# sucesso, a ETAPA 2 (sync-drive.yml) começa sozinha e leva o arquivo pro
+# Supabase. Pra rodar fora de hora: aba Actions > este workflow > Run workflow.
 on:
+  schedule:
+    # 05:00 UTC = 02:00 em Brasília. Leva ~10 min; a etapa 2 vem em seguida.
+    - cron: "0 5 * * *"
   workflow_dispatch: {}
+
+# Build e sync nunca rodam ao mesmo tempo (um lê o arquivo que o outro grava).
+concurrency:
+  group: carga-diaria
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -22,15 +30,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/sync-drive/package-lock.json
 
-      - run: npm install
+      - run: npm ci
+
+      - name: Testes das regras de leitura
+        run: npm test
 
       - name: Montar e gravar o arquivo central
         env:
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
-          # A aba "Base Apontamento" do Indicadores Diário 2025 tem 379.792
-          # linhas × 25 colunas; com o heap padrão do Node o processo entra em
-          # thrashing de GC e não termina.
+          # A aba "Base Apontamento" tem centenas de milhares de linhas; com o
+          # heap padrão do Node o processo entra em thrashing de GC e não termina.
           NODE_OPTIONS: --max-old-space-size=6144
         run: node build-database-central.js

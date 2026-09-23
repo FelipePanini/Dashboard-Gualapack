@@ -11,6 +11,25 @@
 -- "security_invoker = true" faz a view respeitar o RLS das tabelas de
 -- origem com base em quem está consultando (não em quem criou a view) —
 -- sem isso, uma view roda com o privilégio de quem a criou, ignorando RLS.
+--
+-- O QUE O PAINEL (demo/index.html) LÊ DE FATO
+--   Filtradas pelo calendário (p_de/p_ate, p_ate exclusivo):
+--     rpc_maquinas_resumo, rpc_perda_por_motivo, rpc_perda_por_classificacao,
+--     rpc_downtime_por_status, rpc_ops_refugo, rpc_produtividade_maquina
+--   Sem filtro (séries de 12 meses / último dia / frescor):
+--     v_fardos_mensal, v_scrap_bi_mensal, v_producao_kg_mensal,
+--     v_refugo_producao_maquina, v_apontamentos_ultimo_dia, v_dados_status
+--
+-- NÃO LIDAS PELO PAINEL (existem no banco; ficam aqui pra consulta manual)
+--   v_maquinas_resumo, v_perda_por_motivo, v_perda_por_classificacao,
+--   v_downtime_por_status, v_ops_refugo, v_produtividade_maquina — atalhos
+--   "select * from rpc_...(null, null)" = histórico inteiro;
+--   v_refugo_mensal — não bate com o Power BI (o painel usa v_scrap_bi_mensal);
+--   v_produtividade_mensal — série mensal ainda sem gráfico.
+--
+-- Postgres não deixa "create or replace" renomear ou reordenar colunas de
+-- uma view/função existente (erro 42P16): pra mudar a saída, acrescente
+-- colunas no FIM, ou faça drop + create.
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -19,14 +38,7 @@
 --    Card mistura máquinas reais com categorias administrativas (GERAL,
 --    IMPRESSORAS, MANUTENÇÃO...) que não são recursos físicos.
 --
---    "drop view" antes do "create": adicionamos horas_planejado/
---    horas_disponiveis em 2026-09-16 e o Postgres não deixa "create or
---    replace" mudar/inserir coluna no meio da lista de saída de uma view
---    existente (só no fim) — precisa recriar.
--- ----------------------------------------------------------------------------
--- ----------------------------------------------------------------------------
--- 1. Resumo por máquina — TMR, horas, perda, aderência (planejado/realizado)
---    Agora é rpc_maquinas_resumo(p_de, p_ate): função parametrizada por
+--    É rpc_maquinas_resumo(p_de, p_ate): função parametrizada por
 --    período, criada pra o filtro de datas do painel poder pedir "só este
 --    mês" / "só esta semana" em vez de sempre somar o histórico inteiro.
 --    A view abaixo é um atalho — select * from rpc(null,null) — que mantém

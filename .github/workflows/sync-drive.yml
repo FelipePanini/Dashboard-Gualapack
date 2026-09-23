@@ -1,14 +1,24 @@
 name: Carga diária de dados de produção (Google Drive)
 
+# ETAPA 2 da carga diária: DATABASE_GUALAPACK.xlsx -> Supabase.
+# Começa sozinha quando a ETAPA 1 (build-database-central.yml) termina com
+# sucesso. Se a etapa 1 falhar, esta não roda — o painel mantém o dado do dia
+# anterior e o selo de data no topo mostra até quando o dado vai.
 on:
-  schedule:
-    # 06:00 UTC = 03:00 no horário de Brasília (UTC-3)
-    - cron: "0 6 * * *"
-  workflow_dispatch: {} # permite rodar manualmente pela aba "Actions"
+  workflow_run:
+    workflows: ["Montar base central (DATABASE_GUALAPACK.xlsx)"]
+    types: [completed]
+  workflow_dispatch: {} # rodar manualmente pela aba "Actions"
+
+concurrency:
+  group: carga-diaria
+  cancel-in-progress: false
 
 jobs:
   sync:
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
+    timeout-minutes: 30
     defaults:
       run:
         working-directory: backend/sync-drive
@@ -18,8 +28,10 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/sync-drive/package-lock.json
 
-      - run: npm install
+      - run: npm ci
 
       - name: Rodar a carga
         env:
@@ -27,4 +39,7 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
           DRIVE_FOLDER_ID: ${{ secrets.DRIVE_FOLDER_ID }}
           GOOGLE_SERVICE_ACCOUNT_JSON: ${{ secrets.GOOGLE_SERVICE_ACCOUNT_JSON }}
+          # O arquivo central passa de 200 MB; mesmo lendo só as abas usadas,
+          # o heap padrão fica no limite.
+          NODE_OPTIONS: --max-old-space-size=6144
         run: node sync.js

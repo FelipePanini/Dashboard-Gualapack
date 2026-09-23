@@ -1,6 +1,19 @@
-# Dados reais — upload direto pelo painel
+# Upload manual pelo painel (legado)
 
-Sem SharePoint automático, sem Power Automate, sem app registrado no Azure.
+> **Caminho legado.** Era o fluxo principal antes da carga automática
+> ([carga-automatica-drive.md](./carga-automatica-drive.md)), que hoje roda
+> todo dia sozinha. A tela `demo/upload.html` e a função `ingest` continuam
+> publicadas, mas têm uma cópia própria das regras de tabela que **não
+> acompanha** `backend/sync-drive/lib.js`:
+>
+> - não conhece `scrap_bi_mensal`, `producao_metros` nem
+>   `classificacao_apontamento`;
+> - o que for subido por aqui é sobrescrito pela carga automática seguinte
+>   quando o nome do arquivo for o mesmo.
+>
+> Use só em emergência. Decidir entre atualizar ou aposentar este caminho
+> está na lista de pendências do [README](../../README.md).
+
 Quem atualiza os dados faz isso **de dentro do próprio painel**, arrastando
 a planilha (ou a aba certa dela) — o mesmo login de admin que já existe.
 
@@ -19,16 +32,14 @@ Dashboard já mostra o dado novo
 
 ## 1. Rodar os schemas no Supabase
 
-`SQL Editor` do Supabase → colar e rodar, nesta ordem (**rode `schema_data.sql`
-de novo mesmo se já rodou antes** — as tabelas mudaram pra bater com as
-planilhas reais):
-1. `backend/schema.sql` (se ainda não rodou)
-2. `backend/schema_data.sql`
+`SQL Editor` do Supabase → colar e rodar, nesta ordem:
+1. `backend/sql/schema.sql` (se ainda não rodou)
+2. `backend/sql/schema_data.sql`
 
 ## 2. Publicar a função `ingest` (atualizada)
 
 - Painel do Supabase → `Edge Functions` → abre `ingest` → cola o conteúdo
-  novo de [`functions/ingest/index.ts`](./functions/ingest/index.ts) por
+  novo de [`functions/ingest/index.ts`](../../backend/functions/ingest/index.ts) por
   cima → `Deploy`.
 - Mantenha **"Enforce JWT Verification" ligado**.
 
@@ -97,22 +108,6 @@ select * from apontamentos order by dt_producao desc limit 10;
 
 ## 7. Sincronização automática
 
-O caminho via SharePoint/Entra ID (app registrado pela TI) foi descartado —
-envolvia gente demais e não era viável de liberar. A sincronização
-automática que está de pé usa uma pasta pessoal do Google Drive, sem
-depender de aprovação de ninguém da empresa: ver
-[`backend/README-drive-sync.md`](./README-drive-sync.md) pro passo a passo
-completo (criar o projeto no Google Cloud, gerar a chave, compartilhar a
-pasta, cadastrar os secrets no GitHub).
-
-Até isso estar configurado, `upload.html` é o fluxo real do dia a dia;
-depois de ativo, ele vira só um botão de emergência.
-
-## Próximo passo: os gráficos do painel
-
-As tabelas e o upload já refletem a estrutura real. O próximo passo é trocar
-os arrays fictícios em `demo/index.html` pelos `select` dessas tabelas e
-ajustar os gráficos pra essas colunas (ex: TMR/velocidade agora vêm de
-`apontamentos` agregado por máquina/dia, não de uma tabela pronta) —
-mantendo o mesmo estilo visual atual. Isso é a próxima etapa, ainda não
-feita nesta rodada.
+A carga automática (pasta do Google Drive → arquivo central → Supabase, todo
+dia às 02:00) está em [carga-automatica-drive.md](./carga-automatica-drive.md).
+Com ela ativa, este upload é só um botão de emergência.

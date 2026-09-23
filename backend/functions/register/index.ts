@@ -11,7 +11,7 @@
 //   2. Valida formato básico dos campos
 //   3. Chama a função Postgres validate_and_consume_invite(inviteKey)
 //      usando o client "admin" (service role) — essa função só pode ser
-//      chamada com esse privilégio (revoke em schema.sql).
+//      chamada com esse privilégio (revoke em backend/sql/schema.sql).
 //   4. Se a chave for válida, cria o usuário via Admin API e grava o
 //      perfil (role vem da própria chave de convite, o cliente NUNCA
 //      escolhe seu próprio role).

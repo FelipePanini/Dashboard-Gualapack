@@ -1,31 +1,24 @@
 // ============================================================================
-// build-database-central.js — monta o DATABASE_GUALAPACK.xlsx a partir das
-// bases reais e grava (cria ou atualiza) esse arquivo na mesma pasta do
-// Google Drive.
+// build-database-central.js — ETAPA 1 da carga diária.
+// Monta o DATABASE_GUALAPACK.xlsx a partir das planilhas originais e grava
+// esse arquivo (atualiza o que já existe) na mesma pasta do Google Drive.
 // ----------------------------------------------------------------------------
-// Arquitetura (decidida com o usuário em 2026-09-09):
-//
-//   BASES ORIGINAIS (Drive)
+//   PLANILHAS ORIGINAIS (pasta do Drive)
 //         |
 //   ESTE SCRIPT — lê os originais, normaliza, escreve as abas DB_
 //         |
-//   DATABASE_GUALAPACK.xlsx (Drive) <- fica sendo o retrato fiel e atualizado
+//   DATABASE_GUALAPACK.xlsx (Drive) — retrato consolidado, abre no Excel
 //         |
-//   sync.js — (nesta fase ainda lê os originais direto; o corte pra ler só
-//              o arquivo central é o próximo incremento, depois de validar
-//              que este arquivo sai correto)
-//         |
-//   SUPABASE
+//   sync.js (ETAPA 2) — lê só esse arquivo e grava no Supabase
 //
-// Cobre só as abas já validadas na Etapa 2/3 da conversa com o usuário:
-// DB_APONTAMENTOS, DB_PRODUCAO_KG, DB_FARDOS_APARAS, DB_REFUGO_APARAS,
-// DB_REFUGO_PRODUCAO, DB_TENDENCIA, DB_MAQUINAS. NÃO inclui DB_TMR nem
-// DB_ADERENCIA ainda — dependem de confirmar a aba/chave real (Fases 2 e 3
-// do plano combinado), ver DB_CONTROLE pra aviso disso a cada execução.
+// Três grupos de abas no arquivo central:
+//   - DB_* de DB_SHEET_NAME (lib.js): alimentam o Supabase;
+//   - DB_* de bases-catalog.js: inventário da fase de mapeamento, só pra
+//     conferência — não vão pro Supabase;
+//   - DB_CONTROLE: o que cada aba recebeu, de onde, e o que falhou.
 //
-// Roda toda vez do zero (não é incremental) — é só um espelho consolidado
-// pra leitura, não substitui a lógica de INSERT/UPDATE/IGNORAR, que fica na
-// carga do Supabase (sync.js).
+// Roda sempre do zero (não é incremental). As regras de gravação
+// (troca-por-arquivo, upsert) ficam no sync.js.
 // ============================================================================
 
 import * as XLSX from "xlsx";
@@ -34,6 +27,7 @@ import {
   TABLE_DEFS, RETENTION_MONTHS, RETENTION_DATE_COL, DEDUPE_KEY, MERGE_DEDUPE_KEY,
   dedupeRows, detectTables, detectSheet, sheetToRows, coerceRow,
   driveClient, listFolderFiles, downloadFile, CENTRAL_FILE_NAME, DB_SHEET_NAME,
+  COLUNA_FALHAS, juntarArquivos,
 } from "./lib.js";
 import { coletarBases, COLUNAS_ORIGEM, totalDeLinhas } from "./collect-bases.js";
 import { BASES } from "./bases-catalog.js";
@@ -91,11 +85,19 @@ const PENDENTES = [
 ];
 
 async function collectTableRows(drive, files, importadoEm, porBase) {
-  // tabela -> { rows: [...], arquivos: Set, erros: [] }
+  // tabela -> { rows, arquivos (contribuíram), falhas (falharam), erros (texto) }
   const porTabela = new Map();
   const touch = (table) => {
-    if (!porTabela.has(table)) porTabela.set(table, { rows: [], arquivos: new Set(), erros: [] });
+    if (!porTabela.has(table)) porTabela.set(table, { rows: [], arquivos: new Set(), falhas: new Set(), erros: [] });
     return porTabela.get(table);
+  };
+  // Toda falha de um arquivo numa tabela passa por aqui: vira texto no
+  // DB_CONTROLE (observacoes) E entra na lista estruturada que o sync usa
+  // pra não apagar o dado antigo desse arquivo (ver lerFalhasDoControle).
+  const falhou = (table, fileName, msg) => {
+    const bucket = touch(table);
+    bucket.falhas.add(fileName);
+    bucket.erros.push(`${fileName}: ${msg}`);
   };
 
   for (const file of files) {
@@ -118,7 +120,8 @@ async function collectTableRows(drive, files, importadoEm, porBase) {
     try {
       bytes = await downloadFile(drive, file);
     } catch (err) {
-      for (const def of defs) if (DB_SHEET_NAME[def.table]) touch(def.table).erros.push(`${file.name}: falha ao baixar (${err.message})`);
+      for (const def of defs) if (DB_SHEET_NAME[def.table]) falhou(def.table, file.name, `falha ao baixar (${err.message})`);
+      console.error(`[erro] "${file.name}": falha ao baixar — ${err.message}`);
       continue;
     }
 
@@ -158,7 +161,7 @@ async function collectTableRows(drive, files, importadoEm, porBase) {
       try {
         workbook = XLSX.read(bytes, { type: "array", sheets: lidas });
       } catch (err) {
-        for (const def of usados) touch(def.table).erros.push(`${file.name}: falha ao ler (${err.message})`);
+        for (const def of usados) falhou(def.table, file.name, `falha ao ler (${err.message})`);
         console.error(`[erro] "${file.name}": falha ao ler — ${err.message}`);
         continue;
       }
@@ -171,13 +174,13 @@ async function collectTableRows(drive, files, importadoEm, porBase) {
         if (grandeDemais.has(sheetName)) {
           const n = totalDeLinhas(sonda.Sheets[sheetName]);
           const msg = `aba "${sheetName}" pulada: ${n} linhas, acima do teto de ${TETO_LINHAS_TABELA}.`;
-          bucket.erros.push(`${file.name}: ${msg}`);
+          falhou(def.table, file.name, msg);
           console.warn(`[pulado] "${file.name}": ${msg}`);
           continue;
         }
         const sheet = workbook.Sheets[sheetName];
         if (!sheet) {
-          bucket.erros.push(`${file.name}: aba "${sheetName}" não veio na leitura.`);
+          falhou(def.table, file.name, `aba "${sheetName}" não veio na leitura.`);
           continue;
         }
         const rawRows = sheetToRows(sheet);
@@ -185,7 +188,7 @@ async function collectTableRows(drive, files, importadoEm, porBase) {
 
         let rows = rawRows.map((r) => coerceRow(r, def.numeric, def.date, def.allowed));
         if (rows.every((r) => Object.keys(r).length === 0)) {
-          bucket.erros.push(`${file.name} [${sheetName}]: nenhuma coluna bateu com o esperado.`);
+          falhou(def.table, file.name, `[${sheetName}] nenhuma coluna bateu com o esperado.`);
           continue;
         }
 
@@ -212,7 +215,7 @@ async function collectTableRows(drive, files, importadoEm, porBase) {
         bucket.arquivos.add(file.name);
         console.log(`[ok] "${file.name}" [${sheetName}] -> ${DB_SHEET_NAME[def.table]}: ${rows.length} linhas`);
       } catch (err) {
-        bucket.erros.push(`${file.name}: ${err.message}`);
+        falhou(def.table, file.name, err.message);
         console.error(`[erro] "${file.name}" -> ${def.table}:`, err.message);
       }
     }
@@ -230,17 +233,25 @@ async function collectTableRows(drive, files, importadoEm, porBase) {
   return porTabela;
 }
 
+// Primeira e última data de uma aba, pro DB_CONTROLE. Guarda só o mínimo e o
+// máximo (antes juntava todas as datas num array e ordenava — centenas de
+// milhares de strings por aba) e testa o nome de cada coluna uma vez só.
+const PARECE_COLUNA_DE_DATA = /^(data|dt_|.*_data)/;
 function periodo(linhas) {
-  const datas = [];
+  const ehData = new Map();
+  let primeira = "", ultima = "";
   for (const l of linhas) {
-    for (const [k, v] of Object.entries(l)) {
-      if (!/^(data|dt_|.*_data)/.test(k) || typeof v !== "string") continue;
-      if (/^\d{4}-\d\d-\d\d/.test(v)) datas.push(v.slice(0, 10));
+    for (const k in l) {
+      let sim = ehData.get(k);
+      if (sim === undefined) { sim = PARECE_COLUNA_DE_DATA.test(k); ehData.set(k, sim); }
+      const v = l[k];
+      if (!sim || typeof v !== "string" || !/^\d{4}-\d\d-\d\d/.test(v)) continue;
+      const d = v.slice(0, 10);
+      if (!primeira || d < primeira) primeira = d;
+      if (!ultima || d > ultima) ultima = d;
     }
   }
-  if (datas.length === 0) return { primeira: "", ultima: "" };
-  datas.sort();
-  return { primeira: datas[0], ultima: datas[datas.length - 1] };
+  return { primeira, ultima };
 }
 
 function buildWorkbook(porTabela, porBase, agora) {
@@ -251,7 +262,7 @@ function buildWorkbook(porTabela, porBase, agora) {
   for (const def of TABLE_DEFS) {
     const sheetName = DB_SHEET_NAME[def.table];
     if (!sheetName) continue;
-    const bucket = porTabela.get(def.table) ?? { rows: [], arquivos: new Set(), erros: [] };
+    const bucket = porTabela.get(def.table) ?? { rows: [], arquivos: new Set(), falhas: new Set(), erros: [] };
     // ordem de coluna estável = a mesma ordem de "allowed" no TABLE_DEFS,
     // mais _source_file no fim (controle, não é dado de negócio).
     const header = [...def.allowed, "_source_file"];
@@ -266,6 +277,7 @@ function buildWorkbook(porTabela, porBase, agora) {
       data_importacao: agora,
       status: bucket.erros.length ? "erro" : bucket.rows.length ? "ok" : "vazio",
       classificacao: "EM USO", granularidade: "", observacoes: bucket.erros.join(" ; "),
+      [COLUNA_FALHAS]: juntarArquivos(bucket.falhas),
     });
   }
 
@@ -319,7 +331,7 @@ function buildWorkbook(porTabela, porBase, agora) {
   XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(controleRows, {
     header: ["aba", "destino", "arquivo_origem", "aba_origem", "registros", "registros_na_origem",
       "primeira_data", "ultima_data", "data_importacao", "status", "classificacao",
-      "granularidade", "observacoes"],
+      "granularidade", "observacoes", COLUNA_FALHAS],
   }), "DB_CONTROLE");
 
   return wb;
@@ -378,6 +390,7 @@ async function main() {
   console.log("\nResumo — abas que alimentam o Supabase:");
   for (const [table, bucket] of porTabela) {
     console.log(`  ${DB_SHEET_NAME[table]}: ${bucket.rows.length} linhas de ${bucket.arquivos.size} arquivo(s)${bucket.erros.length ? ` — ${bucket.erros.length} erro(s)` : ""}`);
+    if (bucket.falhas.size) console.log(`    falharam (o sync mantém o dado anterior deles): ${juntarArquivos(bucket.falhas)}`);
   }
   console.log("\nResumo — abas de inventário (não vão pro Supabase ainda):");
   for (const base of BASES) {

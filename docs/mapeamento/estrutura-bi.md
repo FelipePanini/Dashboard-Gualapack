@@ -1,5 +1,10 @@
 # Estrutura extraída dos BIs de Produção — Gualapack Jaguariúna
 
+> Referência de **estrutura** (nomes de indicadores, máquinas, status e cores
+> oficiais) — continua valendo. As notas sobre "valores de referência" e o
+> "Próximo passo" no fim são do início do projeto: o painel já lê dado real
+> do Supabase (ver o [README da raiz](../../README.md)).
+
 Levantamento feito a partir dos 5 arquivos `.pbix` fornecidos. **Os arquivos não foram
 alterados** — apenas lidos para mapear indicadores, dimensões e valores de domínio.
 

@@ -1,11 +1,13 @@
 -- ============================================================================
 -- Painel de Produção Gualapack — schema dos dados operacionais REAIS
--- Alvo: Supabase (Postgres 15+). Rode depois de schema.sql, uma única vez.
+-- Alvo: Supabase (Postgres 15+). Rode depois de schema.sql.
 --
--- Tabelas espelhando a estrutura das planilhas reais da produção (ver pasta
--- do Google Drive compartilhada) — não são mais um modelo fictício. Cada
--- tabela corresponde a uma aba/arquivo de origem; ver backend/README-dados.md
--- para o mapeamento planilha -> tabela -> colunas.
+-- Cada tabela corresponde a uma aba de planilha real da pasta do Drive. O
+-- mapeamento arquivo/aba -> tabela -> colunas está em TABLE_DEFS
+-- (backend/sync-drive/lib.js) — é de lá que a carga lê.
+--
+-- Este arquivo descreve o banco como ele está HOJE. Migrações que já rodaram
+-- no Supabase de produção foram tiradas daqui (ficam no histórico do git).
 -- ============================================================================
 
 -- ----------------------------------------------------------------------------
@@ -82,18 +84,12 @@ create table if not exists public.apontamentos (
   classificacao       text,          -- família de produto
   nome_cliente         text,
   -- Só existem na aba [Base Apontamento] (fonte do TMR desde 2026-09-10).
-  -- classificacao_disp: PLANEJADO / IMPRODUTIVO / PRODUZINDO — é a
-  -- classificação oficial de disponibilidade da própria origem. Hoje o TMR
-  -- ainda é calculado por cod_apont = '20'; as duas concordam (48.888
-  -- eventos PRODUZINDO x 48.830 com cod_apont '20' em 2026), então a coluna
-  -- fica gravada para conferência antes de virar a regra do cálculo.
+  -- classificacao_disp: PLANEJADO / IMPRODUTIVO / PRODUZINDO. O TMR usa esta
+  -- coluna e, quando ela vem vazia, cai no cadastro classificacao_apontamento
+  -- pelo cod_apont (ver rpc_maquinas_resumo em schema_views.sql).
   classificacao_disp   text,
   classificacao_horas  text
 );
-
--- Migração para bancos que já têm a tabela criada (idempotente).
-alter table public.apontamentos add column if not exists classificacao_disp  text;
-alter table public.apontamentos add column if not exists classificacao_horas text;
 
 create index if not exists idx_apontamentos_data on public.apontamentos (dt_producao desc);
 create index if not exists idx_apontamentos_recurso on public.apontamentos (cod_recurso, dt_producao desc);
@@ -125,8 +121,9 @@ create index if not exists idx_fardos_aparas_source on public.fardos_aparas (_so
 
 -- ----------------------------------------------------------------------------
 -- 4. Aderência — apontamentos de produção por máquina/dia (de "Aderência
---    Máquinas - Diária", aba "Apontamentos_produção")
---    Mesma troca-por-arquivo e retenção de 12 meses da tabela apontamentos.
+--    Máquinas - Diária", aba "Apontamentos_produção").
+--    SEM CARGA HOJE: esse arquivo não existe mais na pasta do Drive, então a
+--    tabela fica vazia. Mantida porque o upload manual ainda escreve nela.
 -- ----------------------------------------------------------------------------
 create table if not exists public.aderencia_maquinas_diaria (
   id             bigint generated always as identity primary key,
@@ -148,14 +145,12 @@ create index if not exists idx_aderencia_maq_data on public.aderencia_maquinas_d
 create index if not exists idx_aderencia_maq_source on public.aderencia_maquinas_diaria (_source_file);
 
 -- ----------------------------------------------------------------------------
--- 5. Aderência à programação (de "Histórico Aderência Programação")
---    Mesma retenção de 12 meses e troca-por-arquivo da tabela apontamentos
---    (por dt_saida_maquina / _source_file).
+-- 5. Aderência à programação (de "Aderência Semanal.xlsx", aba "ADERÊNCIA
+--    DIÁRIA": planejado e produzido já cruzados na mesma linha).
+--    Mesma retenção de 12 meses (por dt_ini_plan) e troca-por-arquivo da
+--    tabela apontamentos. Fonte trocada em 2026-09-11 — histórico no
+--    TABLE_DEFS de aderencia_programacao em backend/sync-drive/lib.js.
 -- ----------------------------------------------------------------------------
--- Fonte trocada em 2026-09-11 — ver comentário no TABLE_DEFS de
--- aderencia_programacao em backend/sync-drive/lib.js pro histórico
--- completo. Colunas de baixo pra cima batem com a aba real "ADERÊNCIA
--- DIÁRIA" de Aderência Semanal.xlsx, não com o arquivo morto antigo.
 create table if not exists public.aderencia_programacao (
   id             bigint generated always as identity primary key,
   _source_file   text,          -- nome do arquivo que gravou a linha
@@ -169,40 +164,6 @@ create table if not exists public.aderencia_programacao (
   base           text,
   dt_entrega     date
 );
-
--- Migração pra bancos que já têm a tabela com o esquema antigo (colunas
--- do arquivo morto) — descarta e recria, porque a tabela está órfã hoje
--- (nenhum arquivo alimenta ela desde que "Histórico Aderência
--- Programação.xlsx" saiu da pasta do Drive), então não existe dado real
--- pra perder. Tem que rodar ANTES dos create index abaixo — "create table
--- if not exists" não recria a tabela antiga sozinho, e os índices novos
--- referenciam colunas que só existem depois desta migração.
-do $$
-begin
-  if exists (
-    select 1 from information_schema.columns
-    where table_schema = 'public' and table_name = 'aderencia_programacao'
-      and column_name = 'recurso_ctr'
-  ) then
-    -- v_maquinas_resumo depende desta tabela — cai junto e é recriada
-    -- por schema_views.sql (rode esse arquivo logo em seguida).
-    drop view if exists public.v_maquinas_resumo;
-    drop table public.aderencia_programacao;
-    create table public.aderencia_programacao (
-      id             bigint generated always as identity primary key,
-      _source_file   text,
-      num_ordem      text,
-      maquina        text,
-      dt_ini_plan    date,
-      qtd_planejada  numeric,
-      produto        text,
-      qtd_produzida  numeric,
-      ano            numeric,
-      base           text,
-      dt_entrega     date
-    );
-  end if;
-end $$;
 
 create index if not exists idx_aderencia_prog_data on public.aderencia_programacao (dt_ini_plan desc);
 create index if not exists idx_aderencia_prog_maquina on public.aderencia_programacao (maquina, dt_ini_plan desc);
@@ -264,7 +225,8 @@ create index if not exists idx_refugo_producao_source on public.refugo_producao 
 -- ----------------------------------------------------------------------------
 -- 6c. Produção/refugo em kg por ordem (de "Indicadores Diário - AAAA.xlsx",
 --     aba "Base Apontamentos (kg)") — separado de "apontamentos" (que vem
---     da aba "Base Máquina_Embalagem" e tem os campos de TMR/Gantt/parada).
+--     da aba "Base Apontamento" e tem os campos de TMR/Gantt/parada).
+--     É a fonte da apara por máquina (peso bruto e refugo na mesma linha).
 --     Mesma troca-por-arquivo e retenção de 12 meses.
 -- ----------------------------------------------------------------------------
 create table if not exists public.producao_kg (
@@ -340,7 +302,8 @@ create index if not exists idx_producao_metros_source on public.producao_metros 
 
 -- ----------------------------------------------------------------------------
 -- 8. RLS — leitura para qualquer usuário autenticado, escrita só via
---    service_role (a função "ingest", nunca o navegador direto).
+--    service_role (sync.js no GitHub Actions e a função "ingest" do upload
+--    manual — nunca o navegador direto).
 -- ----------------------------------------------------------------------------
 alter table public.maquinas                   enable row level security;
 alter table public.apontamentos               enable row level security;

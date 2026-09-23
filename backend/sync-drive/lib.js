@@ -1,18 +1,19 @@
 // ============================================================================
 // lib.js — lógica compartilhada de leitura/normalização das planilhas reais.
-// Usada por sync.js (carga no Supabase) e build-database-central.js (monta
-// o DATABASE_GUALAPACK.xlsx). Extraído de sync.js em 2026-09-09 pra não
-// duplicar a mesma lógica de novo — já tínhamos o aviso de espelhar em 3
-// lugares (upload.html, ingest/index.ts, sync.js); esse arquivo é a fonte
-// única para os dois scripts Node.
+// Usada por build-database-central.js (monta o DATABASE_GUALAPACK.xlsx) e
+// por sync.js (carrega esse arquivo no Supabase). É a FONTE ÚNICA das regras
+// "qual arquivo/aba vira qual tabela, com quais colunas".
+//
+// O upload manual (demo/upload.html + backend/functions/ingest) é um caminho
+// legado, de antes da carga automática, e tem uma cópia própria dessas regras
+// que não acompanha este arquivo — ver docs/guias/upload-manual.md.
 // ============================================================================
 
 import { google } from "googleapis";
 import * as XLSX from "xlsx";
 
 // Tabela -> palavras-chave no nome do arquivo, palavras-chave na aba, e
-// colunas numéricas. Espelha TABLES em demo/upload.html e ALLOWED_COLUMNS
-// em backend/functions/ingest/index.ts.
+// colunas numéricas/de data aceitas.
 export const TABLE_DEFS = [
   {
     // fileExclude: "Sequenciamento Acumulado 2026.xlsx" repete jan–jun/2026
@@ -79,9 +80,9 @@ export const TABLE_DEFS = [
   {
     // "Indicadores Diário - AAAA.xlsx" [Base Apontamentos (kg)] — produção e
     // refugo em kg por ordem/máquina/dia, separado de "apontamentos" (que
-    // vem de [Base Máquina_Embalagem] e tem os campos de TMR/Gantt/parada).
-    // Mesmo fileKeywords do def "apontamentos" abaixo — um arquivo agora
-    // pode alimentar mais de uma tabela (ver detectTables()).
+    // vem de [Base Apontamento] e tem os campos de TMR/Gantt/parada).
+    // Mesmo fileKeywords do def "apontamentos" abaixo — um arquivo pode
+    // alimentar mais de uma tabela (ver detectTables()).
     table: "producao_kg", fileKeywords: ["indicadores"], sheetKeywords: ["base_apontamentos_kg"],
     numeric: ["peso_bruto", "refugo"], date: { dt_producao: "date" },
     allowed: ["num_ordem", "cod_recurso", "dt_producao", "turno", "peso_bruto", "refugo", "descricao", "estrutura", "processo", "tipo_produto", "considerar", "planta", "maquina_real", "chave"],
@@ -169,8 +170,8 @@ export const CONFLICT_COLUMNS = { refugo_aparas_historico: "data", tendencia_men
 
 // Retenção: as tabelas de apontamento bruto (uma linha por evento de
 // máquina) crescem rápido e estouraram os 500 MB do plano free do
-// Supabase somando anos de histórico. Ver sync.js pro histórico completo
-// dessa decisão.
+// Supabase somando anos de histórico. Aplicada no build E no sync — no sync
+// pra janela andar todo dia mesmo que o arquivo central não mude.
 export const RETENTION_MONTHS = 12;
 export const RETENTION_DATE_COL = {
   apontamentos: "dt_producao",
@@ -228,6 +229,12 @@ export const MERGE_DEDUPE_KEY = {
   apontamentos: "num_ordem,cod_recurso,dt_producao,hora_inicio,hora_fim,tipo_perda,kg_perda",
 };
 
+function contarPreenchidas(row) {
+  let n = 0;
+  for (const v of Object.values(row)) if (v !== null && v !== undefined && v !== "") n++;
+  return n;
+}
+
 export function dedupeRows(rows, keyCols) {
   if (!keyCols) return rows;
   const cols = keyCols.split(",");
@@ -239,10 +246,7 @@ export function dedupeRows(rows, keyCols) {
     // colunas preenchidas) — ex: "classificacao_disp" só existe na Base
     // Apontamento, não na BASE_DETALHE, e não dá pra confiar na ordem de
     // leitura dos arquivos do Drive pra garantir qual "vence" por último.
-    if (existing) {
-      const contarPreenchidas = (r) => Object.values(r).filter((v) => v !== null && v !== undefined && v !== "").length;
-      if (contarPreenchidas(existing) >= contarPreenchidas(row)) continue;
-    }
+    if (existing && contarPreenchidas(existing) >= contarPreenchidas(row)) continue;
     map.set(key, row); // a linha mais completa vence
   }
   return Array.from(map.values());
@@ -378,7 +382,9 @@ export const CENTRAL_FILE_NAME = "DATABASE_GUALAPACK.xlsx";
 
 // tabela (mesmo nome usado no Supabase, via TABLE_DEFS) -> nome da aba DB_
 // no arquivo central (DATABASE_GUALAPACK.xlsx). Só as abas já validadas
-// entram aqui — DB_TMR e DB_ADERENCIA ainda não (ver build-database-central.js).
+// entram aqui — DB_TMR ainda não (ver PENDENTES em build-database-central.js).
+// aderencia_maquinas_diaria fica de fora de propósito: o arquivo de origem
+// dela não existe mais na pasta do Drive.
 export const DB_SHEET_NAME = {
   apontamentos: "DB_APONTAMENTOS",
   producao_kg: "DB_PRODUCAO_KG",
@@ -392,6 +398,40 @@ export const DB_SHEET_NAME = {
   producao_metros: "DB_PRODUCAO_METROS",
   classificacao_apontamento: "DB_CLASSIFICACAO_APONT",
 };
+
+// ----------------------------------------------------------------------------
+// Proteção contra apagar dado bom quando a montagem falha.
+//
+// O build registra, na aba DB_CONTROLE do arquivo central, quais arquivos
+// FALHARAM ao alimentar cada aba DB_ (download com erro, aba pulada por
+// tamanho, aba não encontrada, nenhuma coluna reconhecida). O sync lê essa
+// lista e NÃO apaga as linhas antigas desses arquivos — mantém o último dado
+// bom até a próxima montagem que funcionar.
+//
+// Por que existe: em 18/09/2026 a aba "Base Apontamento" do Indicadores
+// Diário 2026 passou do teto de linhas e foi pulada no build. O sync viu o
+// arquivo sem nenhuma linha, tratou como "órfão" e apagou tudo que ele tinha
+// gravado antes: o painel ficou com 0 horas no ano inteiro, sem nenhum erro.
+// ----------------------------------------------------------------------------
+export const COLUNA_FALHAS = "arquivos_com_falha";
+const SEPARADOR_ARQUIVOS = " | ";
+
+export function juntarArquivos(nomes) {
+  return [...nomes].join(SEPARADOR_ARQUIVOS);
+}
+
+// Linhas da aba DB_CONTROLE -> Map(nome da aba DB_ -> Set de arquivos que
+// falharam). Arquivo central antigo, sem a coluna, devolve Map vazio: o sync
+// se comporta exatamente como antes dessa proteção existir.
+export function lerFalhasDoControle(linhasControle) {
+  const porAba = new Map();
+  for (const linha of linhasControle ?? []) {
+    const texto = String(linha?.[COLUNA_FALHAS] ?? "").trim();
+    if (!linha?.aba || !texto) continue;
+    porAba.set(linha.aba, new Set(texto.split(SEPARADOR_ARQUIVOS).map((s) => s.trim()).filter(Boolean)));
+  }
+  return porAba;
+}
 
 export async function downloadFile(drive, file) {
   if (file.mimeType === "application/vnd.google-apps.spreadsheet") {

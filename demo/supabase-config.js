@@ -2,7 +2,7 @@
 //
 // IMPORTANTE: a "anon key" abaixo é feita para ser pública — ela só permite
 // o que as regras de Row Level Security (RLS) do banco autorizarem (veja
-// backend/schema.sql). NUNCA coloque aqui a "service_role key": essa sim é
+// backend/sql/schema.sql). NUNCA coloque aqui a "service_role key": essa sim é
 // secreta e só pode viver do lado do servidor (Edge Function).
 //
 // Preencha os dois valores depois de criar o projeto no Supabase:
