@@ -23,11 +23,11 @@ def registrar_indicadores(con: duckdb.DuckDBPyConnection, indicadores: list[dict
         con.execute(
             """insert or replace into indicators
                (codigo, versao, nome, unidade, grao, definicao, regra_sql, fonte_oficial,
-                fontes_comparadas, tolerancia_abs, tolerancia_pct, dono, status_definicao)
-               values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                fontes_comparadas, comparacao_opcional, tolerancia_abs, tolerancia_pct, dono, status_definicao)
+               values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             [ind["codigo"], ind["versao"], ind["nome"], ind["unidade"], ind["grao"],
              ind["definicao"].strip(), ";".join(m["regra"] for m in ind["medicoes"]),
-             ind["fonte_oficial"], ",".join(comparadas) or None,
+             ind["fonte_oficial"], ",".join(comparadas) or None, bool(ind.get("comparacao_opcional")),
              ind.get("tolerancia_abs"), ind.get("tolerancia_pct"), ind.get("dono"),
              ind.get("status_definicao")],
         )

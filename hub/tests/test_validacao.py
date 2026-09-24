@@ -54,3 +54,17 @@ def test_status(con):
     assert s[("TMR", MES_ATUAL)][0] == "aguardando"
     assert s[("SCRAP", date(2025, 1, 1))] == ("validado", "fonte única: conferidos faixa e frescor")
     assert sum(contagem.values()) == 7
+
+
+def test_comparacao_opcional_nao_vira_erro(con):
+    # fardos: o Acumulado tem o ano todo, o arquivo mensal só o mês dele
+    con.execute("""insert into indicators (codigo, versao, nome, unidade, grao, definicao, regra_sql,
+                     fonte_oficial, fontes_comparadas, comparacao_opcional, tolerancia_abs)
+                   values ('APARA', 1, 'Apara', 'pct', 'mes', 'def', 'z.sql', 'acumulado', 'mensal', true, 0.1)""")
+    _med(con, "APARA", "acumulado", date(2025, 7, 1), 6.5, recorte="TOTAL")
+    _med(con, "APARA", "acumulado", date(2025, 8, 1), 6.6, recorte="TOTAL")
+    _med(con, "APARA", "mensal", date(2025, 8, 1), 6.9, recorte="TOTAL")
+    validacao.validar(con, 1)
+    s = _status(con)
+    assert s[("APARA", date(2025, 7, 1))] == ("validado", "sem comparação neste período: conferidos faixa e frescor")
+    assert s[("APARA", date(2025, 8, 1))][0] == "divergente"

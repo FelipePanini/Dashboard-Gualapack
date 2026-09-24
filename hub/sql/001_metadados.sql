@@ -66,12 +66,14 @@ create table if not exists indicators (
   regra_sql         varchar not null,                 -- arquivos de regra, separados por ';'
   fonte_oficial     varchar not null,                 -- sources.id ou 'hub.calculo'
   fontes_comparadas varchar,                          -- ids separados por ',' (nulo = fonte única)
+  comparacao_opcional boolean default false,          -- a comparada só existe em alguns períodos
   tolerancia_abs    double,
   tolerancia_pct    double,
   dono              varchar,
   status_definicao  varchar,                          -- rascunho | em_validacao | oficial
   primary key (codigo, versao)
 );
+alter table indicators add column if not exists comparacao_opcional boolean default false;
 
 create table if not exists measurements (
   run_id      integer not null,

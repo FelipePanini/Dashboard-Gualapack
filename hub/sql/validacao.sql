@@ -29,7 +29,12 @@ with med as (
   full join oficial o
          on o.indicador = c.indicador and o.periodo = c.periodo and o.recorte = c.recorte
 ), avaliado as (
-  select p.*, i.unidade, i.fontes_comparadas, i.tolerancia_abs, i.tolerancia_pct,
+  select p.*, i.unidade, i.tolerancia_abs, i.tolerancia_pct,
+         -- comparação opcional: a comparada só existe em alguns períodos (ex.: arquivo
+         -- mensal de fardos só do mês corrente); sem ela, o período vale como fonte única
+         case when coalesce(i.comparacao_opcional, false) then null else i.fontes_comparadas end
+                                                                   as comparacao_obrigatoria,
+         i.fontes_comparadas,
          p.valor_comparado - p.valor_oficial as dif_abs,
          (p.valor_comparado - p.valor_oficial) / nullif(abs(p.valor_oficial), 0) as dif_pct,
          p.periodo >= date_trunc('month', current_date) as periodo_aberto,
@@ -45,7 +50,7 @@ select $run, indicador, periodo, recorte, fonte_oficial, valor_oficial,
          when not periodo_aberto and sem_cobertura                                 then 'desatualizado'
          when periodo_aberto                                                       then 'aguardando'
          when valor_oficial is null                                                then 'aguardando'
-         when fontes_comparadas is not null and valor_comparado is null            then 'erro'
+         when comparacao_obrigatoria is not null and valor_comparado is null       then 'erro'
          when valor_comparado is null                                              then 'validado'
          when abs(dif_abs) <= coalesce(tolerancia_abs, 0)
            or abs(dif_abs) <= coalesce(tolerancia_pct, 0) * abs(valor_oficial)    then 'validado'
@@ -59,7 +64,8 @@ select $run, indicador, periodo, recorte, fonte_oficial, valor_oficial,
                                                coalesce(ate_comparado, ate_oficial)), '%d/%m/%Y')
          when periodo_aberto                                                       then 'mês em andamento'
          when valor_oficial is null                                                then 'fonte oficial ainda sem este período'
-         when fontes_comparadas is not null and valor_comparado is null            then 'fonte comparada sem este período'
+         when comparacao_obrigatoria is not null and valor_comparado is null       then 'fonte comparada sem este período'
+         when valor_comparado is null and fontes_comparadas is not null            then 'sem comparação neste período: conferidos faixa e frescor'
          when valor_comparado is null                                              then 'fonte única: conferidos faixa e frescor'
          when abs(dif_abs) <= coalesce(tolerancia_abs, 0)
            or abs(dif_abs) <= coalesce(tolerancia_pct, 0) * abs(valor_oficial)    then 'dentro da tolerância'

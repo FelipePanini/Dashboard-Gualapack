@@ -52,8 +52,10 @@ e rodar `uv sync` dentro de `hub/`. Não precisa de administrador.
   sem Power BI e sem acesso ao banco, desde que o relatório seja do tipo
   Importação (o dado fica salvo dentro do .pbix). O dado é o da última vez que
   o .pbix foi atualizado e salvo; a fonte `pbi.atualizacao` mostra quando foi.
-- **Um arquivo por mês:** os Sequenciamentos mensais de fardos são lidos
-  todos juntos; é só ir acrescentando o arquivo do mês.
+- **Fardos:** o histórico do ano vem do Sequenciamento Acumulado (aba Base
+  Aparas Total); o arquivo mensal cobre o mês corrente, que é mais atual.
+  Mês que tem arquivo mensal usa o mensal; os outros, o Acumulado. Nos meses
+  em que os dois existem, o hub compara as duas cópias.
 - **Nome com revisão:** o Sequenciamento Acumulado aceita "Rev2", "Rev3"...
   mas só um por vez.
 - **Arquivo que derruba o leitor rápido de Excel** (hoje: Refugo Aparas) é
@@ -111,28 +113,28 @@ aguardando, divergente, validado.
 
 ## Situação em 24/09/2026
 
-- **20 fontes** catalogadas, incluindo o BI Dados de Produção. Primeira
+- **21 fontes** catalogadas, incluindo o BI Dados de Produção. Primeira
   leitura de tudo: ~95 s; depois, só o que mudou.
-- **7 indicadores:** 245 validados, 99 divergentes, 44 aguardando, 2 erros.
-- **TMR resolvido.** Com os apontamentos do BI e a regra PRODUZINDO ÷
-  (horas − FIM TURNO), o hub reproduz o Gráficos Tendência. O Corte bate
-  igual em todos os meses, e R18, L04 e Roto ficam abaixo de 0,3 p.p. de
-  erro médio.
+- **8 indicadores:** 262 validados, 90 divergentes, 45 aguardando, 2 erros.
+- **TMR resolvido.** Com os apontamentos do BI, a regra PRODUZINDO ÷
+  (horas − FIM TURNO) e Flexo = R12 + R18 + R20, o hub reproduz o Gráficos
+  Tendência. O TMR tem 49 meses validados, o Setup 56 de 56.
 - **Achado 1:** a Base Apontamento do Indicadores Diário está com
-  apontamentos faltando (Roto com menos da metade das horas do BI). É
-  essa a origem das divergências de TMR.
-- **Achado 2:** o recorte Flexo do Gráficos Tendência inclui a R12 em alguns
-  meses e em outros não.
+  apontamentos faltando (Roto com menos da metade das horas do BI). Era a
+  origem das divergências de TMR.
+- **Achado 2:** em jan e fev o Gráficos Tendência deixou a R12 fora do Flexo,
+  mesmo com ela apontando. No Machine Card a R12 está como FUNGICIDA.
 - **Achado 3:** a velocidade do painel web bate com a do BI (menos de 1%)
   na maioria das máquinas. Fogem HMC01 em julho, REB05 e REB10 em agosto.
+- **Achado 4:** a apara apontada de agosto é 6,99% no Acumulado; o painel
+  web mostra 6,58%, vindo do arquivo mensal de agosto.
 - **SQL Server:** fora por enquanto (decisão de 24/09); o hub trabalha só
   com as planilhas e o .pbix.
 
 ## Próximos passos
 
-1. Confirmar com o dono do indicador qual é o Flexo certo (com ou sem R12).
-2. Indicadores de aparas, refugo, aderência e produtividade a partir das
+1. Indicadores de aparas, refugo, aderência e produtividade a partir das
    fontes já catalogadas (as que o painel web mostra).
-3. Publicar no Supabase (`sql/supabase/001_trusted.sql`, ainda não aplicado)
+2. Publicar no Supabase (`sql/supabase/001_trusted.sql`, ainda não aplicado)
    para o painel web ler do hub. Aí o upload para o Google Drive deixa de ser
    necessário.

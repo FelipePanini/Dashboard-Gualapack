@@ -1,9 +1,12 @@
 # Recorte (como o Gráficos Tendência agrupa) -> máquinas.
-# Feito à mão até o Machine Card entrar como fonte. A composição de cada
-# recorte precisa ser confirmada com o dono da planilha: se o Gráficos
-# Tendência junta máquinas diferentes, o TMR do hub vai divergir por isso.
+# Feito à mão até o Machine Card entrar como fonte de grupos.
+#
+# Flexo = impressoras flexográficas R12, R18 e R20 (definição do dono em
+# 24/09). A R12 saiu por volta de julho (último apontamento no BI: 15/07);
+# sem apontamento, ela para de contar sozinha. Obs.: no Machine Card a R12
+# está no grupo FUNGICIDA.
 recortes:
-  Flexo: [R18, R20]
+  Flexo: [R12, R18, R20]
   R18: [R18]
   R20: [R20]
   Roto: [RT01]

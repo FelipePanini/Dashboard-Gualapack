@@ -34,10 +34,10 @@ indicadores:
       R18, L04 e Roto com erro médio abaixo de 0,3 p.p.; Laminação = L02+L03+L04).
       A divergência vinha da Base Apontamento do Indicadores Diário, que está
       com apontamentos faltando — ver HORAS_APONTADAS.
-      Divergência que é da PLANILHA: o recorte Flexo do Gráficos Tendência muda
-      de composição. Em jan, fev e ago é R18+R20; em mar, abr, mai e jul inclui
-      também a R12 (bate exato com R12: 35,9 / 31,0 / 38,0 / 32,8). A R12 é do
-      grupo FUNGICIDA no Machine Card. Confirmar com o dono qual é o certo.
+      Flexo = R12 + R18 + R20 (definição do dono em 24/09; a R12 saiu em julho).
+      Divergência que é da PLANILHA: em jan e fev o Gráficos Tendência deixou a
+      R12 de fora do Flexo, mesmo com ela apontando. No Machine Card a R12
+      está no grupo FUNGICIDA.
       Ainda a entender: Laminação em março (planilha 35,8% x 39,1%).
       O painel web atual usa outra regra (desconta todo PLANEJADO do total).
     medicoes:
@@ -121,6 +121,29 @@ indicadores:
       - fonte: hub.calculo
         regra: indicadores/velocidade_machine_card.sql
         usa: [machine_card.producao_metros]
+
+  - codigo: APARA_APONTADA_PCT
+    versao: 1
+    nome: Apara apontada (fardos)
+    unidade: pct
+    grao: mes
+    dono: Aparas
+    definicao: >
+      (Peso bruto − peso líquido) ÷ peso bruto dos fardos de aparas pesados no
+      mês (JGR). Mesma definição do painel web.
+    fonte_oficial: sequenciamento.fardos
+    tolerancia_abs: 0.1            # pontos percentuais
+    comparacao_opcional: true      # o arquivo mensal só cobre o mês corrente
+    status_definicao: oficial
+    notas: >
+      O histórico vem do Sequenciamento Acumulado (aba Base Aparas Total). O
+      arquivo mensal é o mesmo registro, mais atual: nos meses em que os dois
+      existem, precisam bater.
+    medicoes:
+      - fonte: sequenciamento.fardos
+        regra: indicadores/apara_apontada_acumulado.sql
+      - fonte: fardos.mensal
+        regra: indicadores/apara_apontada_mensal.sql
 
   - codigo: PRODUCAO_KG
     versao: 1
