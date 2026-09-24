@@ -115,7 +115,17 @@ aguardando, divergente, validado.
 
 - **21 fontes** catalogadas, incluindo o BI Dados de Produção. Primeira
   leitura de tudo: ~95 s; depois, só o que mudou.
-- **8 indicadores:** 262 validados, 90 divergentes, 45 aguardando, 2 erros.
+- **8 indicadores:** 339 validados, 15 divergentes, 44 aguardando, 0 erros.
+  Os 15 divergentes são células do Gráficos Tendência desatualizadas ou
+  erradas; o relatório lista cada uma na seção "O que corrigir nas
+  planilhas" (também em `relatorios/correcoes.csv`), com o valor certo.
+- **Base Apontamento do Excel:** a consulta dela descarta parada sem OP, OP
+  de WIP e revisão (filtro lido do Power Query da planilha). Com o mesmo
+  filtro, BI e planilha batem nos 56 meses. Ela não serve pra TMR — e é dela
+  que o painel web atual calcula o TMR.
+- **Velocidade:** o hub recalcula a regra do BI (consulta BaseVazao) a partir
+  dos apontamentos e bate com o BI em 106 de 106 meses. O painel web atual
+  usa outra regra (Machine Card, por dia).
 - **TMR resolvido.** Com os apontamentos do BI, a regra PRODUZINDO ÷
   (horas − FIM TURNO) e Flexo = R12 + R18 + R20, o hub reproduz o Gráficos
   Tendência. O TMR tem 49 meses validados, o Setup 56 de 56.

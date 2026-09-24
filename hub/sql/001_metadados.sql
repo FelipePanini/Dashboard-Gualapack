@@ -74,6 +74,7 @@ create table if not exists indicators (
   primary key (codigo, versao)
 );
 alter table indicators add column if not exists comparacao_opcional boolean default false;
+alter table indicators add column if not exists correcao varchar;  -- onde e o que corrigir quando divergir
 
 create table if not exists measurements (
   run_id      integer not null,

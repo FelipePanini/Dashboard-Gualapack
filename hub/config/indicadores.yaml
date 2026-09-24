@@ -25,6 +25,8 @@ indicadores:
       Horas classificadas como PRODUZINDO no cadastro oficial ÷ horas
       apontadas no recorte e no mês, sem as horas de FIM TURNO. Apontamentos
       do BI Dados de Produção (tabela Dados).
+    # Onde corrigir quando divergir: o cálculo do hub usa o dado completo do BI.
+    correcao: "Gráficos Tendência › aba TMR - {recorte} › linha {mes} › coluna Produzindo = {valor_comparado}"
     fonte_oficial: graficos.tmr
     tolerancia_abs: 1.0            # pontos percentuais
     status_definicao: em_validacao
@@ -54,6 +56,7 @@ indicadores:
     grao: mes x recorte
     dono: superior imediato de Produção
     definicao: Horas com classe SETUP ÷ horas apontadas no recorte e no mês, sem FIM TURNO.
+    correcao: "Gráficos Tendência › aba TMR - {recorte} › linha {mes} › coluna Setup = {valor_comparado}"
     fonte_oficial: graficos.tmr
     tolerancia_abs: 1.0
     status_definicao: em_validacao
@@ -71,6 +74,7 @@ indicadores:
     grao: mes x recorte
     dono: superior imediato de Produção
     definicao: Horas com classe INATIVIDADE ÷ horas apontadas no recorte e no mês, sem FIM TURNO.
+    correcao: "Gráficos Tendência › aba TMR - {recorte} › linha {mes} › coluna Inativo = {valor_comparado}"
     fonte_oficial: graficos.tmr
     tolerancia_abs: 1.0
     status_definicao: em_validacao
@@ -82,18 +86,25 @@ indicadores:
         usa: [pbi.apontamentos, indicadores.classificacao]
 
   - codigo: HORAS_APONTADAS
-    versao: 1
-    nome: Horas apontadas
+    versao: 2
+    nome: Horas apontadas (recorte da Base Apontamento)
     unidade: h
     grao: mes x recorte
     dono: superior imediato de Produção
     definicao: >
-      Soma das horas de todos os apontamentos das máquinas do recorte no mês.
-      BI e Indicadores Diário leem a mesma view do SQL Server: mês fechado
-      precisa bater. Diferença aqui é linha faltando ou sobrando numa das cópias.
+      Soma das horas dos apontamentos das máquinas do recorte no mês, sem
+      parada sem OP, sem OP de WIP e sem revisão — o mesmo filtro da consulta
+      "Base Apontamento" do Indicadores Diário. BI e planilha leem a mesma
+      view do SQL Server: mês fechado precisa bater.
     fonte_oficial: pbi.apontamentos
     tolerancia_pct: 0.01           # 1%
     status_definicao: oficial
+    notas: >
+      v1 comparava o total de horas e divergia em 51 meses: a planilha descarta
+      parada sem OP, WIP e revisão por construção (filtro do Power Query), não
+      por falha. Com o mesmo filtro dos dois lados, 56 de 56 meses batem abaixo
+      de 0,1%. Por isso a Base Apontamento NÃO serve pra TMR: ela não tem todo o
+      tempo de máquina (o painel web atual calcula TMR em cima dela).
     medicoes:
       - fonte: pbi.apontamentos
         regra: indicadores/horas_bi.sql
@@ -101,26 +112,30 @@ indicadores:
         regra: indicadores/horas_excel.sql
 
   - codigo: VELOCIDADE_M_MIN
-    versao: 1
+    versao: 2
     nome: Velocidade
     unidade: m_min
     grao: mes x maquina
     dono: superior imediato de Produção
     definicao: >
-      Metros produzidos ÷ minutos produzindo, pela medida "Velocidade" do BI
-      Dados de Produção: (SUM(Qtd Produzida) / SUM(Horas Produzindo)) / 60.
+      Metros produzidos ÷ minutos produzindo, pela regra do BI Dados de
+      Produção (consulta BaseVazao + medida Velocidade): por OP, processo e
+      máquina, no mês do último dia da OP, sem OP de WIP ou revisão, sem OP com
+      produção até 10 e sem OP sem hora produzindo.
     fonte_oficial: pbi.vazao
-    tolerancia_pct: 0.05           # 5%: o BI data a OP pelo último dia, o Machine Card por dia
-    status_definicao: em_validacao
+    tolerancia_pct: 0.01           # 1%
+    status_definicao: oficial
     notas: >
-      O valor comparado é a regra que o painel web usa hoje (Machine Card,
-      Produção (Metros)). Divergência aqui = o painel mostra outra velocidade.
+      v1 comparava com a regra do painel web (Machine Card, por dia): outra
+      definição, que diverge do BI em ~20% dos meses. O painel web passa a
+      mostrar a velocidade do BI quando ler do hub. A v2 recalcula a regra do
+      BI a partir dos apontamentos do próprio BI: confere a tabela BaseVazao.
     medicoes:
       - fonte: pbi.vazao
         regra: indicadores/velocidade_bi.sql
       - fonte: hub.calculo
-        regra: indicadores/velocidade_machine_card.sql
-        usa: [machine_card.producao_metros]
+        regra: indicadores/velocidade_hub.sql
+        usa: [pbi.apontamentos]
 
   - codigo: APARA_APONTADA_PCT
     versao: 1
@@ -152,6 +167,7 @@ indicadores:
     grao: mes
     dono: superior imediato de Produção
     definicao: Produção total do mês em kg, como o Power BI fecha.
+    correcao: "Gráficos Tendência › aba Volume (ton) › bloco Volume Corte (JGR + OF) › linha {mes} › kg = {valor_oficial}"
     fonte_oficial: sequenciamento.scrap_bi
     tolerancia_pct: 0.005          # 0,5%
     status_definicao: oficial

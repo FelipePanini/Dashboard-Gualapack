@@ -48,6 +48,26 @@ def _dif(d, pct, unidade: str) -> str:
     return f"{d:+,.0f}".translate(_PT) + SUFIXO.get(unidade, "") + extra
 
 
+MESES_NOME = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto",
+              "Setembro", "Outubro", "Novembro", "Dezembro"]
+
+
+def _correcao(modelo: str | None, recorte: str, periodo: date, oficial, comparado, unidade: str) -> str | None:
+    """Preenche o modelo de correção do catálogo: onde mexer e qual valor colocar."""
+    if not modelo:
+        return None
+
+    def valor(x):
+        if x is None:
+            return "—"
+        if unidade == "pct":
+            return f"{x:.2f}%".translate(_PT)
+        return f"{x:,.2f}".translate(_PT) + SUFIXO.get(unidade, "")
+
+    return modelo.format(recorte=recorte, mes=MESES_NOME[periodo.month - 1],
+                         valor_oficial=valor(oficial), valor_comparado=valor(comparado))
+
+
 def _mes(d: date | None) -> str:
     return f"{MESES[d.month - 1]}/{d.year}" if d else "—"
 
@@ -74,7 +94,7 @@ def gerar(con: duckdb.DuckDBPyConnection, run_id: int | None = None) -> Path:
     validacoes = con.execute(
         """select v.indicador, i.nome, i.unidade, v.recorte, v.periodo, v.fonte_oficial, v.valor_oficial,
                   v.fonte_comparada, v.valor_comparado, v.dif_abs, v.dif_pct, v.status, v.motivo,
-                  i.definicao, i.status_definicao
+                  i.definicao, i.status_definicao, i.correcao
            from validation_results v
            join indicators i on i.codigo = v.indicador
                             and i.versao = (select max(versao) from indicators where codigo = v.indicador)
@@ -87,6 +107,12 @@ def gerar(con: duckdb.DuckDBPyConnection, run_id: int | None = None) -> Path:
     contagem: dict[str, int] = {}
     for v in validacoes:
         contagem[v[11]] = contagem.get(v[11], 0) + 1
+    correcoes = []  # (indicador, recorte, periodo, instrução) — o caminho pra zerar os divergentes
+    for v in validacoes:
+        if v[11] == "divergente":
+            instrucao = _correcao(v[15], v[3], v[4], v[6], v[8], v[2])
+            if instrucao:
+                correcoes.append((v[1], v[3], v[4], instrucao))
     fontes_ok = sum(1 for f in fontes if f[7] == "ok")
 
     # --- HTML -----------------------------------------------------------------
@@ -109,11 +135,16 @@ def gerar(con: duckdb.DuckDBPyConnection, run_id: int | None = None) -> Path:
         pior = min((l[11] for l in linhas), key=lambda s: ORDEM.get(s, 99))
         resumo = ", ".join(f"{n} {STATUS[s][1].lower()}" for s in STATUS
                            if (n := sum(1 for l in linhas if l[11] == s)))
+        def _motivo(l):
+            texto = html.escape(l[12] or "")
+            instrucao = _correcao(l[15], l[3], l[4], l[6], l[8], l[2]) if l[11] == "divergente" else None
+            return texto + (f"<div class='corrigir'>Corrigir: {html.escape(instrucao)}</div>" if instrucao else "")
+
         corpo = "".join(
             f"<tr class='r-{l[11]}'><td>{html.escape(l[3])}</td><td>{_mes(l[4])}</td>"
             f"<td class='num'>{_num(l[6], unidade)}</td><td class='num'>{_num(l[8], unidade)}</td>"
             f"<td class='num'>{_dif(l[9], l[10], unidade)}</td><td>{_selo(l[11])}</td>"
-            f"<td class='motivo'>{html.escape(l[12] or '')}</td></tr>"
+            f"<td class='motivo'>{_motivo(l)}</td></tr>"
             for l in linhas)
         fonte_of = html.escape(linhas[0][5] or "—")
         fonte_cmp = html.escape(next((l[7] for l in linhas if l[7]), "—"))
@@ -130,6 +161,21 @@ def gerar(con: duckdb.DuckDBPyConnection, run_id: int | None = None) -> Path:
         f"<tr><td>{_selo('erro' if p[0] == 'erro' else 'divergente').replace('Divergente', 'Aviso')}</td>"
         f"<td><code>{html.escape(p[1])}</code></td><td><code>{html.escape(p[2])}</code></td>"
         f"<td>{html.escape(p[3])}</td></tr>" for p in problemas) or "<tr><td colspan=4>Nenhum.</td></tr>"
+
+    # O caminho pra zerar os divergentes: divergência cuja causa conhecida é
+    # uma célula de planilha desatualizada ou errada vira instrução direta.
+    if correcoes:
+        itens = "".join(
+            f"<tr><td>{html.escape(c[0])}</td><td>{html.escape(c[1])}</td><td>{_mes(c[2])}</td>"
+            f"<td>{html.escape(c[3])}</td></tr>" for c in correcoes)
+        secao_correcoes = (
+            f"<h2>O que corrigir nas planilhas ({len(correcoes)})</h2>"
+            "<p class='mut'>Divergências cuja causa é uma célula de planilha desatualizada ou errada. "
+            "Corrigida a célula, a próxima execução valida sozinha.</p>"
+            "<div class='wrap'><table><thead><tr><th>Indicador</th><th>Recorte</th><th>Mês</th>"
+            f"<th>Onde e o quê</th></tr></thead><tbody>{itens}</tbody></table></div>")
+    else:
+        secao_correcoes = ""
 
     pagina = f"""<!doctype html>
 <html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
@@ -151,7 +197,7 @@ td.num,th.num{{text-align:right;font-variant-numeric:tabular-nums}} td.motivo{{c
 .s-erro{{color:var(--err)}} .s-desatualizado{{color:var(--des)}} .s-aguardando{{color:var(--agu)}}
 details{{background:var(--card);border:1px solid var(--linha);border-radius:10px;margin:10px 0;padding:10px 12px}}
 details table{{margin-top:8px;border:none}} summary{{cursor:pointer}} .def{{margin:8px 0 0;color:var(--mut)}}
-.wrap{{overflow-x:auto}}
+.wrap{{overflow-x:auto}} .corrigir{{margin-top:4px;color:var(--div);font-weight:600}}
 </style></head><body><main>
 <h1>Qualidade dos dados</h1>
 <div class="mut">Execução {execucao[0]} · {_data(execucao[1])} → {_data(execucao[2])} · {_selo(execucao[3])} ·
@@ -160,6 +206,7 @@ details table{{margin-top:8px;border:none}} summary{{cursor:pointer}} .def{{marg
 <h2>Fontes</h2>
 <div class="wrap"><table><thead><tr><th>Fonte</th><th>Status</th><th>Última leitura</th><th>Arquivo salvo em</th>
 <th>Dado até</th><th class="num">Linhas</th></tr></thead><tbody>{linhas_fontes}</tbody></table></div>
+{secao_correcoes}
 <h2>Indicadores</h2>
 {''.join(blocos) or '<p class="mut">Nenhuma validação nesta execução.</p>'}
 <h2>Erros e avisos da execução</h2>
@@ -174,4 +221,8 @@ details table{{margin-top:8px;border:none}} summary{{cursor:pointer}} .def{{marg
     con.execute("select * from validation_results where run_id = ? order by indicador, recorte, periodo",
                 [run_id]).pl().write_csv(RELATORIOS / "validacao.csv", separator=";",
                                          include_bom=True, decimal_comma=True)
+    import polars as pl
+    pl.DataFrame([(c[0], c[1], c[2], c[3]) for c in correcoes],
+                 schema={"indicador": pl.String, "recorte": pl.String, "mes": pl.Date, "onde_e_o_que": pl.String},
+                 orient="row").write_csv(RELATORIOS / "correcoes.csv", separator=";", include_bom=True)
     return destino
