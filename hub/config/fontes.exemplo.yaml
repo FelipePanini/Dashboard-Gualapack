@@ -1,0 +1,43 @@
+# Modelo de config/fontes.local.yaml (este vai pro git, o local não).
+# Copie para fontes.local.yaml e troque o caminho da pasta de entrada.
+#
+# Nomes de coluna são os cabeçalhos NORMALIZADOS: sem acento, minúsculos,
+# "_" no lugar de espaço e entre palavras em CamelCase ("CodApont" -> cod_apont).
+#
+# Tipos de fonte:
+#   excel_tabela  aba de base, cabeçalho na primeira linha
+#   excel_bloco   tabela pequena dentro de aba de relatório: começa na célula
+#                 "ancora" (abaixo do "titulo", se houver) e vai até a 1ª linha vazia.
+#                 Com "abas" (recorte -> aba), lê o mesmo bloco em várias abas.
+#
+# "arquivo" aceita {ano}, {entrada} e curinga (* ?). O padrão precisa achar
+# exatamente UM arquivo; zero ou dois é erro.
+#
+# Campos opcionais: coluna_data, data_conta_se (só conta a data onde essa
+# coluna > 0), granularidade: mensal, linhas_minimas, frescor_dias.
+
+ano: 2026
+
+pastas:
+  entrada: 'C:\Users\<voce>\<Área de Trabalho>\Dados do Painel'
+
+fontes:
+  - id: indicadores.base_apontamento
+    tipo: excel_tabela
+    descricao: Evento de máquina. Base do TMR.
+    dono: <área>
+    arquivo: '{entrada}\Indicadores Diário - {ano}.xlsx'
+    aba: Base Apontamento
+    colunas_obrigatorias: [num_ordem, cod_recurso, cod_apont, dt_producao, qtd_horas]
+    coluna_data: dt_producao
+    linhas_minimas: 1000
+    frescor_dias: 2
+
+  - id: graficos.tmr
+    tipo: excel_bloco
+    arquivo: '{entrada}\Graficos Tendência.xlsx'
+    ancora: Mês
+    abas:
+      Flexo: TMR - Flexo
+    colunas_obrigatorias: [mes, setup, improdutivo, inativo, produzindo]
+    frescor_dias: 35

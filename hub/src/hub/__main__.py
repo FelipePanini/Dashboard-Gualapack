@@ -1,0 +1,133 @@
+"""Uma execução completa do hub.
+
+    uv run hub                     coleta, valida e gera o relatório
+    uv run hub --se-mudou          só roda se algo mudou na pasta de entrada
+                                   ou na configuração (é o que o agendador usa)
+    uv run hub relatorio           só regenera o relatório da última execução
+"""
+from __future__ import annotations
+
+import argparse
+import logging
+import sys
+import time
+from datetime import date
+
+from hub import coleta, config, db, execucao, medicao, relatorio, transformacao, validacao
+from hub.caminhos import CONFIG, DADOS, LOGS, SQL
+from hub.origens import Origens, resolver
+
+log = logging.getLogger("hub")
+MARCA_ULTIMA_EXECUCAO = DADOS / "ultima_execucao"
+MAXIMO_SEM_RODAR_S = 24 * 3600  # mesmo sem mudança, roda 1x/dia: o frescor depende da data de hoje
+
+
+def _configurar_log() -> None:
+    LOGS.mkdir(parents=True, exist_ok=True)
+    handlers: list[logging.Handler] = [
+        logging.FileHandler(LOGS / f"hub-{date.today():%Y-%m}.log", encoding="utf-8")]
+    if sys.stderr is not None:  # rodando por pythonw.exe (agendador) não há console
+        handlers.append(logging.StreamHandler())
+    logging.basicConfig(level=logging.INFO, handlers=handlers,
+                        format="%(asctime)s %(levelname)s %(message)s", datefmt="%Y-%m-%d %H:%M:%S")
+
+
+def _momento(caminho) -> float:
+    st = caminho.stat()
+    # st_ctime no Windows é a data de criação: arquivo copiado pro lugar mantém
+    # o "modificado em" antigo, mas ganha data de criação nova.
+    return max(st.st_mtime, st.st_ctime)
+
+
+def algo_mudou(cfg: dict) -> str | None:
+    """Motivo pra rodar, ou None se nada mudou desde a última execução."""
+    if not MARCA_ULTIMA_EXECUCAO.exists():
+        return "primeira execução"
+    ultima = float(MARCA_ULTIMA_EXECUCAO.read_text())
+    if time.time() - ultima > MAXIMO_SEM_RODAR_S:
+        return "mais de 24 h sem rodar"
+    for pasta in (CONFIG, SQL):
+        for arq in pasta.rglob("*"):
+            if arq.is_file() and _momento(arq) > ultima:
+                return f"configuração alterada ({arq.name})"
+    arquivos = list(cfg["pasta_entrada"].iterdir()) if cfg["pasta_entrada"] and cfg["pasta_entrada"].exists() else []
+    for fonte in cfg["fontes"]:
+        try:
+            arquivos.append(resolver(fonte["arquivo"]))
+        except FileNotFoundError:
+            pass
+    for arq in arquivos:
+        if arq.is_file() and not arq.name.startswith("~$") and _momento(arq) > ultima:
+            return f"arquivo novo ou alterado ({arq.name})"
+    return None
+
+
+def executar(gatilho: str = "manual", so_se_mudou: bool = False) -> int:
+    cfg = config.carregar()
+    if so_se_mudou:
+        motivo = algo_mudou(cfg)
+        if motivo is None:
+            log.info("nada mudou desde a última execução")
+            return 0
+        log.info("rodando: %s", motivo)
+
+    inicio = time.time()
+    con = db.conectar()
+    run = execucao.iniciar(con, gatilho)
+    log.info("execução %s iniciada (%s)", run, gatilho)
+
+    coleta.sincronizar_fontes(con, cfg["fontes"])
+    coleta.inventariar_pasta(con, run, cfg["pasta_entrada"], cfg["fontes"])
+    with Origens() as origens:
+        for fonte in cfg["fontes"]:
+            try:
+                status = coleta.coletar(con, run, fonte, origens)
+                log.info("  %-32s %s", fonte["id"], status)
+            except coleta.ContratoQuebrado as e:
+                execucao.registrar_excecao(con, run, fonte["id"], e, codigo="contrato_quebrado")
+                log.error("  %-32s CONTRATO QUEBRADO: %s", fonte["id"], e)
+            except FileNotFoundError as e:
+                execucao.registrar_excecao(con, run, fonte["id"], e, codigo="arquivo_ausente")
+                log.error("  %-32s ARQUIVO AUSENTE: %s", fonte["id"], e)
+            except Exception as e:  # uma fonte quebrada não derruba as outras
+                execucao.registrar_excecao(con, run, fonte["id"], e)
+                log.exception("  %-32s ERRO", fonte["id"])
+
+    transformacao.preparar_parametros(con, cfg)
+    transformacao.executar_clean(con, run)
+    transformacao.executar_checagens(con, run)
+    medicao.registrar_indicadores(con, cfg["indicadores"])
+    medicao.calcular(con, run, cfg["indicadores"])
+    contagem = validacao.validar(con, run)
+    status = execucao.finalizar(con, run)
+    caminho = relatorio.gerar(con, run)
+    con.close()
+    MARCA_ULTIMA_EXECUCAO.write_text(str(inicio))
+
+    log.info("validação: %s", ", ".join(f"{k}={v}" for k, v in sorted(contagem.items())) or "nada")
+    log.info("execução %s terminou: %s · relatório em %s", run, status, caminho)
+    return 0 if status == "ok" else 1
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser(prog="hub", description="Data hub de produção — Gualapack Jaguariúna")
+    parser.add_argument("comando", nargs="?", default="executar", choices=["executar", "relatorio"])
+    parser.add_argument("--gatilho", default="manual", help="manual | agendado | teste")
+    parser.add_argument("--se-mudou", action="store_true",
+                        help="só roda se algo mudou na pasta de entrada ou na configuração")
+    args = parser.parse_args()
+    _configurar_log()
+    try:
+        if args.comando == "relatorio":
+            con = db.conectar()
+            log.info("relatório: %s", relatorio.gerar(con))
+            con.close()
+            return
+        sys.exit(executar(args.gatilho, args.se_mudou))
+    except Exception:
+        log.exception("falha na execução")  # no agendador não há console: o log é o único registro
+        sys.exit(2)
+
+
+if __name__ == "__main__":
+    main()

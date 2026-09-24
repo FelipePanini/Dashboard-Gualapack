@@ -1,0 +1,13 @@
+# Dado e log nunca vão pro git
+data/
+logs/
+relatorios/
+
+# Configuração com caminhos internos e nomes de servidor: só local
+config/*.local.yaml
+
+# Python / uv
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/

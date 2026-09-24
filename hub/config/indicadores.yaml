@@ -1,0 +1,112 @@
+# ============================================================================
+# Catálogo de indicadores (vai pro git).
+#
+# Cada indicador tem UMA fonte oficial e uma definição escrita. O hub não
+# escolhe valor: ele mede cada fonte com a regra declarada aqui e compara
+# com a oficial. Mudou a regra? Suba a versão; a anterior fica no histórico.
+#
+# Enquanto o cálculo do hub ("hub.calculo") não bate com a planilha, a
+# planilha é a oficial e o hub é a conferência. Quando bater por um mês
+# inteiro, o dono decide inverter.
+#
+# Campos: codigo, versao, nome, unidade (pct|kg|h), grao, dono, definicao,
+# fonte_oficial, tolerancia_abs / tolerancia_pct, status_definicao
+# (rascunho | em_validacao | oficial), notas, medicoes[fonte, regra, usa].
+# ============================================================================
+
+indicadores:
+  - codigo: TMR_PCT
+    versao: 1
+    nome: TMR (tempo de máquina rodando)
+    unidade: pct
+    grao: mes x recorte
+    dono: superior imediato de Produção
+    definicao: >
+      Horas classificadas como PRODUZINDO no cadastro oficial ÷ horas
+      apontadas no recorte e no mês, sem as horas de FIM TURNO.
+    fonte_oficial: graficos.tmr
+    tolerancia_abs: 1.0            # pontos percentuais
+    status_definicao: em_validacao
+    notas: >
+      Regra do hub escolhida por evidência em 24/09: sem FIM TURNO no total, a
+      R18 bate de jan a jul (0 a 1,7 p.p.). Perguntas abertas ao dono:
+      (1) a aba TMR conta horas de calendário SEM apontamento como Inativo?
+      Roto em maio: 60% inativo na planilha x 5% nos apontamentos;
+      (2) o que mudou em agosto (R18: 37,0% na planilha x 44,8% no hub);
+      (3) quais máquinas compõem "Laminação" e "Flexo" na planilha.
+      O painel web atual usa outra regra (desconta todo PLANEJADO do total).
+    medicoes:
+      - fonte: graficos.tmr
+        regra: indicadores/tmr_referencia.sql
+      - fonte: hub.calculo
+        regra: indicadores/tmr_hub.sql
+        usa: [indicadores.base_apontamento, indicadores.classificacao]
+
+  - codigo: SETUP_PCT
+    versao: 1
+    nome: Horas em setup
+    unidade: pct
+    grao: mes x recorte
+    dono: superior imediato de Produção
+    definicao: Horas com classe SETUP ÷ horas apontadas no recorte e no mês, sem FIM TURNO.
+    fonte_oficial: graficos.tmr
+    tolerancia_abs: 1.0
+    status_definicao: em_validacao
+    medicoes:
+      - fonte: graficos.tmr
+        regra: indicadores/setup_referencia.sql
+      - fonte: hub.calculo
+        regra: indicadores/setup_hub.sql
+        usa: [indicadores.base_apontamento, indicadores.classificacao]
+
+  - codigo: INATIVO_PCT
+    versao: 1
+    nome: Horas inativas
+    unidade: pct
+    grao: mes x recorte
+    dono: superior imediato de Produção
+    definicao: Horas com classe INATIVIDADE ÷ horas apontadas no recorte e no mês, sem FIM TURNO.
+    fonte_oficial: graficos.tmr
+    tolerancia_abs: 1.0
+    status_definicao: em_validacao
+    medicoes:
+      - fonte: graficos.tmr
+        regra: indicadores/inativo_referencia.sql
+      - fonte: hub.calculo
+        regra: indicadores/inativo_hub.sql
+        usa: [indicadores.base_apontamento, indicadores.classificacao]
+
+  - codigo: PRODUCAO_KG
+    versao: 1
+    nome: Produção do mês
+    unidade: kg
+    grao: mes
+    dono: superior imediato de Produção
+    definicao: Produção total do mês em kg, como o Power BI fecha.
+    fonte_oficial: sequenciamento.scrap_bi
+    tolerancia_pct: 0.005          # 0,5%
+    status_definicao: oficial
+    notas: >
+      O Gráficos Tendência copia esse número no bloco "Volume Corte (JGR + OF)".
+      A comparação pega erro de cópia entre as duas planilhas.
+    medicoes:
+      - fonte: sequenciamento.scrap_bi
+        regra: indicadores/producao_kg_bi.sql
+      - fonte: graficos.volume_corte
+        regra: indicadores/producao_kg_graficos.sql
+
+  - codigo: SCRAP_PCT
+    versao: 1
+    nome: Scrap confirmado
+    unidade: pct
+    grao: mes
+    dono: superior imediato de Produção
+    definicao: Refugo total ÷ produção do mês, os dois como o Power BI fecha.
+    fonte_oficial: sequenciamento.scrap_bi
+    status_definicao: oficial
+    notas: >
+      Fonte única no MVP: conferidos só faixa (0–100%) e frescor. Não comparar
+      com a apara de fardos: é outra definição, com escala 4 a 5 vezes menor.
+    medicoes:
+      - fonte: sequenciamento.scrap_bi
+        regra: indicadores/scrap_pct_bi.sql

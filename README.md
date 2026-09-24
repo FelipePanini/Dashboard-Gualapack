@@ -8,6 +8,13 @@ o painel se atualiza sozinho todo dia de madrugada.
 **Painel:** https://felipepanini.github.io/Dashboard-Gualapack/demo/ (acesso
 com login; cadastro só com chave de convite).
 
+> **Em construção: o data hub ([`hub/`](./hub/README.md)).** Ele lê as
+> planilhas de uma pasta na Área de Trabalho, valida cada indicador contra a
+> fonte oficial e mostra o resultado numa tela de qualidade dos dados. Quando
+> ele publicar no Supabase, o painel passa a ler dele e o upload para o
+> Google Drive deixa de ser necessário. Até lá, o fluxo abaixo continua
+> alimentando o painel.
+
 ---
 
 ## Como o dado chega na tela
@@ -101,6 +108,7 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 | [`docs/mapeamento/`](./docs/mapeamento/) | Levantamentos: inventário das 220 abas, redundâncias, origem de cada número, validação contra as planilhas. |
 | [`docs/historico/`](./docs/historico/) | Retrato do projeto em 14/09/2026, com as decisões e descartes até ali. |
 | [`tools/`](./tools/) | Script local pra cortar uma planilha grande numa aba só (apoio ao upload manual). |
+| [`hub/`](./hub/) | Data hub em construção: coleta local das planilhas, validação de cada indicador contra a fonte oficial e tela de qualidade dos dados. Python + DuckDB, roda no PC. |
 
 ---
 
