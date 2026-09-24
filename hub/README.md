@@ -43,13 +43,21 @@ e rodar `uv sync` dentro de `hub/`. Não precisa de administrador.
 
 - **Atualizar:** substitua a planilha pelo arquivo novo, com o mesmo nome.
   Pode deixar o Excel aberto; o hub lê uma cópia.
+- **Subpastas:** cada arquivo é achado pelo nome em qualquer subpasta. Pode
+  reorganizar à vontade; só não deixe duas cópias com o mesmo nome (é erro,
+  nunca palpite).
 - **Arquivo novo:** aparece no relatório como "não catalogado" até ganhar
   uma entrada no catálogo de fontes.
-- **Power BI (.pbix):** o hub não lê o .pbix. Para os números, exporte os
-  dados do visual para Excel/CSV nesta pasta. Para as regras (medidas DAX),
-  salve como projeto do Power BI (.pbip).
-- **Nome com revisão:** o Sequenciamento aceita "Rev2", "Rev3"... mas só um
-  por vez na pasta; dois é erro, nunca palpite.
+- **Power BI (.pbix):** o hub lê direto o arquivo — tabelas e fórmulas DAX —
+  sem Power BI e sem acesso ao banco, desde que o relatório seja do tipo
+  Importação (o dado fica salvo dentro do .pbix). O dado é o da última vez que
+  o .pbix foi atualizado e salvo; a fonte `pbi.atualizacao` mostra quando foi.
+- **Um arquivo por mês:** os Sequenciamentos mensais de fardos são lidos
+  todos juntos; é só ir acrescentando o arquivo do mês.
+- **Nome com revisão:** o Sequenciamento Acumulado aceita "Rev2", "Rev3"...
+  mas só um por vez.
+- **Arquivo que derruba o leitor rápido de Excel** (hoje: Refugo Aparas) é
+  lido pelo leitor alternativo, mais lento, e vira aviso no relatório.
 
 ## Execução automática
 
@@ -103,20 +111,28 @@ aguardando, divergente, validado.
 
 ## Situação em 24/09/2026
 
-- 5 fontes e 5 indicadores rodando da pasta de entrada, em ~7 segundos.
-- **TMR:** o hub reproduz a planilha na R18 de jan a jul, com diferença de 0
-  a 1,7 p.p., contando PRODUZINDO ÷ (horas apontadas − FIM TURNO).
-- **Perguntas abertas ao dono do indicador**, listadas nas notas do `TMR_PCT`:
-  - A planilha conta hora de calendário sem apontamento como Inativo?
-  - O que mudou em agosto?
-  - Quais máquinas formam "Laminação" e "Flexo"?
-- **SQL Server:** fora por enquanto (decisão de 24/09). O login integrado do
-  Windows é recusado; o hub trabalha só com as planilhas.
+- **20 fontes** catalogadas, incluindo o BI Dados de Produção. Primeira
+  leitura de tudo: ~95 s; depois, só o que mudou.
+- **7 indicadores:** 245 validados, 99 divergentes, 44 aguardando, 2 erros.
+- **TMR resolvido.** Com os apontamentos do BI e a regra PRODUZINDO ÷
+  (horas − FIM TURNO), o hub reproduz o Gráficos Tendência. O Corte bate
+  igual em todos os meses, e R18, L04 e Roto ficam abaixo de 0,3 p.p. de
+  erro médio.
+- **Achado 1:** a Base Apontamento do Indicadores Diário está com
+  apontamentos faltando (Roto com menos da metade das horas do BI). É
+  essa a origem das divergências de TMR.
+- **Achado 2:** o recorte Flexo do Gráficos Tendência inclui a R12 em alguns
+  meses e em outros não.
+- **Achado 3:** a velocidade do painel web bate com a do BI (menos de 1%)
+  na maioria das máquinas. Fogem HMC01 em julho, REB05 e REB10 em agosto.
+- **SQL Server:** fora por enquanto (decisão de 24/09); o hub trabalha só
+  com as planilhas e o .pbix.
 
 ## Próximos passos
 
-1. Respostas do dono do indicador → ajustar recortes e a regra do TMR.
-2. Mais planilhas e exportações do BI na pasta de entrada, cada uma com contrato.
+1. Confirmar com o dono do indicador qual é o Flexo certo (com ou sem R12).
+2. Indicadores de aparas, refugo, aderência e produtividade a partir das
+   fontes já catalogadas (as que o painel web mostra).
 3. Publicar no Supabase (`sql/supabase/001_trusted.sql`, ainda não aplicado)
    para o painel web ler do hub. Aí o upload para o Google Drive deixa de ser
    necessário.

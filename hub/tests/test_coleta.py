@@ -4,7 +4,7 @@ import pytest
 
 from hub import coleta, db
 from hub.coleta import ContratoQuebrado, ler_bloco, nomes_unicos, normalizar
-from hub.origens import Origens
+from hub.origens import Origens, localizar, resolver
 
 
 def test_normalizar():
@@ -75,20 +75,54 @@ def _base(caminho, colunas, linhas):
 def test_inventario_avisa_arquivo_nao_catalogado(tmp_path):
     con = db.conectar(":memory:")
     run = con.execute("insert into processing_runs (gatilho) values ('teste') returning id").fetchone()[0]
-    _base(str(tmp_path / "Base.xlsx"), ["CodRecurso"], [["R18"]])
-    _base(str(tmp_path / "Planilha Nova.xlsx"), ["X"], [[1]])
+    (tmp_path / "Indicadores").mkdir()
+    _base(str(tmp_path / "Indicadores" / "Base.xlsx"), ["CodRecurso"], [["R18"]])
+    _base(str(tmp_path / "Indicadores" / "Planilha Nova.xlsx"), ["X"], [[1]])   # em subpasta
     (tmp_path / "Indicadores.pbix").write_bytes(b"pbix")
     (tmp_path / "~$Base.xlsx").write_bytes(b"lock")        # arquivo de trava do Excel: ignora
     (tmp_path / "notas.txt").write_text("não é dado")     # extensão fora da lista: ignora
-    fontes = [{"id": "teste.base", "arquivo": str(tmp_path / "Base.xlsx")}]
+    fontes = [{"id": "teste.base", "arquivo": "Base.xlsx"}]  # achado pelo nome, em qualquer subpasta
 
     coleta.inventariar_pasta(con, run, tmp_path, fontes)
 
     avisos = con.execute("select mensagem from errors where codigo = 'arquivo_nao_catalogado' "
                          "order by mensagem").fetchall()
     assert len(avisos) == 2
-    assert "Indicadores.pbix" in avisos[0][0] and ".pbip" in avisos[0][0]
+    assert "Indicadores.pbix" in avisos[0][0]
     assert "Planilha Nova.xlsx" in avisos[1][0]
+
+
+def test_resolver_acha_em_subpasta_e_recusa_duplicado(tmp_path):
+    (tmp_path / "A").mkdir()
+    (tmp_path / "B").mkdir()
+    _base(str(tmp_path / "A" / "Refugo.xlsx"), ["X"], [[1]])
+    assert resolver("Refugo.xlsx", tmp_path) == tmp_path / "A" / "Refugo.xlsx"
+    _base(str(tmp_path / "B" / "Refugo.xlsx"), ["X"], [[2]])  # cópia esquecida em outra subpasta
+    with pytest.raises(FileNotFoundError, match="2 arquivo"):
+        resolver("Refugo.xlsx", tmp_path)
+
+
+def test_leitor_alternativo_quando_o_rapido_cai(tmp_path):
+    arq = tmp_path / "Refugo Aparas.xlsx"
+    _base(str(arq), ["DATE", "VOLUME JGR"], [["2026-01-01", 100.0], ["2026-02-01", 120.0]])
+    fonte = {"id": "teste.refugo", "tipo": "excel_tabela", "aba": "Base",
+             "colunas_obrigatorias": ["date", "volume_jgr"], "_teste_travar_motor": "calamine"}
+    df, motor = coleta.ler_isolado(fonte, [arq])
+    assert motor == "openpyxl"
+    assert df.height == 2
+
+
+def test_varios_arquivos_sao_empilhados(tmp_path):
+    for mes, kg in [("Agosto", 10.0), ("Setembro", 20.0)]:
+        _base(str(tmp_path / f"SEQUENCIAMENTO DOS FARDOS - {mes} 2026.xlsx"), ["DATA", "QTD BRUTA (KG)"],
+              [["2026-08-01", kg]])
+    fonte = {"id": "teste.fardos", "tipo": "excel_tabela", "aba": "Base", "varios": True,
+             "arquivo": "*SEQUENCIAMENTO DOS FARDOS*2026.xlsx", "colunas_obrigatorias": ["qtd_bruta_kg"]}
+    arquivos = localizar(fonte, tmp_path)
+    assert len(arquivos) == 2
+    df, _ = coleta.ler_isolado(fonte, arquivos)
+    assert sorted(df["qtd_bruta_kg"].to_list()) == [10.0, 20.0]
+    assert "_arquivo" in df.columns
 
 
 def test_contrato_quebrado_mantem_ultimo_dado_bom(tmp_path, monkeypatch):

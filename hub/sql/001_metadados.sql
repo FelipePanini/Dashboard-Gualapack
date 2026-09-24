@@ -33,7 +33,7 @@ create table if not exists sources (
   tipo          varchar not null,                     -- excel_tabela | excel_bloco | sql_view | manual
   descricao     varchar,
   dono          varchar,
-  frescor_dias  integer not null default 1,           -- atraso máximo aceito do dado
+  frescor_dias  integer not null default 1,           -- atraso máximo aceito do dado (0 = histórico, não confere)
   ativa         boolean not null default true
 );  -- o caminho do arquivo fica só em config/fontes.local.yaml
 
@@ -44,6 +44,7 @@ create table if not exists files (
   caminho            varchar not null,
   sha256             varchar not null,
   config_hash        varchar,                         -- muda quando a regra de leitura muda
+  assinatura_origem  varchar,                         -- nome+tamanho+data de gravação: igual = nem copia
   tamanho_bytes      bigint,
   modificado_em      timestamp,
   linhas             bigint,
@@ -52,6 +53,8 @@ create table if not exists files (
   dado_ate           date,
   status             varchar not null                 -- novo | sem_mudanca | contrato_quebrado | erro
 );
+-- bancos criados antes da coluna existir (24/09)
+alter table files add column if not exists assinatura_origem varchar;
 
 create table if not exists indicators (
   codigo            varchar not null,
@@ -137,7 +140,7 @@ select s.id as fonte, s.tipo, s.frescor_dias, s.dono,
        case
          when e.source_id is not null or u.status in ('contrato_quebrado', 'erro') then 'erro'
          when u.status is null                                                      then 'aguardando'
-         when b.dado_ate is not null and b.dado_ate < current_date - s.frescor_dias then 'desatualizado'
+         when s.frescor_dias > 0 and b.dado_ate < current_date - s.frescor_dias      then 'desatualizado'
          else 'ok'
        end as status
 from sources s

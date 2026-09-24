@@ -15,7 +15,7 @@ from datetime import date
 
 from hub import coleta, config, db, execucao, medicao, relatorio, transformacao, validacao
 from hub.caminhos import CONFIG, DADOS, LOGS, SQL
-from hub.origens import Origens, resolver
+from hub.origens import Origens, localizar
 
 log = logging.getLogger("hub")
 MARCA_ULTIMA_EXECUCAO = DADOS / "ultima_execucao"
@@ -50,10 +50,11 @@ def algo_mudou(cfg: dict) -> str | None:
         for arq in pasta.rglob("*"):
             if arq.is_file() and _momento(arq) > ultima:
                 return f"configuração alterada ({arq.name})"
-    arquivos = list(cfg["pasta_entrada"].iterdir()) if cfg["pasta_entrada"] and cfg["pasta_entrada"].exists() else []
-    for fonte in cfg["fontes"]:
+    entrada = cfg["pasta_entrada"]
+    arquivos = list(entrada.rglob("*")) if entrada and entrada.exists() else []
+    for fonte in cfg["fontes"]:  # fontes com caminho absoluto fora da pasta de entrada
         try:
-            arquivos.append(resolver(fonte["arquivo"]))
+            arquivos.extend(localizar(fonte, entrada))
         except FileNotFoundError:
             pass
     for arq in arquivos:
@@ -78,20 +79,23 @@ def executar(gatilho: str = "manual", so_se_mudou: bool = False) -> int:
 
     coleta.sincronizar_fontes(con, cfg["fontes"])
     coleta.inventariar_pasta(con, run, cfg["pasta_entrada"], cfg["fontes"])
-    with Origens() as origens:
+    with Origens(cfg["pasta_entrada"]) as origens:
         for fonte in cfg["fontes"]:
             try:
                 status = coleta.coletar(con, run, fonte, origens)
-                log.info("  %-32s %s", fonte["id"], status)
+                log.info("  %-36s %s", fonte["id"], status)
             except coleta.ContratoQuebrado as e:
                 execucao.registrar_excecao(con, run, fonte["id"], e, codigo="contrato_quebrado")
-                log.error("  %-32s CONTRATO QUEBRADO: %s", fonte["id"], e)
+                log.error("  %-36s CONTRATO QUEBRADO: %s", fonte["id"], e)
             except FileNotFoundError as e:
                 execucao.registrar_excecao(con, run, fonte["id"], e, codigo="arquivo_ausente")
-                log.error("  %-32s ARQUIVO AUSENTE: %s", fonte["id"], e)
+                log.error("  %-36s ARQUIVO AUSENTE: %s", fonte["id"], e)
+            except coleta.LeituraFalhou as e:
+                execucao.registrar_excecao(con, run, fonte["id"], e, codigo="leitura_falhou")
+                log.error("  %-36s LEITURA FALHOU: %s", fonte["id"], e)
             except Exception as e:  # uma fonte quebrada não derruba as outras
                 execucao.registrar_excecao(con, run, fonte["id"], e)
-                log.exception("  %-32s ERRO", fonte["id"])
+                log.exception("  %-36s ERRO", fonte["id"])
 
     transformacao.preparar_parametros(con, cfg)
     transformacao.executar_clean(con, run)

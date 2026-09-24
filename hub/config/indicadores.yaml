@@ -23,24 +23,29 @@ indicadores:
     dono: superior imediato de Produção
     definicao: >
       Horas classificadas como PRODUZINDO no cadastro oficial ÷ horas
-      apontadas no recorte e no mês, sem as horas de FIM TURNO.
+      apontadas no recorte e no mês, sem as horas de FIM TURNO. Apontamentos
+      do BI Dados de Produção (tabela Dados).
     fonte_oficial: graficos.tmr
     tolerancia_abs: 1.0            # pontos percentuais
     status_definicao: em_validacao
     notas: >
-      Regra do hub escolhida por evidência em 24/09: sem FIM TURNO no total, a
-      R18 bate de jan a jul (0 a 1,7 p.p.). Perguntas abertas ao dono:
-      (1) a aba TMR conta horas de calendário SEM apontamento como Inativo?
-      Roto em maio: 60% inativo na planilha x 5% nos apontamentos;
-      (2) o que mudou em agosto (R18: 37,0% na planilha x 44,8% no hub);
-      (3) quais máquinas compõem "Laminação" e "Flexo" na planilha.
+      Resolvido por evidência em 24/09: com os apontamentos do BI e FIM TURNO
+      fora do total, o hub reproduz a planilha (Corte igual em todos os meses;
+      R18, L04 e Roto com erro médio abaixo de 0,3 p.p.; Laminação = L02+L03+L04).
+      A divergência vinha da Base Apontamento do Indicadores Diário, que está
+      com apontamentos faltando — ver HORAS_APONTADAS.
+      Divergência que é da PLANILHA: o recorte Flexo do Gráficos Tendência muda
+      de composição. Em jan, fev e ago é R18+R20; em mar, abr, mai e jul inclui
+      também a R12 (bate exato com R12: 35,9 / 31,0 / 38,0 / 32,8). A R12 é do
+      grupo FUNGICIDA no Machine Card. Confirmar com o dono qual é o certo.
+      Ainda a entender: Laminação em março (planilha 35,8% x 39,1%).
       O painel web atual usa outra regra (desconta todo PLANEJADO do total).
     medicoes:
       - fonte: graficos.tmr
         regra: indicadores/tmr_referencia.sql
       - fonte: hub.calculo
         regra: indicadores/tmr_hub.sql
-        usa: [indicadores.base_apontamento, indicadores.classificacao]
+        usa: [pbi.apontamentos, indicadores.classificacao]
 
   - codigo: SETUP_PCT
     versao: 1
@@ -57,7 +62,7 @@ indicadores:
         regra: indicadores/setup_referencia.sql
       - fonte: hub.calculo
         regra: indicadores/setup_hub.sql
-        usa: [indicadores.base_apontamento, indicadores.classificacao]
+        usa: [pbi.apontamentos, indicadores.classificacao]
 
   - codigo: INATIVO_PCT
     versao: 1
@@ -74,7 +79,48 @@ indicadores:
         regra: indicadores/inativo_referencia.sql
       - fonte: hub.calculo
         regra: indicadores/inativo_hub.sql
-        usa: [indicadores.base_apontamento, indicadores.classificacao]
+        usa: [pbi.apontamentos, indicadores.classificacao]
+
+  - codigo: HORAS_APONTADAS
+    versao: 1
+    nome: Horas apontadas
+    unidade: h
+    grao: mes x recorte
+    dono: superior imediato de Produção
+    definicao: >
+      Soma das horas de todos os apontamentos das máquinas do recorte no mês.
+      BI e Indicadores Diário leem a mesma view do SQL Server: mês fechado
+      precisa bater. Diferença aqui é linha faltando ou sobrando numa das cópias.
+    fonte_oficial: pbi.apontamentos
+    tolerancia_pct: 0.01           # 1%
+    status_definicao: oficial
+    medicoes:
+      - fonte: pbi.apontamentos
+        regra: indicadores/horas_bi.sql
+      - fonte: indicadores.base_apontamento
+        regra: indicadores/horas_excel.sql
+
+  - codigo: VELOCIDADE_M_MIN
+    versao: 1
+    nome: Velocidade
+    unidade: m_min
+    grao: mes x maquina
+    dono: superior imediato de Produção
+    definicao: >
+      Metros produzidos ÷ minutos produzindo, pela medida "Velocidade" do BI
+      Dados de Produção: (SUM(Qtd Produzida) / SUM(Horas Produzindo)) / 60.
+    fonte_oficial: pbi.vazao
+    tolerancia_pct: 0.05           # 5%: o BI data a OP pelo último dia, o Machine Card por dia
+    status_definicao: em_validacao
+    notas: >
+      O valor comparado é a regra que o painel web usa hoje (Machine Card,
+      Produção (Metros)). Divergência aqui = o painel mostra outra velocidade.
+    medicoes:
+      - fonte: pbi.vazao
+        regra: indicadores/velocidade_bi.sql
+      - fonte: hub.calculo
+        regra: indicadores/velocidade_machine_card.sql
+        usa: [machine_card.producao_metros]
 
   - codigo: PRODUCAO_KG
     versao: 1

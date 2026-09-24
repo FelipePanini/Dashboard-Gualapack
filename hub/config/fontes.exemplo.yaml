@@ -1,6 +1,11 @@
 # Modelo de config/fontes.local.yaml (este vai pro git, o local não).
 # Copie para fontes.local.yaml e troque o caminho da pasta de entrada.
 #
+# "arquivo" é o NOME do arquivo: ele é procurado em qualquer subpasta da
+# pasta de entrada. Aceita {ano} e curinga (* ?). Precisa achar exatamente
+# UM arquivo (zero ou dois é erro), a não ser com "varios: true".
+# Caminho absoluto também vale.
+#
 # Nomes de coluna são os cabeçalhos NORMALIZADOS: sem acento, minúsculos,
 # "_" no lugar de espaço e entre palavras em CamelCase ("CodApont" -> cod_apont).
 #
@@ -9,12 +14,14 @@
 #   excel_bloco   tabela pequena dentro de aba de relatório: começa na célula
 #                 "ancora" (abaixo do "titulo", se houver) e vai até a 1ª linha vazia.
 #                 Com "abas" (recorte -> aba), lê o mesmo bloco em várias abas.
+#   pbix          tabela do modelo de um Power BI (.pbix, modo Importação), ou
+#                 "conteudo: medidas" pras fórmulas DAX. Não precisa de Power BI
+#                 nem de acesso ao banco: lê o dado salvo no arquivo.
 #
-# "arquivo" aceita {ano}, {entrada} e curinga (* ?). O padrão precisa achar
-# exatamente UM arquivo; zero ou dois é erro.
-#
-# Campos opcionais: coluna_data, data_conta_se (só conta a data onde essa
-# coluna > 0), granularidade: mensal, linhas_minimas, frescor_dias.
+# Opcionais: varios (empilha todos os arquivos do padrão), colunas_excluir
+# (dado pessoal sai na leitura), coluna_data, formato_data (quando a data vem
+# como texto), data_conta_se (só conta a data onde essa coluna > 0),
+# granularidade: mensal, linhas_minimas, frescor_dias (0 = histórico).
 
 ano: 2026
 
@@ -24,20 +31,30 @@ pastas:
 fontes:
   - id: indicadores.base_apontamento
     tipo: excel_tabela
-    descricao: Evento de máquina. Base do TMR.
+    descricao: Evento de máquina.
     dono: <área>
-    arquivo: '{entrada}\Indicadores Diário - {ano}.xlsx'
+    arquivo: 'Indicadores Diário - {ano}.xlsx'
     aba: Base Apontamento
     colunas_obrigatorias: [num_ordem, cod_recurso, cod_apont, dt_producao, qtd_horas]
     coluna_data: dt_producao
     linhas_minimas: 1000
     frescor_dias: 2
 
-  - id: graficos.tmr
-    tipo: excel_bloco
-    arquivo: '{entrada}\Graficos Tendência.xlsx'
-    ancora: Mês
-    abas:
-      Flexo: TMR - Flexo
-    colunas_obrigatorias: [mes, setup, improdutivo, inativo, produzindo]
-    frescor_dias: 35
+  - id: fardos.mensal
+    tipo: excel_tabela
+    arquivo: '*SEQUENCIAMENTO DOS FARDOS DE APARAS JGR*{ano}.xlsx'
+    varios: true
+    aba: COMPLETOS
+    colunas_obrigatorias: [data, qtd_bruta_kg, qtd_liquida_kg]
+    colunas_excluir: [nome]
+    coluna_data: data
+    frescor_dias: 3
+
+  - id: pbi.apontamentos
+    tipo: pbix
+    arquivo: 'Dados_Produção.pbix'
+    tabela: Dados
+    colunas_obrigatorias: [num_ordem, cod_recurso, cod_apont, dt_producao, qtd_horas]
+    colunas_excluir: [nome_operador]
+    coluna_data: dt_producao
+    frescor_dias: 3

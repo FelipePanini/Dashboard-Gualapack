@@ -28,12 +28,15 @@ _PT = str.maketrans(",.", ".,")
 MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"]
 
 
+SUFIXO = {"kg": " kg", "h": " h", "m_min": " m/min"}
+
+
 def _num(v, unidade: str) -> str:
     if v is None:
         return "—"
     if unidade == "pct":
         return f"{v:.1f}%".translate(_PT)
-    return f"{v:,.0f} kg".translate(_PT)
+    return f"{v:,.0f}".translate(_PT) + SUFIXO.get(unidade, "")
 
 
 def _dif(d, pct, unidade: str) -> str:
@@ -42,7 +45,7 @@ def _dif(d, pct, unidade: str) -> str:
     if unidade == "pct":
         return f"{d:+.1f}".translate(_PT) + " p.p."
     extra = f" ({pct:+.1%})".translate(_PT) if pct is not None else ""
-    return f"{d:+,.0f} kg".translate(_PT) + extra
+    return f"{d:+,.0f}".translate(_PT) + SUFIXO.get(unidade, "") + extra
 
 
 def _mes(d: date | None) -> str:
