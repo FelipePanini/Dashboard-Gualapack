@@ -15,16 +15,154 @@
 # ============================================================================
 
 indicadores:
+  # --- O que o painel mostra: regras do BI Indicadores Produção -----------------
+  # O painel usa o cálculo das planilhas (chegam todo dia pela cópia automática);
+  # o BI é a fonte oficial e a conferência. Mesmas tabelas dos dois lados.
   - codigo: TMR_PCT
-    versao: 1
+    versao: 2
     nome: TMR (tempo de máquina rodando)
+    unidade: pct
+    grao: mes x recorte
+    dono: superior imediato de Produção
+    definicao: >
+      Horas PRODUZINDO ÷ horas totais sem FIM TURNO e sem INATIVIDADE (medidas
+      Horas Produzindo e Horas Totais do BI Indicadores Produção). Tabela Horas
+      do Machine Card, com a classificação de cada apontamento. TOTAL = todas as
+      máquinas, como o cartão TMR do BI.
+    fonte_oficial: pbi_ind.machine_card
+    tolerancia_abs: 0.1            # pontos percentuais
+    status_definicao: oficial
+    notas: >
+      Regra do BI escolhida pelo dono em 25/09 (o Gráficos Tendência usa outra:
+      só tira FIM TURNO; ver TMR_GRAFICOS_PCT). Planilha e BI leem a mesma
+      tabela: meses fechados precisam bater.
+    medicoes:
+      - fonte: pbi_ind.machine_card
+        regra: indicadores/tmr_bi_indicadores.sql
+      - fonte: hub.calculo
+        regra: indicadores/tmr_machine_card.sql
+        usa: [machine_card.horas, machine_card_2025.horas]
+
+  - codigo: VELOCIDADE_MEDIA_M_MIN
+    versao: 1
+    nome: Velocidade média
+    unidade: m_min
+    grao: mes x recorte
+    dono: superior imediato de Produção
+    definicao: >
+      Metros produzidos ÷ horas PRODUZINDO ÷ 60 (medida VelMédia do BI
+      Indicadores Produção). Tabela Horas do Machine Card.
+    fonte_oficial: pbi_ind.machine_card
+    tolerancia_pct: 0.005
+    status_definicao: oficial
+    medicoes:
+      - fonte: pbi_ind.machine_card
+        regra: indicadores/velocidade_media_bi_indicadores.sql
+      - fonte: hub.calculo
+        regra: indicadores/velocidade_media_machine_card.sql
+        usa: [machine_card.horas, machine_card_2025.horas]
+
+  - codigo: APARA_APONTADA_PCT
+    versao: 2
+    nome: Apara apontada
+    unidade: pct
+    grao: mes
+    dono: Aparas
+    definicao: >
+      Refugo apontado ÷ (refugo + peso bruto das REBs) (medida "% Apontada_Geral
+      REBS", gráfico Perda GPK do BI Indicadores Produção). Tabela BASE_PROD do
+      Base Aparas; peso bruto das REBs pela coluna MÁQUINA REAL.
+    fonte_oficial: pbi_ind.aparas_processo
+    tolerancia_abs: 0.05
+    status_definicao: oficial
+    notas: >
+      A v1 era a apara dos fardos (peso bruto − líquido), que o painel usava
+      com o nome de "apontado": outra coisa, hoje em APARA_FARDOS_PCT.
+    medicoes:
+      - fonte: pbi_ind.aparas_processo
+        regra: indicadores/apara_bi_indicadores.sql
+      - fonte: hub.calculo
+        regra: indicadores/apara_bi_regra.sql
+        usa: [base_aparas.prod]
+
+  - codigo: APARA_CONFIRMADA_PCT
+    versao: 1
+    nome: Apara confirmada
+    unidade: pct
+    grao: mes
+    dono: Aparas
+    definicao: >
+      Scrap total da balança ÷ (peso bruto das REBs + scrap total) (medida
+      "% PerdaConfirm. TOTAL" do BI Indicadores Produção). Scrap da Refugo Aparas
+      (tabela HISTÓRICOPERDAS3), peso bruto da BASE_PROD.
+    fonte_oficial: pbi_ind.perda_aparas
+    tolerancia_abs: 0.05
+    status_definicao: oficial
+    notas: >
+      O painel mostrava scrap ÷ produção (aba Percentual Scrap BI, SCRAP_PCT):
+      mesmos números, sem o scrap no denominador (ago/2026: 17,14% x 14,63%).
+    medicoes:
+      - fonte: pbi_ind.perda_aparas
+        regra: indicadores/apara_confirmada_bi_indicadores.sql
+        usa: [pbi_ind.perda_aparas, pbi_ind.aparas_processo]
+      - fonte: hub.calculo
+        regra: indicadores/apara_confirmada_regra.sql
+        usa: [refugo.aparas, base_aparas.prod]
+
+  - codigo: ADERENCIA_PCT
+    versao: 1
+    nome: Aderência ao programado
+    unidade: pct
+    grao: mes x recorte
+    dono: PCP
+    definicao: >
+      Quantidade produzida ÷ quantidade planejada, pelo mês de início planejado
+      (medida "% Realizado Prog" do BI Indicadores Produção, página Ad. Plan
+      Diária). Tabela ADERENCIA_BI da Aderência Semanal.
+    fonte_oficial: pbi_ind.aderencia
+    tolerancia_abs: 0.1
+    faixa_max: 300                 # produzir mais que o planejado passa de 100%
+    status_definicao: oficial
+    medicoes:
+      - fonte: pbi_ind.aderencia
+        regra: indicadores/aderencia_bi_indicadores.sql
+      - fonte: hub.calculo
+        regra: indicadores/aderencia_planilha.sql
+        usa: [aderencia.diaria]
+
+  - codigo: PERDA_KG
+    versao: 1
+    nome: Perda apontada (kg)
+    unidade: kg
+    grao: mes x recorte
+    dono: Aparas
+    definicao: >
+      Soma dos kg de perda apontados (código 40), a base do gráfico Perda por
+      Motivos. Confere os dois BIs entre si e com a BASE_DETALHE do Base Aparas.
+    fonte_oficial: pbi_ind.perda_sistemica
+    tolerancia_pct: 0.005
+    status_definicao: oficial
+    medicoes:
+      - fonte: pbi_ind.perda_sistemica
+        regra: indicadores/perda_kg_bi_indicadores.sql
+      - fonte: pbi.apontamentos
+        regra: indicadores/perda_kg_bi_dados.sql
+      - fonte: hub.calculo
+        regra: indicadores/perda_kg_planilha.sql
+        usa: [base_aparas.generico, base_aparas_2025.detalhe]
+
+  # --- Conferências de planilha (não vão pro painel) ------------------------------
+  - codigo: TMR_GRAFICOS_PCT
+    versao: 1
+    nome: TMR pela regra do Gráficos Tendência
     unidade: pct
     grao: mes x recorte
     dono: superior imediato de Produção
     definicao: >
       Horas classificadas como PRODUZINDO no cadastro oficial ÷ horas
       apontadas no recorte e no mês, sem as horas de FIM TURNO. Apontamentos
-      do BI Dados de Produção (tabela Dados).
+      do BI Dados de Produção (tabela Dados). É a regra do Gráficos Tendência;
+      o painel usa a do BI (TMR_PCT).
     # Onde corrigir quando divergir: o cálculo do hub usa o dado completo do BI.
     correcao: "Gráficos Tendência › aba TMR - {recorte} › linha {mes} › coluna Produzindo = {valor_comparado}"
     fonte_oficial: graficos.tmr
@@ -41,7 +179,7 @@ indicadores:
       R12 de fora do Flexo, mesmo com ela apontando. No Machine Card a R12
       está no grupo FUNGICIDA.
       Ainda a entender: Laminação em março (planilha 35,8% x 39,1%).
-      O painel web atual usa outra regra (desconta todo PLANEJADO do total).
+      Até 24/09 este era o TMR_PCT; em 25/09 o dono escolheu a regra do BI.
     medicoes:
       - fonte: graficos.tmr
         regra: indicadores/tmr_referencia.sql
@@ -113,7 +251,7 @@ indicadores:
 
   - codigo: VELOCIDADE_M_MIN
     versao: 2
-    nome: Velocidade
+    nome: Velocidade por OP (BI Dados de Produção)
     unidade: m_min
     grao: mes x maquina
     dono: superior imediato de Produção
@@ -127,9 +265,10 @@ indicadores:
     status_definicao: oficial
     notas: >
       v1 comparava com a regra do painel web (Machine Card, por dia): outra
-      definição, que diverge do BI em ~20% dos meses. O painel web passa a
-      mostrar a velocidade do BI quando ler do hub. A v2 recalcula a regra do
+      definição, que diverge do BI em ~20% dos meses. A v2 recalcula a regra do
       BI a partir dos apontamentos do próprio BI: confere a tabela BaseVazao.
+      O painel mostra a velocidade média do BI Indicadores Produção
+      (VELOCIDADE_MEDIA_M_MIN), que é outra conta.
     medicoes:
       - fonte: pbi.vazao
         regra: indicadores/velocidade_bi.sql
@@ -137,15 +276,15 @@ indicadores:
         regra: indicadores/velocidade_hub.sql
         usa: [pbi.apontamentos]
 
-  - codigo: APARA_APONTADA_PCT
+  - codigo: APARA_FARDOS_PCT
     versao: 1
-    nome: Apara apontada (fardos)
+    nome: Apara dos fardos
     unidade: pct
     grao: mes
     dono: Aparas
     definicao: >
       (Peso bruto − peso líquido) ÷ peso bruto dos fardos de aparas pesados no
-      mês (JGR). Mesma definição do painel web.
+      mês (JGR). Confere o Sequenciamento Acumulado com o arquivo do mês.
     fonte_oficial: sequenciamento.fardos
     tolerancia_abs: 0.1            # pontos percentuais
     comparacao_opcional: true      # o arquivo mensal só cobre o mês corrente
@@ -192,6 +331,8 @@ indicadores:
     notas: >
       Fonte única no MVP: conferidos só faixa (0–100%) e frescor. Não comparar
       com a apara de fardos: é outra definição, com escala 4 a 5 vezes menor.
+      O BI Indicadores Produção põe o scrap também no denominador: é a apara
+      confirmada que o painel mostra (APARA_CONFIRMADA_PCT).
     medicoes:
       - fonte: sequenciamento.scrap_bi
         regra: indicadores/scrap_pct_bi.sql

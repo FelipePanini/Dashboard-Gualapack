@@ -1451,6 +1451,8 @@ function calcAderenciaProcesso(maquinas){
 
 function applyFallback(){
   USANDO_DADOS_REAIS = false;
+  window.HUB_TOTAIS = null;
+  window.PERDA_POR_MAQ = null;
   MAQUINAS = FALLBACK.MAQUINAS.map(m=>({...m}));
   const FATOR_KM = 8; // converte horas × m/min de referência em km lineares do período
   MAQUINAS.forEach(m=>{
@@ -1491,7 +1493,8 @@ async function loadRealData(periodoDe, periodoAte){
   const pAte = periodoAte ? isoDate(periodoAte) : null;
   try{
     const [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes, prodRes, statusRes, refugoProdRes, producaoKgRes,
-           hubMaqRes, hubParadasRes, hubGanttRes] = await Promise.all([
+           hubMaqRes, hubParadasRes, hubGanttRes, hubMotivoRes, hubRefugoMaqRes, hubOpsRes, hubClasseRes, hubAparaRes,
+           hubFontesRes] = await Promise.all([
       // Resumo por máquina, perdas, downtime, ops e produtividade agora são
       // FUNÇÕES parametrizadas por período (p_de/p_ate) — é o que o
       // seletor de datas do topo filtra de verdade. As séries mensais
@@ -1522,6 +1525,14 @@ async function loadRealData(periodoDe, periodoAte){
       client.rpc("rpc_hub_maquinas", { p_de: pDe, p_ate: pAte }),
       client.rpc("rpc_hub_paradas", { p_de: pDe, p_ate: pAte }),
       client.from("v_hub_ultimo_dia").select("*"),
+      // Resto dos cartões pelo hub (002_cartoes.sql). Mesma regra: sem erro
+      // derrubando o painel se ainda não existirem.
+      client.rpc("rpc_hub_perda_motivo", { p_de: pDe, p_ate: pAte }),
+      client.rpc("rpc_hub_refugo_maquina", { p_de: pDe, p_ate: pAte }),
+      client.rpc("rpc_hub_ops_refugo", { p_de: pDe, p_ate: pAte }),
+      client.rpc("rpc_hub_classificacao", { p_de: pDe, p_ate: pAte }),
+      client.from("v_hub_apara_mensal").select("*"),
+      client.from("v_hub_fontes").select("fonte,dado_ate"),
     ]);
     const erro = [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes].find(r=>r.error);
     if(erro) throw erro.error;
@@ -1704,6 +1715,95 @@ async function loadRealData(periodoDe, periodoAte){
       console.error("Falha ao carregar refugo por máquina / produção em kg — usando referência só nesses gráficos:", err);
       REFUGO_PRODUCAO_MAQUINA = FALLBACK.REFUGO_PRODUCAO_MAQUINA.map(r=>({...r}));
       PRODUCAO_KG_MENSAL = FALLBACK.PRODUCAO_KG_MENSAL.map(p=>({...p}));
+    }
+
+    // ===== Cartões pelo data hub: regras do BI Indicadores Produção =====
+    // Com o 002_cartoes.sql aplicado, TMR, velocidade, apara, aderência,
+    // perdas, OPs, classificações e produtividade saem das séries por dia que
+    // o hub publica, somadas no período pelo Supabase. São as medidas do BI
+    // (conferidas mês a mês na página Qualidade dos dados):
+    //   TMR = produzindo ÷ horas sem FIM TURNO e sem INATIVIDADE (Machine Card)
+    //   velocidade = metros ÷ horas produzindo ÷ 60
+    //   apontado = refugo ÷ (refugo + peso bruto das REBs); confirmado = scrap ÷ (peso bruto REBs + scrap)
+    //   aderência = produzido ÷ planejado
+    // Sem o 002, a rpc_hub_maquinas do 001 não traz "metros": fica tudo como acima.
+    const HUB2 = HUB_HORAS && "metros" in hubMaqRes.data[0];
+    window.HUB_TOTAIS = null;
+    window.PERDA_POR_MAQ = null;
+    if(HUB2){
+      const n = v => Number(v)||0;
+      const chave = s => String(s||"").trim().toUpperCase();
+      const porMaq = new Map(hubMaqRes.data.map(r=>[chave(r.maquina), r]));
+      MAQUINAS.forEach(m=>{
+        const h = porMaq.get(chave(m.id)) || {};
+        const tot = n(h.horas_totais), prod = n(h.horas_produzindo);
+        m.tmr = tot>0 ? Math.round(prod/tot*100) : 0;
+        m.horasProd = Math.round(prod);
+        m.horasTot = Math.round(tot);
+        m.vel = prod>0 ? Math.round(n(h.metros)/prod/60) : null;
+        m.velRef = h.velocidade_ref_m_min != null ? Math.round(n(h.velocidade_ref_m_min)) : null;
+        // mesma guarda de antes: perda maior que o peso de onde saiu é dado insuficiente
+        const pb = n(h.peso_bruto), rf = n(h.refugo);
+        m.aparas = pb>0 && rf<=pb ? rf/pb*100 : 0;
+        // quantidades da Aderência em metros (o BI divide por 1000 pra mostrar km)
+        m.planKm = Math.round(n(h.planejado)/1000);
+        m.realKm = Math.round(n(h.produzido)/1000);
+        m.aderencia = n(h.planejado)>0 ? n(h.produzido)/n(h.planejado)*100 : 0;
+      });
+      // Cartões gerais somam todas as máquinas do período, como os cartões do BI
+      // (média de percentuais não é o número do BI).
+      const soma = c => hubMaqRes.data.reduce((a,r)=>a+n(r[c]),0);
+      window.HUB_TOTAIS = {
+        tmr: soma("horas_totais")>0 ? soma("horas_produzindo")/soma("horas_totais")*100 : 0,
+        vel: soma("horas_produzindo")>0 ? soma("metros")/soma("horas_produzindo")/60 : null,
+        planKm: soma("planejado")/1000, realKm: soma("produzido")/1000,
+        aderencia: soma("planejado")>0 ? soma("produzido")/soma("planejado")*100 : 0,
+      };
+      PRODUTIVIDADE = soma("horas_m2")>0 ? soma("m2")/soma("horas_m2") : null;
+      ADERENCIA_PROCESSO = calcAderenciaProcesso(MAQUINAS);
+
+      if(!hubMotivoRes.error){
+        TIPOS_PERDA = (hubMotivoRes.data||[]).map(r=>({ cod: null, nome: prettyCodigo(r.tipo), kg: n(r.kg) }));
+      }
+      if(!hubClasseRes.error){
+        CLASSIFICACOES = (hubClasseRes.data||[]).map(r=>({ nome: r.grupo, aparas: n(r.apara_pct), kg: n(r.peso_bruto_rebs) }));
+      }
+      if(!hubOpsRes.error){
+        // OP ainda sem peso bruto na REB não tem apara: "—", não 100%.
+        OPS = (hubOpsRes.data||[]).slice(0,12).map(r=>({
+          op: r.num_ordem, maq: r.maquina || "—", desc: r.descricao || "—",
+          peso: Math.round(n(r.peso_bruto)), refugo: Math.round(n(r.refugo)),
+          pct: n(r.peso_bruto)>0 ? n(r.apara_pct) : null, motivo: prettyCodigo(r.motivo_principal),
+        }));
+      }
+      if(!hubRefugoMaqRes.error){
+        REFUGO_PRODUCAO_MAQUINA = (hubRefugoMaqRes.data||[]).slice(0,12).map(r=>({
+          maquina: r.maquina, kg_perda: n(r.kg), motivo: prettyCodigo(r.motivo_principal),
+        }));
+        window.PERDA_POR_MAQ = new Map((hubRefugoMaqRes.data||[]).map(r=>[chave(r.maquina), n(r.kg)]));
+      }
+      if(!hubAparaRes.error){
+        const serie = (hubAparaRes.data||[]).filter(r=>r.apontado_pct!=null || r.confirmado_pct!=null).slice(-12);
+        if(serie.length >= 2){
+          MESES = serie.map(r=>fmtMes(String(r.mes).slice(0,10)));
+          APARAS_MENSAL = {
+            apontado: serie.map(r=> r.apontado_pct!=null ? n(r.apontado_pct) : null),
+            // mês corrente fora do confirmado, como acima: a balança fecha no fim do mês
+            confirmado: serie.map(r=> r.confirmado_pct!=null && String(r.mes).slice(0,7) < mesCorrente ? n(r.confirmado_pct) : null),
+          };
+          PRODUCAO_KG_MENSAL = serie.map(r=>({
+            mes: fmtMes(String(r.mes).slice(0,10)), peso_bruto_kg: n(r.peso_bruto_rebs), refugo_kg: n(r.refugo),
+          }));
+        }
+      }
+      if(!hubFontesRes.error){
+        const usadas = new Set(["machine_card.horas", "base_aparas.prod", "base_aparas.generico", "aderencia.diaria",
+                                "refugo.aparas", "indicadores.producao_kg", "machine_card.producao_metros"]);
+        const status = (hubFontesRes.data||[]).filter(r=>usadas.has(r.fonte) && r.dado_ate)
+          .map(r=>({ base: r.fonte, ate: String(r.dado_ate).slice(0,10) }))
+          .sort((a,b)=>b.ate.localeCompare(a.ate));
+        if(status.length){ window.DADOS_STATUS = status; window.DADOS_ATE = status[0].ate; }
+      }
     }
 
     USANDO_DADOS_REAIS = true;
@@ -2002,8 +2102,10 @@ const confirmMedia  = ultimoValido(APARAS_MENSAL.confirmado);
 // que é onde o "0%" é informação e não ruído.
 const MAQ_ATIVAS    = MAQUINAS.filter(m=>m.horasTot > 0);
 const baseTmr       = MAQ_ATIVAS.length ? MAQ_ATIVAS : MAQUINAS;
-const tmrMedio      = baseTmr.reduce((a,m)=>a+m.tmr,0)/baseTmr.length;
-const aderMedia     = ADERENCIA_PROCESSO.reduce((a,p)=>a+p.pct,0)/ADERENCIA_PROCESSO.length;
+// Com o hub, TMR e aderência são os totais do período (como os cartões do BI).
+const tmrMedio      = window.HUB_TOTAIS ? window.HUB_TOTAIS.tmr : baseTmr.reduce((a,m)=>a+m.tmr,0)/baseTmr.length;
+const aderMedia     = window.HUB_TOTAIS ? window.HUB_TOTAIS.aderencia
+                                        : ADERENCIA_PROCESSO.reduce((a,p)=>a+p.pct,0)/ADERENCIA_PROCESSO.length;
 const produtividade = PRODUTIVIDADE; // m²/h — null quando nenhuma base carregada traz essa métrica
 const perdaTotalKg  = TIPOS_PERDA.reduce((a,t)=>a+t.kg,0);
 
@@ -2146,6 +2248,15 @@ renderMotivoChart();
 })();
 
 /* ============ VIEW: APARAS & REFUGO ============ */
+// Diferença do MESMO mês: o último com apontado e confirmado. O apontado do
+// mês aberto contra o confirmado do mês anterior comparava meses diferentes.
+function diferencaMesmoMes(){
+  const { apontado, confirmado } = APARAS_MENSAL;
+  for(let i = apontado.length - 1; i >= 0; i--){
+    if(apontado[i] != null && confirmado[i] != null) return confirmado[i] - apontado[i];
+  }
+  return confirmMedia - aparasMedia;
+}
 renderKpis(document.getElementById("aparas-kpis"), [
   { label:"Refugo total", value: perdaTotalKg/1000, suffix:" t", decimals:1,
     delta:"acumulado do período", dir:"down", spark: wobble(perdaTotalKg/1000, 12) },
@@ -2153,7 +2264,7 @@ renderKpis(document.getElementById("aparas-kpis"), [
     delta:`meta ${fmt1(META_APARAS)}%`, dir: aparasMedia<=META_APARAS?"up":"down", spark: APARAS_MENSAL.apontado.slice() },
   { label:"Apara confirmada", value: confirmMedia, suffix:"%", decimals:1,
     delta:"medição por balança", dir:"down", spark: APARAS_MENSAL.confirmado.slice() },
-  { label:"Diferença apont. x conf.", value: confirmMedia-aparasMedia, suffix:" p.p.", decimals:1,
+  { label:"Diferença apont. x conf.", value: diferencaMesmoMes(), suffix:" p.p.", decimals:1,
     delta:"quanto o apontamento subestima", dir:"down", spark: wobble(1.1, .5) },
 ]);
 
@@ -2165,9 +2276,13 @@ hBarChart(document.getElementById("perda-tipo-chart"), TIPOS_PERDA.map(t=>({
 })), { idPrefix:"pt", labelW:158, valueW:74, rowH:26, aria:"Perda por motivo" });
 
 (function(){
+  // Com o hub: os kg de perda apontados em cada máquina no período (os do
+  // BI). Sem ele, a divisão antiga do total pela apara de cada máquina.
+  const kgReal = window.PERDA_POR_MAQ;
   const porMaq = MAQUINAS.map(m=>({
     nome:m.nome,
-    kg: Math.round(perdaTotalKg * (m.aparas/MAQUINAS.reduce((a,x)=>a+x.aparas,0))),
+    kg: kgReal ? Math.round(kgReal.get(String(m.id).trim().toUpperCase()) || 0)
+               : Math.round(perdaTotalKg * (m.aparas/MAQUINAS.reduce((a,x)=>a+x.aparas,0))),
     pct:m.aparas
   })).sort((a,b)=>b.kg-a.kg);
   hBarChart(document.getElementById("perda-maquina-chart"), porMaq.map(m=>({
@@ -2209,16 +2324,20 @@ hBarChart(document.getElementById("refugo-producao-chart"), REFUGO_PRODUCAO_MAQU
 
 (function(){
   const tbody = document.querySelector("#ops-table tbody");
-  const rows = OPS.map(o=>({ ...o, pct: o.refugo/o.peso*100 })).sort((a,b)=>b.pct-a.pct);
+  // Com o hub a apara da OP já vem na regra do BI (refugo ÷ (refugo + peso
+  // bruto das REBs)); OP sem peso bruto na REB fica com "—" e vai pro fim.
+  const rows = OPS.map(o=>({ ...o, pct: "pct" in o ? o.pct : o.refugo/o.peso*100 }))
+    .sort((a,b)=>(b.pct ?? -1)-(a.pct ?? -1));
   tbody.innerHTML = rows.map(o=>{
-    const st = aparasStatus(o.pct);
+    const st = o.pct == null ? "warning" : aparasStatus(o.pct);
     return `<tr>
       <td class="mono">${esc(o.op)}</td>
       <td>${esc(o.maq)}</td>
       <td>${esc(o.desc)}</td>
       <td class="mono">${fmt(o.peso)} kg</td>
       <td class="mono">${fmt(o.refugo)} kg</td>
-      <td><span class="status-pill status-${st}"><span class="dot" style="background:currentColor"></span>${fmt1(o.pct)}%</span></td>
+      <td>${o.pct == null ? `<span class="mono" title="OP sem peso bruto na rebobinadeira no período">—</span>`
+          : `<span class="status-pill status-${st}"><span class="dot" style="background:currentColor"></span>${fmt1(o.pct)}%</span>`}</td>
       <td>${esc(o.motivo)}</td>
     </tr>`;
   }).join("");
@@ -2230,8 +2349,13 @@ hBarChart(document.getElementById("refugo-producao-chart"), REFUGO_PRODUCAO_MAQU
   const horasTot  = MAQUINAS.reduce((a,m)=>a+m.horasTot,0);
   // Nenhuma base carregada até agora traz velocidade de máquina — quando
   // isso mudar, essas duas linhas passam a achar dado de verdade sozinhas.
-  const velDisponivel = MAQUINAS.length>0 && MAQUINAS.every(m=>m.vel!=null && m.velRef!=null);
-  const velMedia = velDisponivel ? MAQUINAS.reduce((a,m)=>a+m.vel,0)/MAQUINAS.length : null;
+  // Com o hub, máquina sem hora produzindo no período fica sem velocidade
+  // (não 0) e sai do gráfico; a média é a do BI (metros ÷ horas de todas).
+  const MAQ_VEL = window.HUB_TOTAIS ? MAQUINAS.filter(m=>m.vel!=null && m.velRef!=null) : MAQUINAS;
+  const velDisponivel = MAQ_VEL.length>0 && MAQ_VEL.every(m=>m.vel!=null && m.velRef!=null);
+  const velMedia = !velDisponivel ? null
+                 : window.HUB_TOTAIS && window.HUB_TOTAIS.vel != null ? window.HUB_TOTAIS.vel
+                 : MAQ_VEL.reduce((a,m)=>a+m.vel,0)/MAQ_VEL.length;
 
   const kpisProd = [
     { label:"TMR médio", value:tmrMedio, suffix:"%", decimals:1, delta:"horas produzindo ÷ horas totais", dir:"up", spark: wobble(tmrMedio,3) },
@@ -2262,12 +2386,12 @@ hBarChart(document.getElementById("refugo-producao-chart"), REFUGO_PRODUCAO_MAQU
   if(!velDisponivel){
     holder.innerHTML = `<div class="empty-state">Nenhuma das bases carregadas traz velocidade de máquina (m/min) ainda.</div>`;
   }else{
-    const W=1120, rowH=30, gap=8, H=MAQUINAS.length*(rowH+gap);
+    const W=1120, rowH=30, gap=8, H=MAQ_VEL.length*(rowH+gap);
     const labelW=110, valW=104, barMax=W-labelW-valW;
-    const maxVel = Math.max(...MAQUINAS.map(m=>m.velRef));
+    const maxVel = Math.max(...MAQ_VEL.map(m=>m.velRef));
     holder.innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Velocidade média por máquina contra o melhor mês de cada uma">
       <style>.vrow:hover .vfill{ filter:brightness(1.12); } .vrow:hover .vbg{ fill:var(--glass-bg-strong); }</style>
-      ${MAQUINAS.map((m,i)=>{
+      ${MAQ_VEL.map((m,i)=>{
         const y=i*(rowH+gap);
         const wRef=(m.velRef/maxVel)*barMax, wVel=(m.vel/maxVel)*barMax;
         const ating = m.vel/m.velRef*100;
@@ -2285,7 +2409,7 @@ hBarChart(document.getElementById("refugo-producao-chart"), REFUGO_PRODUCAO_MAQU
       }).join("")}
     </svg>`;
     holder.querySelectorAll(".vrow").forEach(g=>{
-      const m = MAQUINAS[+g.dataset.i];
+      const m = MAQ_VEL[+g.dataset.i];
       g.addEventListener("mousemove", e=> attachTip(holder,
         `<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br>${m.vel} m/min · melhor mês ${m.velRef} m/min<br>${fmt1(m.vel/m.velRef*100)}% do melhor mês`, e));
       g.addEventListener("mouseleave", ()=> clearTip(holder));
@@ -2295,9 +2419,10 @@ hBarChart(document.getElementById("refugo-producao-chart"), REFUGO_PRODUCAO_MAQU
 
 /* ============ VIEW: ADERÊNCIA ============ */
 (function(){
-  // Consolidado inclui todas as máquinas (Coating incluído).
-  const planTot = MAQUINAS.reduce((a,m)=>a+m.planKm,0);
-  const realTot = MAQUINAS.reduce((a,m)=>a+m.realKm,0);
+  // Consolidado inclui todas as máquinas (Coating incluído); com o hub, todas
+  // as da programação no período, como o cartão do BI.
+  const planTot = window.HUB_TOTAIS ? window.HUB_TOTAIS.planKm : MAQUINAS.reduce((a,m)=>a+m.planKm,0);
+  const realTot = window.HUB_TOTAIS ? window.HUB_TOTAIS.realKm : MAQUINAS.reduce((a,m)=>a+m.realKm,0);
   renderKpis(document.getElementById("ader-kpis"), [
     { label:"Aderência ao plano", value: realTot/planTot*100, suffix:"%", decimals:1, delta:"km lineares realizados ÷ planejados", dir:"down", spark: wobble(aderMedia,4) },
     { label:"Planejado", value: planTot, suffix:" km", decimals:0, delta:"programação do período", dir:"flat", spark: wobble(planTot/12,30) },

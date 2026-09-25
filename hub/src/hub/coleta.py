@@ -35,6 +35,7 @@ from hub.db import tabela_existe
 from hub.origens import Origens, localizar
 
 SNAPSHOTS_POR_FONTE = 10
+FOLGA_DADO_MAIS_ANTIGO_DIAS = 2  # correção de data digitada errada pode recuar o fim em 1-2 dias
 EXTENSOES_DE_DADOS = {".xlsx", ".xlsm", ".xls", ".csv", ".pbix", ".pbip"}
 TEMPO_MAXIMO_LEITURA_S = 15 * 60
 _CTX = multiprocessing.get_context("spawn")
@@ -379,6 +380,19 @@ def coletar(con: duckdb.DuckDBPyConnection, run_id: int, fonte: dict, origens: O
     except LeituraFalhou:
         _registrar(con, run_id, fonte, "erro", originais, sha, assinatura)
         raise
+
+    # Dado não volta no tempo: arquivo que vai até antes do que o hub já tem é
+    # quase sempre uma versão velha posta no lugar da nova (aconteceu com um
+    # .pbix de julho no lugar do de setembro). Fica o anterior, com aviso.
+    _, ate_novo = _periodo(fonte, df)
+    anterior = con.execute("select dado_ate from files where source_id = ? and status = 'novo' "
+                           "order by id desc limit 1", [fonte["id"]]).fetchone()
+    if (anterior and anterior[0] and ate_novo and not fonte.get("aceita_dado_mais_antigo")
+            and (anterior[0] - ate_novo).days > FOLGA_DADO_MAIS_ANTIGO_DIAS):
+        _registrar(con, run_id, fonte, "contrato_quebrado", originais, sha, assinatura, df)
+        raise ContratoQuebrado(
+            f"o arquivo novo vai só até {ate_novo:%d/%m/%Y}, e o hub já tem dado até {anterior[0]:%d/%m/%Y}: "
+            f"parece uma versão antiga. Mantive a anterior. Se for isso mesmo, use aceita_dado_mais_antigo.")
 
     file_id = _registrar(con, run_id, fonte, "novo", originais, sha, assinatura, df)
     if motor == "openpyxl":

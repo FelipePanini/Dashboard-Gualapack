@@ -75,6 +75,7 @@ create table if not exists indicators (
 );
 alter table indicators add column if not exists comparacao_opcional boolean default false;
 alter table indicators add column if not exists correcao varchar;  -- onde e o que corrigir quando divergir
+alter table indicators add column if not exists faixa_max double;  -- teto da faixa em %, se não for 100 (aderência passa de 100)
 
 create table if not exists measurements (
   run_id      integer not null,
@@ -118,13 +119,16 @@ create table if not exists errors (
   criado_em  timestamp default current_timestamp
 );
 
--- Meses de horas por máquina já publicados no Supabase. A assinatura é o md5
--- do conteúdo do mês: só vai de novo o mês que mudou. "uv run hub publicar"
--- limpa esta tabela e reenvia tudo.
-create table if not exists publicacao_horas (
-  mes          date primary key,
+-- Meses de cada série por dia já publicados no Supabase (publicacao.CONJUNTOS).
+-- A assinatura é o md5 do conteúdo do mês: só vai de novo o mês que mudou.
+-- "uv run hub publicar" limpa esta tabela e reenvia tudo.
+drop table if exists publicacao_horas;  -- versão só com as horas (até 25/09)
+create table if not exists publicacao_mes (
+  conjunto     varchar not null,
+  mes          date not null,
   assinatura   varchar not null,
-  publicado_em timestamp default current_timestamp
+  publicado_em timestamp default current_timestamp,
+  primary key (conjunto, mes)
 );
 
 create or replace table cfg.meses as

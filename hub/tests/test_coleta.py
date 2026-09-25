@@ -146,3 +146,28 @@ def test_contrato_quebrado_mantem_ultimo_dado_bom(tmp_path, monkeypatch):
     assert con.execute("select count(*), sum(qtd_horas) from raw.teste__base").fetchone() == (2, 3.5)
     status = [s for (s,) in con.execute("select status from files order by id").fetchall()]
     assert status == ["novo", "sem_mudanca", "contrato_quebrado"]
+
+
+def test_versao_antiga_no_lugar_da_nova_e_recusada(tmp_path, monkeypatch):
+    monkeypatch.setattr(coleta, "RAW", tmp_path / "raw")
+    con = db.conectar(":memory:")
+    run = con.execute("insert into processing_runs (gatilho) values ('teste') returning id").fetchone()[0]
+    arq = tmp_path / "Base.xlsx"
+    fonte = {"id": "teste.base", "tipo": "excel_tabela", "arquivo": str(arq), "aba": "Base",
+             "colunas_obrigatorias": ["dt_producao"], "coluna_data": "dt_producao"}
+
+    _base(str(arq), ["DtProducao", "QtdHoras"], [["2026-09-01", 1.0], ["2026-09-22", 2.0]])
+    with Origens() as o:
+        assert coleta.coletar(con, run, fonte, o) == "novo"
+    _base(str(arq), ["DtProducao", "QtdHoras"], [["2026-07-01", 1.0], ["2026-07-06", 5.0]])  # o de julho
+    with Origens() as o, pytest.raises(ContratoQuebrado, match="versão antiga"):
+        coleta.coletar(con, run, fonte, o)
+    assert con.execute("select sum(qtd_horas) from raw.teste__base").fetchone() == (3.0,)  # ficou o de setembro
+
+    _base(str(arq), ["DtProducao", "QtdHoras"], [["2026-09-01", 1.0], ["2026-09-21", 4.0]])  # 1 dia a menos: ok
+    with Origens() as o:
+        assert coleta.coletar(con, run, fonte, o) == "novo"
+
+    _base(str(arq), ["DtProducao", "QtdHoras"], [["2026-07-01", 7.0]])
+    with Origens() as o:                       # quem sabe o que faz pode aceitar
+        assert coleta.coletar(con, run, {**fonte, "aceita_dado_mais_antigo": True}, o) == "novo"

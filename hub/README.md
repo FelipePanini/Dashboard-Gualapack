@@ -23,8 +23,9 @@ data/hub.duckdb
       ▼
 relatorios/qualidade.html + validacao.csv + correcoes.csv
       ▼
-Supabase, schema trusted (só agregados)  →  painel: TMR, paradas, linha do tempo
-                                            e página "Qualidade dos dados"
+Supabase, schema trusted (só agregados)  →  painel: todos os cartões, com as regras
+                                            do BI Indicadores Produção, e a página
+                                            "Qualidade dos dados"
 ```
 
 Nenhuma etapa usa IA. A atualização é determinística e não gasta tokens.
@@ -69,8 +70,15 @@ funcionam.
   uma entrada no catálogo de fontes.
 - **Power BI (.pbix):** o hub lê direto o arquivo — tabelas e fórmulas DAX —
   sem Power BI e sem acesso ao banco, desde que o relatório seja do tipo
-  Importação (o dado fica salvo dentro do .pbix). O dado é o da última vez que
-  o .pbix foi atualizado e salvo; a fonte `pbi.atualizacao` mostra quando foi.
+  Importação (o dado fica salvo dentro do .pbix). São dois: `Dados_Produção.pbix`
+  e `Indicadores de Produção.pbix`, postos direto em "Dados do Painel". O dado
+  é o da última atualização salva; `pbi.atualizacao` e `pbi_ind.atualizacao`
+  mostram quando foi.
+- **Versão antiga no lugar da nova:** arquivo cujo dado vai até antes do que
+  o hub já tem (mais de 2 dias) é recusado e a versão anterior continua
+  valendo, com erro no relatório. Aconteceu em 25/09 com um
+  `Dados_Produção.pbix` atualizado em 06/07. Se for de propósito, marque a
+  fonte com `aceita_dado_mais_antigo: true`.
 - **Fardos:** o histórico do ano vem do Sequenciamento Acumulado (aba Base
   Aparas Total); o arquivo mensal cobre o mês corrente, que é mais atual.
   Mês que tem arquivo mensal usa o mensal; os outros, o Acumulado. Nos meses
@@ -98,25 +106,43 @@ schtasks /Delete /TN "Gualapack Data Hub" /F # remover
 Ao fim de cada execução o hub publica no Supabase, e o painel usa de dois
 jeitos:
 
-- **Cartões de TMR, paradas e linha do tempo** passam a sair dos
-  apontamentos do BI (horas por máquina, dia e código), com a regra que
-  reproduz o Gráficos Tendência: PRODUZINDO ÷ (horas − FIM TURNO). Antes
-  saíam da Base Apontamento do Excel, que perde as paradas sem OP: em
-  agosto o TMR do painel ficava de 4 a 29 p.p. acima do BI (L02 50% contra
-  21%, R18 51% contra 37%). Enquanto o hub não publica, o painel segue como
-  era.
+- **Todos os cartões** saem de séries por dia que o hub publica e o Supabase
+  soma no período escolhido (`sql/supabase/002_cartoes.sql`), com as medidas
+  do **BI Indicadores Produção** aplicadas às mesmas planilhas que ele lê:
+
+  | Cartão | Regra (medida do BI) | Tabela |
+  |---|---|---|
+  | TMR | produzindo ÷ horas sem FIM TURNO e sem INATIVIDADE | Machine Card, tabela Horas |
+  | Velocidade | metros ÷ horas produzindo ÷ 60 (VelMédia) | Machine Card, tabela Horas |
+  | Paradas | horas por código, fora PRODUZINDO | Machine Card, tabela Horas |
+  | Apara apontada | refugo ÷ (refugo + peso bruto das REBs) | Base Aparas, BASE_PROD |
+  | Apara confirmada | scrap ÷ (peso bruto das REBs + scrap) | Refugo Aparas + BASE_PROD |
+  | Aderência | produzido ÷ planejado (% Realizado Prog) | Aderência Semanal, ADERENCIA_BI |
+  | Perda por motivo / máquina, OPs | kg de perda apontada (código 40) | Base Aparas, BASE_DETALHE |
+  | Apara por classificação | apontado por grupo de produto (Aparas_Geral v3) | BASE_PROD |
+
+  Os cartões gerais (TMR, aderência, velocidade) são o total do período,
+  como no BI, não a média das máquinas. A regra do TMR foi escolhida pelo
+  dono em 25/09 (o Gráficos Tendência usa outra; segue conferido à parte).
+  Em ago/2026: TMR geral 42,7%, R18 50,7%, apontado 11,49%, confirmado
+  14,63%, aderência 76,0%, perda 45.116 kg — iguais ao BI. A linha do tempo
+  continua com os apontamentos do BI Dados de Produção. Sem o 002 aplicado,
+  o painel segue como era.
 - **Página Qualidade dos dados** (`demo/qualidade.html`, ícone de prancheta
   no menu): placar por status, cada indicador mês a mês e recorte a recorte,
   o que corrigir nas planilhas, as fontes e os avisos.
 
-Só sai do PC o que é agregado: horas por máquina/dia/código, os eventos do
-último dia (máquina, código, início, fim, OP), valores por mês e recorte, o
-catálogo de indicadores, o estado de cada fonte (sem caminho de arquivo) e os
-avisos (com os caminhos apagados). Nada de operador, observação ou cliente.
-As horas vão um mês por vez e só o mês que mudou.
+Só sai do PC o que é agregado: horas e metros por máquina/dia/código, peso
+bruto e refugo por OP/dia (com a descrição do produto), perda por
+OP/dia/tipo, programado × produzido por OP/dia, kg e m² por máquina/dia, os
+eventos do último dia (máquina, código, início, fim, OP), valores por mês e
+recorte, o catálogo de indicadores, o estado de cada fonte (sem caminho de
+arquivo) e os avisos (com os caminhos apagados). Nada de operador,
+observação ou cliente. As séries vão um mês por vez e só o mês que mudou; o
+Supabase confirma quantas linhas gravou, senão o mês vai de novo.
 
-O TMR do painel fica tão atual quanto o `Dados_Produção.pbix` da pasta de
-entrada: troque o arquivo quando o BI for atualizado, como as planilhas.
+Os cartões ficam tão atuais quanto as planilhas da pasta compartilhada (a
+cópia automática traz o que mudou); o BI Indicadores Produção é a conferência.
 
 A escrita é feita por um **usuário técnico** do painel, só dele: a função
 `public.hub_publicar` confere a tabela `trusted.escritores` e troca os dados
@@ -132,8 +158,12 @@ Uma vez só, nesta ordem:
    chave quando pedir. O script cria o usuário e guarda a senha no Cofre.
 3. No Supabase, **SQL Editor** → rodar `sql/supabase/001_trusted.sql`. A
    última consulta tem de mostrar `autorizado = true`.
-4. Aqui em `hub/`: `uv run hub publicar`. Envia tudo da última execução
-   (o histórico de horas leva uns segundos). Recarregue o painel.
+4. No **SQL Editor** → rodar `sql/supabase/002_cartoes.sql` (os cartões). A
+   última consulta tem de mostrar `funcoes_ok = true`.
+5. Aqui em `hub/`: `uv run hub publicar`. Envia tudo da última execução
+   (o histórico leva uns segundos). Recarregue o painel.
+
+Feitos em 25/09: os passos 1 a 3. Falta o 4 e o 5.
 
 Depois disso cada execução publica sozinha. `uv run hub publicar` também
 serve pra reenviar tudo se o dado do Supabase se perder. Com
@@ -159,7 +189,7 @@ ficam só no PC (`.gitignore`).
 |---|---|
 | ✅ Validado | Diferença dentro da tolerância. Em fonte única: faixa e frescor ok |
 | ⚠️ Divergente | Diferença acima da tolerância |
-| 🔴 Erro | Valor impossível (fora de 0–100%) ou fonte comparada sem o período |
+| 🔴 Erro | Valor impossível (fora de 0–100%, ou do `faixa_max` do indicador) ou fonte comparada sem o período |
 | 🟡 Desatualizado | Mês fechado, mas o dado de alguma fonte para antes do fim do mês |
 | 🔵 Aguardando | Mês em andamento, ou fonte oficial ainda sem o período |
 
@@ -180,14 +210,19 @@ aguardando, divergente, validado.
 
 ## Situação em 25/09/2026
 
-- **21 fontes** catalogadas, incluindo o BI Dados de Produção. Primeira
-  leitura de tudo: ~95 s; depois, só o que mudou.
-- **8 indicadores:** 339 validados, 15 divergentes, 44 aguardando, 0 erros.
-  Os 15 divergentes são células do Gráficos Tendência desatualizadas ou
-  erradas; o relatório lista cada uma na seção "O que corrigir nas
-  planilhas" (também em `relatorios/correcoes.csv`), com o valor certo.
-  Decisão de 25/09: as planilhas não serão corrigidas; as divergências
-  ficam à vista na página Qualidade dos dados.
+- **30 fontes** catalogadas: as planilhas (copiadas da pasta compartilhada)
+  e os dois BIs (Dados de Produção e Indicadores Produção).
+- **14 indicadores:** 675 validados, 15 divergentes, 86 aguardando, 0 erros.
+  Tudo o que o painel mostra (TMR, velocidade, apara apontada e confirmada,
+  aderência, perda) bate com o BI Indicadores Produção em todos os meses
+  fechados de 2026, e a perda bate também com o BI Dados de Produção.
+  Os 15 divergentes são células do Gráficos Tendência (TMR pela regra dele,
+  inativo, volume do corte); o relatório lista cada uma na seção "O que
+  corrigir nas planilhas". Decisão de 25/09: as planilhas não serão
+  corrigidas; as divergências ficam à vista na página Qualidade dos dados.
+- **Achado 5 (25/09):** o painel mostrava como "apontado" a apara dos
+  fardos (6,58% em agosto) e como "confirmado" scrap ÷ produção (17,14%). No
+  BI são outras contas: 11,49% e 14,63%.
 - **Base Apontamento do Excel:** a consulta dela descarta parada sem OP, OP
   de WIP e revisão (filtro lido do Power Query da planilha). Com o mesmo
   filtro, BI e planilha batem nos 56 meses. Ela não serve pra TMR — e é dela
@@ -212,11 +247,11 @@ aguardando, divergente, validado.
 
 ## Próximos passos
 
-1. Indicadores de aparas, refugo, aderência e produtividade a partir das
-   fontes já catalogadas (as que o painel web mostra).
-2. Publicação no Supabase: pronta no hub e no painel (TMR, paradas, linha
-   do tempo e página de qualidade); falta fazer os quatro passos de
-   "Publicar no painel" (o SQL ainda não foi aplicado).
-3. Levar para o hub o resto do que o painel mostra (aparas por máquina,
-   aderência, velocidade, produtividade). Aí o upload para o Google Drive
-   deixa de ser necessário.
+1. Rodar o `002_cartoes.sql` e `uv run hub publicar` (passos 4 e 5 de
+   "Publicar no painel"). Com isso nenhum cartão depende mais do Google
+   Drive, a não ser a lista de máquinas e grupos, que ainda vem do fluxo antigo.
+2. Produtividade: o painel mostra m² ÷ hora de máquina. A do BI (m² ÷ hora
+   trabalhada) depende de duas planilhas paradas (Produção M² em jan/2026,
+   Disponibilidade em fev/2026) e da planilha de horas de pessoas.
+3. Desligar o fluxo antigo (Google Drive + GitHub Actions) quando o dono
+   confirmar que o painel pelo hub está certo.

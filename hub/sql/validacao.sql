@@ -29,7 +29,7 @@ with med as (
   full join oficial o
          on o.indicador = c.indicador and o.periodo = c.periodo and o.recorte = c.recorte
 ), avaliado as (
-  select p.*, i.unidade, i.tolerancia_abs, i.tolerancia_pct,
+  select p.*, i.unidade, i.tolerancia_abs, i.tolerancia_pct, coalesce(i.faixa_max, 100) as faixa_max,
          -- comparação opcional: a comparada só existe em alguns períodos (ex.: arquivo
          -- mensal de fardos só do mês corrente); sem ela, o período vale como fonte única
          case when coalesce(i.comparacao_opcional, false) then null else i.fontes_comparadas end
@@ -45,8 +45,8 @@ with med as (
 select $run, indicador, periodo, recorte, fonte_oficial, valor_oficial,
        fonte_comparada, valor_comparado, dif_abs, dif_pct,
        case
-         when unidade = 'pct' and (valor_oficial not between 0 and 100
-                                or valor_comparado not between 0 and 100)          then 'erro'
+         when unidade = 'pct' and (valor_oficial not between 0 and faixa_max
+                                or valor_comparado not between 0 and faixa_max)    then 'erro'
          when not periodo_aberto and sem_cobertura                                 then 'desatualizado'
          when periodo_aberto                                                       then 'aguardando'
          when valor_oficial is null                                                then 'aguardando'
@@ -57,8 +57,9 @@ select $run, indicador, periodo, recorte, fonte_oficial, valor_oficial,
          else 'divergente'
        end as status,
        case
-         when unidade = 'pct' and (valor_oficial not between 0 and 100
-                                or valor_comparado not between 0 and 100)          then 'valor fora da faixa 0–100%'
+         when unidade = 'pct' and (valor_oficial not between 0 and faixa_max
+                                or valor_comparado not between 0 and faixa_max)
+           then 'valor fora da faixa 0–' || cast(faixa_max as integer) || '%'
          when not periodo_aberto and sem_cobertura then
            'dado vai só até ' || strftime(least(coalesce(ate_oficial, ate_comparado),
                                                coalesce(ate_comparado, ate_oficial)), '%d/%m/%Y')
