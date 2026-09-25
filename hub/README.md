@@ -18,7 +18,9 @@ data/hub.duckdb
   measurements: indicador × mês × recorte × fonte        (sql/indicadores/)
   validation_results: comparação com a fonte oficial     (sql/validacao.sql)
       ▼
-relatorios/qualidade.html + validacao.csv    (próximo: Supabase, schema trusted)
+relatorios/qualidade.html + validacao.csv + correcoes.csv
+      ▼
+Supabase, schema trusted (só agregados)  →  painel: página "Qualidade dos dados"
 ```
 
 Nenhuma etapa usa IA. A atualização é determinística e não gasta tokens.
@@ -74,6 +76,37 @@ schtasks /Run /TN "Gualapack Data Hub"       # rodar agora
 schtasks /Delete /TN "Gualapack Data Hub" /F # remover
 ```
 
+## Publicar no painel
+
+Ao fim de cada execução o hub publica no Supabase o resultado da validação,
+e a página **Qualidade dos dados** do painel (`demo/qualidade.html`, ícone de
+prancheta no menu) mostra tudo: placar por status, cada indicador mês a mês
+e recorte a recorte, o que corrigir nas planilhas, as fontes e os avisos.
+
+Só sai do PC o que é agregado: valores por mês e recorte, o catálogo de
+indicadores, o estado de cada fonte (sem caminho de arquivo) e os avisos (com
+os caminhos apagados). Nada de linha de apontamento, operador ou cliente.
+
+A escrita é feita por um **usuário técnico** do painel, só dele: a função
+`public.hub_publicar` confere a tabela `trusted.escritores` e troca os dados
+numa transação só. Quem está logado no painel só lê (views `public.v_hub_*`).
+A senha do usuário técnico é gerada ao acaso e fica no Cofre de Credenciais
+do Windows (serviço `gualapack-hub`); não fica em arquivo nem no git.
+
+Uma vez só, nesta ordem:
+
+1. No painel, **Administração de acessos** → gerar uma chave de convite
+   (perfil Visualizador, 1 uso).
+2. Aqui em `hub/`: `uv run python scripts/criar_usuario_hub.py` e colar a
+   chave quando pedir. O script cria o usuário e guarda a senha no Cofre.
+3. No Supabase, **SQL Editor** → rodar `sql/supabase/001_trusted.sql`. A
+   última consulta tem de mostrar `autorizado = true`.
+
+Depois disso a próxima execução já publica (`uv run hub` pra não esperar o
+agendador). Com `publicacao.ativa: false` no `fontes.local.yaml` o hub só
+gera o relatório local. Se a publicação falhar (sem rede, por exemplo), a
+execução continua, o motivo vira aviso no relatório e a próxima tenta de novo.
+
 ## Configuração
 
 | Arquivo | Vai pro git? | O quê |
@@ -111,7 +144,7 @@ aguardando, divergente, validado.
   `source_id, gravidade, codigo, mensagem`.
 - **Mudou a regra de um indicador:** suba a `versao` no catálogo.
 
-## Situação em 24/09/2026
+## Situação em 25/09/2026
 
 - **21 fontes** catalogadas, incluindo o BI Dados de Produção. Primeira
   leitura de tudo: ~95 s; depois, só o que mudou.
@@ -119,6 +152,8 @@ aguardando, divergente, validado.
   Os 15 divergentes são células do Gráficos Tendência desatualizadas ou
   erradas; o relatório lista cada uma na seção "O que corrigir nas
   planilhas" (também em `relatorios/correcoes.csv`), com o valor certo.
+  Decisão de 25/09: as planilhas não serão corrigidas; as divergências
+  ficam à vista na página Qualidade dos dados.
 - **Base Apontamento do Excel:** a consulta dela descarta parada sem OP, OP
   de WIP e revisão (filtro lido do Power Query da planilha). Com o mesmo
   filtro, BI e planilha batem nos 56 meses. Ela não serve pra TMR — e é dela
@@ -145,6 +180,8 @@ aguardando, divergente, validado.
 
 1. Indicadores de aparas, refugo, aderência e produtividade a partir das
    fontes já catalogadas (as que o painel web mostra).
-2. Publicar no Supabase (`sql/supabase/001_trusted.sql`, ainda não aplicado)
-   para o painel web ler do hub. Aí o upload para o Google Drive deixa de ser
-   necessário.
+2. Publicação no Supabase: pronta no hub e na página do painel; falta fazer
+   os três passos de "Publicar no painel" (o SQL ainda não foi aplicado).
+3. Os cartões do painel lerem os números do hub (a tabela
+   `trusted.horas_maquina_dia` já existe pra isso). Aí o upload para o
+   Google Drive deixa de ser necessário.

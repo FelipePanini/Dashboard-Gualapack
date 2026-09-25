@@ -10,10 +10,11 @@ com login; cadastro só com chave de convite).
 
 > **Em construção: o data hub ([`hub/`](./hub/README.md)).** Ele lê as
 > planilhas de uma pasta na Área de Trabalho, valida cada indicador contra a
-> fonte oficial e mostra o resultado numa tela de qualidade dos dados. Quando
-> ele publicar no Supabase, o painel passa a ler dele e o upload para o
-> Google Drive deixa de ser necessário. Até lá, o fluxo abaixo continua
-> alimentando o painel.
+> fonte oficial e publica o resultado no Supabase, onde a página
+> **Qualidade dos dados** do painel (`demo/qualidade.html`) mostra cada
+> número, a fonte, o status e as divergências. Os cartões do painel ainda
+> vêm do fluxo abaixo; o próximo passo é eles lerem do hub, e aí o upload
+> para o Google Drive deixa de ser necessário.
 
 ---
 
@@ -99,7 +100,7 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 
 | Caminho | O que é |
 |---|---|
-| [`demo/`](./demo/) | O site: `index.html` (painel), `login.html`, `admin.html` (convites), `upload.html` (upload manual, legado). O nome `demo` ficou porque é o endereço já publicado. |
+| [`demo/`](./demo/) | O site: `index.html` (painel), `login.html`, `admin.html` (convites), `qualidade.html` (validação publicada pelo hub), `upload.html` (upload manual, legado). O nome `demo` ficou porque é o endereço já publicado. |
 | [`backend/sql/`](./backend/sql/) | Estrutura do banco: login e convites, tabelas dos dados, funções e views. |
 | [`backend/sync-drive/`](./backend/sync-drive/) | A carga diária (etapas 1 e 2) e as regras de leitura das planilhas (`lib.js`). |
 | [`backend/functions/`](./backend/functions/) | Funções do Supabase: cadastro com convite e upload manual. |
@@ -108,7 +109,7 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 | [`docs/mapeamento/`](./docs/mapeamento/) | Levantamentos: inventário das 220 abas, redundâncias, origem de cada número, validação contra as planilhas. |
 | [`docs/historico/`](./docs/historico/) | Retrato do projeto em 14/09/2026, com as decisões e descartes até ali. |
 | [`tools/`](./tools/) | Script local pra cortar uma planilha grande numa aba só (apoio ao upload manual). |
-| [`hub/`](./hub/) | Data hub em construção: coleta local das planilhas, validação de cada indicador contra a fonte oficial e tela de qualidade dos dados. Python + DuckDB, roda no PC. |
+| [`hub/`](./hub/) | Data hub em construção: coleta local das planilhas, validação de cada indicador contra a fonte oficial e publicação do resultado no Supabase (schema `trusted`). Python + DuckDB, roda no PC. |
 
 ---
 

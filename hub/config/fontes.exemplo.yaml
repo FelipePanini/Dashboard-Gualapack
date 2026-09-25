@@ -28,6 +28,12 @@ ano: 2026
 pastas:
   entrada: 'C:\Users\<voce>\<Área de Trabalho>\Dados do Painel'
 
+# Publicação no Supabase: ver scripts/criar_usuario_hub.py e
+# sql/supabase/001_trusted.sql. Com ativa: false o hub só gera o relatório local.
+publicacao:
+  ativa: false
+  email: hub-dados@painel-gualapack.invalid
+
 fontes:
   - id: indicadores.base_apontamento
     tipo: excel_tabela

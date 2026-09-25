@@ -35,4 +35,5 @@ def carregar(nome_fontes: str = "fontes.local.yaml") -> dict:
         "fontes": fontes["fontes"],
         "indicadores": _ler("indicadores.yaml")["indicadores"],
         "recortes": _ler("recortes.yaml")["recortes"],
+        "publicacao": fontes.get("publicacao") or {},
     }

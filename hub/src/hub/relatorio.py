@@ -52,7 +52,7 @@ MESES_NOME = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho
               "Setembro", "Outubro", "Novembro", "Dezembro"]
 
 
-def _correcao(modelo: str | None, recorte: str, periodo: date, oficial, comparado, unidade: str) -> str | None:
+def preencher_correcao(modelo: str | None, recorte: str, periodo: date, oficial, comparado, unidade: str) -> str | None:
     """Preenche o modelo de correção do catálogo: onde mexer e qual valor colocar."""
     if not modelo:
         return None
@@ -110,7 +110,7 @@ def gerar(con: duckdb.DuckDBPyConnection, run_id: int | None = None) -> Path:
     correcoes = []  # (indicador, recorte, periodo, instrução) — o caminho pra zerar os divergentes
     for v in validacoes:
         if v[11] == "divergente":
-            instrucao = _correcao(v[15], v[3], v[4], v[6], v[8], v[2])
+            instrucao = preencher_correcao(v[15], v[3], v[4], v[6], v[8], v[2])
             if instrucao:
                 correcoes.append((v[1], v[3], v[4], instrucao))
     fontes_ok = sum(1 for f in fontes if f[7] == "ok")
@@ -137,7 +137,7 @@ def gerar(con: duckdb.DuckDBPyConnection, run_id: int | None = None) -> Path:
                            if (n := sum(1 for l in linhas if l[11] == s)))
         def _motivo(l):
             texto = html.escape(l[12] or "")
-            instrucao = _correcao(l[15], l[3], l[4], l[6], l[8], l[2]) if l[11] == "divergente" else None
+            instrucao = preencher_correcao(l[15], l[3], l[4], l[6], l[8], l[2]) if l[11] == "divergente" else None
             return texto + (f"<div class='corrigir'>Corrigir: {html.escape(instrucao)}</div>" if instrucao else "")
 
         corpo = "".join(

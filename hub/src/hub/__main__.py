@@ -13,7 +13,7 @@ import sys
 import time
 from datetime import date
 
-from hub import coleta, config, db, execucao, medicao, relatorio, transformacao, validacao
+from hub import coleta, config, db, execucao, medicao, publicacao, relatorio, transformacao, validacao
 from hub.caminhos import CONFIG, DADOS, LOGS, SQL
 from hub.origens import Origens, localizar
 
@@ -104,6 +104,12 @@ def executar(gatilho: str = "manual", so_se_mudou: bool = False) -> int:
     medicao.calcular(con, run, cfg["indicadores"])
     contagem = validacao.validar(con, run)
     status = execucao.finalizar(con, run)
+    try:
+        log.info("publicação: %s", publicacao.publicar(con, run, cfg))
+    except Exception as e:  # falha de rede/Supabase não invalida o dado: vira aviso no relatório
+        execucao.registrar_erro(con, run, None, f"publicação no Supabase falhou: {e}",
+                                codigo="publicacao_falhou", gravidade="aviso")
+        log.error("publicação falhou: %s", e)
     caminho = relatorio.gerar(con, run)
     con.close()
     MARCA_ULTIMA_EXECUCAO.write_text(str(inicio))

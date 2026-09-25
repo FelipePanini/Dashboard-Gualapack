@@ -1,0 +1,378 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<title>Qualidade dos dados — Gualapack</title>
+<link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600;1,700&family=Archivo:wght@500;600;700;800&family=Public+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<script src="./supabase-config.js"></script>
+<style>
+/* Mesmos tokens de admin.html / index.html — a página segue o visual do painel. */
+:root{
+  color-scheme: light;
+  --bg: #eef2f6; --surface-1: #ffffff; --surface-sunken: #e6ecf3;
+  --border: #d7e0e9; --border-strong: #b9c8d8;
+  --text-primary: #0a1524; --text-secondary: #3d5066; --text-muted: #7288a0;
+  --accent: #0f5ea6; --accent-ink: #ffffff; --accent-soft: #dbeaf8;
+  --series-1: #0c3868; --series-3: #2f78c4;
+  --good: #0d8f4f; --good-bg: #dff3e8;
+  --warning: #a9720a; --warning-bg: #faedd2;
+  --critical: #c22b3c; --critical-bg: #fbdfe2;
+  --glass-bg: rgba(255,255,255,0.6); --glass-bg-strong: rgba(255,255,255,0.78);
+  --glass-border: rgba(255,255,255,0.65); --glass-highlight: rgba(255,255,255,0.9);
+  --glass-shadow: 0 1px 1px rgba(10,47,87,0.05), 0 20px 40px -20px rgba(10,47,87,0.28);
+  --ease: cubic-bezier(.22,1,.36,1);
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    color-scheme: dark;
+    --bg: #07090c; --surface-1: #0e1116; --surface-sunken: #0a0d12;
+    --border: #212833; --border-strong: #303b4a;
+    --text-primary: #eef3f9; --text-secondary: #a7b7c9; --text-muted: #6d7d90;
+    --accent: #4f9ce0; --accent-ink: #071019; --accent-soft: #132639;
+    --series-1: #175a99; --series-3: #4f9ce0;
+    --good: #2fbf2f; --good-bg: #16301a; --warning: #e0a834; --warning-bg: #382d10;
+    --critical: #e66767; --critical-bg: #3a1616;
+    --glass-bg: rgba(20,26,36,0.5); --glass-bg-strong: rgba(24,30,41,0.68);
+    --glass-border: rgba(146,180,214,0.16); --glass-highlight: rgba(255,255,255,0.06);
+    --glass-shadow: 0 1px 1px rgba(0,0,0,0.3), 0 24px 48px -20px rgba(0,0,0,0.65);
+  }
+}
+:root[data-theme="dark"]{
+  color-scheme: dark;
+  --bg: #07090c; --surface-1: #0e1116; --surface-sunken: #0a0d12;
+  --border: #212833; --border-strong: #303b4a;
+  --text-primary: #eef3f9; --text-secondary: #a7b7c9; --text-muted: #6d7d90;
+  --accent: #4f9ce0; --accent-ink: #071019; --accent-soft: #132639;
+  --series-1: #175a99; --series-3: #4f9ce0;
+  --good: #2fbf2f; --good-bg: #16301a; --warning: #e0a834; --warning-bg: #382d10;
+  --critical: #e66767; --critical-bg: #3a1616;
+  --glass-bg: rgba(20,26,36,0.5); --glass-bg-strong: rgba(24,30,41,0.68);
+  --glass-border: rgba(146,180,214,0.16); --glass-highlight: rgba(255,255,255,0.06);
+  --glass-shadow: 0 1px 1px rgba(0,0,0,0.3), 0 24px 48px -20px rgba(0,0,0,0.65);
+}
+*{ box-sizing:border-box; }
+html,body{ margin:0; padding:0; }
+body{ background:var(--bg); color:var(--text-primary); font-family:"Public Sans",system-ui,sans-serif;
+  -webkit-font-smoothing:antialiased; min-height:100vh; }
+body.auth-pending{ visibility:hidden; }
+h1,h2,h3{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; margin:0; }
+.mono,td.num{ font-family:"IBM Plex Mono",ui-monospace,monospace; font-variant-numeric:tabular-nums; }
+
+.topbar{ display:flex; align-items:center; justify-content:space-between; gap:16px; padding:18px 28px;
+  border-bottom:1px solid var(--glass-border); background:var(--glass-bg);
+  backdrop-filter:blur(20px) saturate(160%); -webkit-backdrop-filter:blur(20px) saturate(160%);
+  position:sticky; top:0; z-index:10; }
+.brand-word{ font-family:"Playfair Display","Georgia",serif; font-style:italic; font-weight:700; font-size:19px; }
+.brand-word .ink-accent{ color:var(--accent); }
+.back-link{ display:inline-flex; align-items:center; gap:6px; font-size:13px; color:var(--text-secondary);
+  text-decoration:none; background:var(--glass-bg-strong); border:1px solid var(--glass-border);
+  padding:8px 14px; border-radius:999px; transition:color .2s var(--ease), border-color .2s var(--ease); }
+.back-link:hover{ color:var(--text-primary); border-color:var(--accent); }
+.theme-toggle{ width:36px; height:36px; border-radius:50%; border:1px solid var(--glass-border);
+  background:var(--glass-bg-strong); color:var(--text-secondary); cursor:pointer;
+  display:flex; align-items:center; justify-content:center; }
+.theme-toggle:hover{ border-color:var(--accent); color:var(--text-primary); }
+.theme-toggle svg[hidden]{ display:none; }
+
+.content{ padding:28px; max-width:1180px; margin:0 auto; }
+.page-title{ font-size:24px; margin-bottom:4px; }
+.page-sub{ color:var(--text-muted); font-size:13.5px; margin-bottom:22px; }
+.panel{ background:var(--glass-bg); backdrop-filter:blur(18px) saturate(160%); -webkit-backdrop-filter:blur(18px) saturate(160%);
+  border:1px solid var(--glass-border); border-radius:14px; box-shadow:var(--glass-shadow), inset 0 1px 0 var(--glass-highlight);
+  padding:20px 22px; margin-bottom:18px; }
+.panel h2{ font-size:16px; margin-bottom:4px; }
+.panel .sub{ color:var(--text-muted); font-size:12.5px; margin-bottom:14px; }
+
+.placar{ display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:12px; margin-bottom:18px; }
+.placar .card{ background:var(--glass-bg); border:1px solid var(--glass-border); border-radius:14px; padding:14px 16px;
+  box-shadow:var(--glass-shadow); cursor:pointer; text-align:left; font-family:inherit; color:inherit;
+  transition:border-color .2s var(--ease), transform .2s var(--ease); }
+.placar .card:hover{ transform:translateY(-1px); border-color:var(--accent); }
+.placar .card.ativo{ border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+.placar .n{ font-family:"IBM Plex Mono",monospace; font-size:28px; font-weight:600; line-height:1.1; margin-bottom:6px; }
+
+.pill{ display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:600; padding:3px 9px 3px 7px;
+  border-radius:99px; white-space:nowrap; }
+.pill .dot{ width:6px; height:6px; border-radius:50%; background:currentColor; }
+.s-validado,.s-ok{ background:var(--good-bg); color:var(--good); }
+.s-divergente,.s-desatualizado{ background:var(--warning-bg); color:var(--warning); }
+.s-erro{ background:var(--critical-bg); color:var(--critical); }
+.s-aguardando{ background:var(--accent-soft); color:var(--accent); }
+
+.filtros{ display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px; }
+.filtros label{ display:flex; flex-direction:column; gap:4px; font-size:11.5px; font-weight:600; color:var(--text-secondary); }
+select{ border:1px solid var(--glass-border); border-radius:9px; padding:8px 10px; font-size:13px;
+  background:var(--glass-bg-strong); color:var(--text-primary); font-family:inherit; min-width:180px; }
+select:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
+
+.table-wrap{ overflow-x:auto; }
+table{ width:100%; border-collapse:collapse; font-size:13px; }
+thead th{ text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:.05em; color:var(--text-muted);
+  font-weight:600; padding:0 10px 10px; border-bottom:1px solid var(--glass-border); white-space:nowrap; vertical-align:bottom; }
+thead th code{ text-transform:none; letter-spacing:0; font-size:10.5px; }
+tbody td{ padding:9px 10px; border-bottom:1px solid var(--glass-border); vertical-align:top; }
+tbody tr:last-child td{ border-bottom:none; }
+tbody tr:hover{ background:var(--glass-bg-strong); }
+td.num,th.num{ text-align:right; white-space:nowrap; }
+td.motivo{ color:var(--text-secondary); min-width:220px; }
+.corrigir{ margin-top:4px; color:var(--warning); font-weight:600; }
+
+details.ind{ border-top:1px solid var(--glass-border); padding:12px 0; }
+details.ind:first-of-type{ border-top:none; }
+details.ind summary{ cursor:pointer; display:flex; flex-wrap:wrap; align-items:center; gap:8px; list-style:none; }
+details.ind summary::-webkit-details-marker{ display:none; }
+details.ind summary h3{ font-size:14.5px; }
+details.ind summary .resumo{ color:var(--text-muted); font-size:12px; }
+details.ind .def{ color:var(--text-secondary); font-size:12.5px; margin:8px 0 10px; line-height:1.5; }
+details.ind .notas{ color:var(--text-muted); font-size:12px; margin:0 0 10px; line-height:1.5; }
+code{ font-family:"IBM Plex Mono",monospace; font-size:11.5px; color:var(--text-muted); }
+
+.vazio{ color:var(--text-muted); font-size:13.5px; padding:22px 0; text-align:center; line-height:1.6; }
+.erro-carga{ color:var(--critical); }
+@media (max-width:760px){ .content{ padding:18px 16px; } .topbar{ padding:14px 16px; } select{ min-width:0; width:100%; }
+  .filtros label{ flex:1 1 140px; } }
+</style>
+</head>
+<body class="auth-pending">
+
+<script>
+(function(){
+  const root = document.documentElement;
+  const KEY = "gualapack-theme";
+  const sistemaEscuro = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
+  const efetivo = () => { const t = root.getAttribute("data-theme"); return t === "light" || t === "dark" ? t : (sistemaEscuro() ? "dark" : "light"); };
+  let salvo = null; try{ salvo = localStorage.getItem(KEY); }catch(e){}
+  root.setAttribute("data-theme", salvo === "light" || salvo === "dark" ? salvo : efetivo());
+  document.addEventListener("DOMContentLoaded", ()=>{
+    const btn = document.getElementById("theme-toggle"); if(!btn) return;
+    const sol = document.getElementById("theme-icon-sun"), lua = document.getElementById("theme-icon-moon");
+    // <svg> não tem a propriedade .hidden: mexe no atributo (o CSS esconde).
+    const icone = t => { sol.toggleAttribute("hidden", t !== "dark"); lua.toggleAttribute("hidden", t === "dark"); };
+    icone(efetivo());
+    btn.addEventListener("click", ()=>{
+      const prox = efetivo() === "dark" ? "light" : "dark";
+      root.setAttribute("data-theme", prox); try{ localStorage.setItem(KEY, prox); }catch(e){}
+      icone(prox);
+    });
+  });
+})();
+</script>
+
+<script>
+/* Guarda de login: igual às outras páginas — sem sessão, volta pro login.
+   A proteção de verdade é o RLS das views v_hub_* (só usuário autenticado lê). */
+(function(){
+  const cfg = window.SUPABASE_CONFIG;
+  if(!cfg || cfg.url.includes("SEU-PROJETO")){
+    document.addEventListener("DOMContentLoaded", ()=> document.body.classList.remove("auth-pending"));
+    return;
+  }
+  window.gualapackAuth = window.supabase.createClient(cfg.url, cfg.anonKey);
+  window.gualapackAuth.auth.getSession().then(({ data })=>{
+    if(!data.session){ window.location.replace("./login.html"); return; }
+    window.gualapackSession = data.session;
+    document.body.classList.remove("auth-pending");
+    document.dispatchEvent(new CustomEvent("gualapack-session-ready"));
+  });
+})();
+</script>
+
+<header class="topbar">
+  <div class="brand-word">Guala<span class="ink-accent">pack</span></div>
+  <div style="display:flex; align-items:center; gap:10px;">
+    <button class="theme-toggle" id="theme-toggle" type="button" title="Trocar tema" aria-label="Trocar tema">
+      <svg id="theme-icon-sun" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8L6 18M18 6l1.8-1.8"/></svg>
+      <svg id="theme-icon-moon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" hidden><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>
+    </button>
+    <a class="back-link" href="./index.html">&larr; Voltar ao painel</a>
+  </div>
+</header>
+
+<main class="content">
+  <h1 class="page-title">Qualidade dos dados</h1>
+  <div class="page-sub" id="sub">O que o hub leu, conferiu e publicou. Atualiza sozinho quando as planilhas mudam.</div>
+  <div id="root"><div class="vazio">Carregando…</div></div>
+</main>
+
+<script>
+(function(){
+  const root = document.getElementById("root");
+  const STATUS = {
+    validado:      { rotulo:"Validado",      ordem:4 },
+    divergente:    { rotulo:"Divergente",    ordem:1 },
+    erro:          { rotulo:"Erro",          ordem:0 },
+    desatualizado: { rotulo:"Desatualizado", ordem:2 },
+    aguardando:    { rotulo:"Aguardando",    ordem:3 },
+    ok:            { rotulo:"OK",            ordem:4 },
+  };
+  const MESES = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+  const SUFIXO = { kg:" kg", h:" h", m_min:" m/min" };
+  const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+  const pill = s => `<span class="pill s-${esc(s)}"><span class="dot"></span>${esc((STATUS[s] || {rotulo:s}).rotulo)}</span>`;
+  const mes = iso => { if(!iso) return "—"; const [a,m] = iso.split("-"); return `${MESES[+m-1]}/${a}`; };
+  const data = iso => iso ? new Date(iso.length === 10 ? iso + "T00:00:00" : iso).toLocaleDateString("pt-BR") : "—";
+  const dataHora = iso => iso ? new Date(iso).toLocaleString("pt-BR", { dateStyle:"short", timeStyle:"short" }) : "—";
+  function num(v, unidade){
+    if(v === null || v === undefined) return "—";
+    if(unidade === "pct") return v.toLocaleString("pt-BR", { minimumFractionDigits:1, maximumFractionDigits:1 }) + "%";
+    return Math.round(v).toLocaleString("pt-BR") + (SUFIXO[unidade] || "");
+  }
+  function dif(d, pct, unidade){
+    if(d === null || d === undefined) return "—";
+    const sinal = d > 0 ? "+" : "";
+    if(unidade === "pct") return sinal + d.toLocaleString("pt-BR", { minimumFractionDigits:1, maximumFractionDigits:1 }) + " p.p.";
+    const p = pct === null || pct === undefined ? "" : ` (${pct > 0 ? "+" : ""}${(pct*100).toLocaleString("pt-BR", { maximumFractionDigits:1 })}%)`;
+    return sinal + Math.round(d).toLocaleString("pt-BR") + (SUFIXO[unidade] || "") + p;
+  }
+
+  // O PostgREST devolve no máximo 1000 linhas por pedido: busca em páginas.
+  async function tudo(tabela, ordem){
+    const client = window.gualapackAuth, linhas = [];
+    for(let de = 0; ; de += 1000){
+      let q = client.from(tabela).select("*").range(de, de + 999);
+      if(ordem) q = q.order(ordem);
+      const { data, error } = await q;
+      if(error) throw error;
+      linhas.push(...data);
+      if(data.length < 1000) return linhas;
+    }
+  }
+
+  let DADOS = null;
+  const filtro = { indicador:"", status:"", recorte:"" };
+
+  async function carregar(){
+    try{
+      const [execucao, fontes, indicadores, validacao, avisos] = await Promise.all([
+        tudo("v_hub_execucao"), tudo("v_hub_fontes", "fonte"), tudo("v_hub_indicadores", "codigo"),
+        tudo("v_hub_validacao"), tudo("v_hub_avisos"),
+      ]);
+      DADOS = { execucao: execucao[0] || null, fontes, indicadores, validacao, avisos };
+    }catch(err){
+      console.error("Falha ao ler o hub:", err);
+      const naoExiste = /does not exist|could not find|relation|42P01|PGRST205/i.test(String(err && (err.message || err.code)));
+      root.innerHTML = naoExiste
+        ? `<div class="panel"><div class="vazio">O hub ainda não publicou dados neste painel.<br>
+           Falta aplicar <code>hub/sql/supabase/001_trusted.sql</code> no Supabase e criar o usuário técnico do hub
+           (<code>hub/scripts/criar_usuario_hub.py</code>).</div></div>`
+        : `<div class="panel"><div class="vazio erro-carga">Não foi possível carregar os dados do hub: ${esc(err.message || err)}</div></div>`;
+      return;
+    }
+    if(!DADOS.execucao && !DADOS.validacao.length){
+      root.innerHTML = `<div class="panel"><div class="vazio">O hub ainda não publicou nenhuma execução.</div></div>`;
+      return;
+    }
+    desenhar();
+  }
+
+  function desenhar(){
+    const { execucao, fontes, indicadores, validacao, avisos } = DADOS;
+    const porCodigo = Object.fromEntries(indicadores.map(i => [i.codigo, i]));
+    document.getElementById("sub").innerHTML =
+      `O que o hub leu, conferiu e publicou. Última execução: <b>${dataHora(execucao && execucao.terminada_em)}</b> `
+      + (execucao ? pill(execucao.status === "ok" ? "ok" : "divergente") : "")
+      + ` · ${fontes.filter(f => f.status === "ok").length} de ${fontes.length} fontes OK.`;
+
+    const contagem = {};
+    validacao.forEach(v => contagem[v.status] = (contagem[v.status] || 0) + 1);
+    const placar = ["validado","divergente","erro","desatualizado","aguardando"].map(s =>
+      `<button type="button" class="card${filtro.status === s ? " ativo" : ""}" data-status="${s}">
+         <div class="n">${contagem[s] || 0}</div>${pill(s)}</button>`).join("");
+
+    const recortes = [...new Set(validacao.map(v => v.recorte))].sort();
+    const opcoes = (lista, atual, todos) => `<option value="">${todos}</option>` +
+      lista.map(([v, r]) => `<option value="${esc(v)}"${v === atual ? " selected" : ""}>${esc(r)}</option>`).join("");
+
+    const visiveis = validacao.filter(v =>
+      (!filtro.indicador || v.indicador === filtro.indicador) &&
+      (!filtro.status || v.status === filtro.status) &&
+      (!filtro.recorte || v.recorte === filtro.recorte));
+
+    const grupos = {};
+    visiveis.forEach(v => (grupos[v.indicador] = grupos[v.indicador] || []).push(v));
+    const blocos = Object.keys(grupos).sort().map(codigo => {
+      const ind = porCodigo[codigo] || { nome: codigo, unidade: "", definicao: "" };
+      const linhas = grupos[codigo].sort((a, b) => a.recorte.localeCompare(b.recorte) || a.periodo.localeCompare(b.periodo));
+      const pior = linhas.map(l => l.status).sort((a, b) => (STATUS[a]?.ordem ?? 9) - (STATUS[b]?.ordem ?? 9))[0];
+      const resumo = ["validado","divergente","erro","desatualizado","aguardando"]
+        .map(s => [s, linhas.filter(l => l.status === s).length]).filter(([, n]) => n)
+        .map(([s, n]) => `${n} ${STATUS[s].rotulo.toLowerCase()}`).join(" · ");
+      const corpo = linhas.map(l => `<tr>
+          <td>${esc(l.recorte)}</td><td class="mono">${mes(l.periodo)}</td>
+          <td class="num">${num(l.valor_oficial, ind.unidade)}</td>
+          <td class="num">${num(l.valor_comparado, ind.unidade)}</td>
+          <td class="num">${dif(l.dif_abs, l.dif_pct, ind.unidade)}</td>
+          <td>${pill(l.status)}</td>
+          <td class="motivo">${esc(l.motivo)}${l.correcao ? `<div class="corrigir">Corrigir: ${esc(l.correcao)}</div>` : ""}</td>
+        </tr>`).join("");
+      const comparada = linhas.find(l => l.fonte_comparada)?.fonte_comparada || "—";
+      return `<details class="ind"${pior === "divergente" || pior === "erro" || filtro.indicador ? " open" : ""}>
+        <summary>${pill(pior)}<h3>${esc(ind.nome)}</h3><code>${esc(codigo)}</code><span class="resumo">${resumo}</span></summary>
+        <p class="def">${esc(ind.definicao)}</p>
+        ${ind.notas ? `<p class="notas">${esc(ind.notas)}</p>` : ""}
+        <div class="table-wrap"><table>
+          <thead><tr><th>Recorte</th><th>Mês</th><th class="num">Oficial<br><code>${esc(ind.fonte_oficial)}</code></th>
+          <th class="num">Comparado<br><code>${esc(comparada)}</code></th><th class="num">Diferença</th><th>Status</th><th>Motivo</th></tr></thead>
+          <tbody>${corpo}</tbody></table></div>
+      </details>`;
+    }).join("");
+
+    const linhasFontes = fontes.map(f => `<tr>
+        <td><code>${esc(f.fonte)}</code><div style="color:var(--text-muted);font-size:12px">${esc(f.descricao)}</div></td>
+        <td>${pill(f.status)}</td><td class="mono">${data(f.dado_ate)}</td>
+        <td class="num">${f.linhas === null || f.linhas === undefined ? "—" : Number(f.linhas).toLocaleString("pt-BR")}</td>
+        <td class="mono">${dataHora(f.arquivo_salvo_em)}</td></tr>`).join("");
+
+    const correcoes = validacao.filter(v => v.correcao);
+    const listaAvisos = avisos.map(a => `<tr><td>${pill(a.gravidade === "erro" ? "erro" : "divergente").replace("Divergente","Aviso")}</td>
+        <td><code>${esc(a.fonte || "—")}</code></td><td>${esc(a.mensagem)}</td></tr>`).join("");
+
+    root.innerHTML = `
+      <div class="placar">${placar}</div>
+      <section class="panel">
+        <h2>Indicadores</h2>
+        <div class="sub">Cada número medido em cada fonte e comparado com a fonte oficial do indicador.
+          Clique num status do placar para filtrar.</div>
+        <div class="filtros">
+          <label>Indicador<select id="f-indicador">${opcoes(indicadores.map(i => [i.codigo, i.nome]), filtro.indicador, "Todos")}</select></label>
+          <label>Recorte<select id="f-recorte">${opcoes(recortes.map(r => [r, r]), filtro.recorte, "Todos")}</select></label>
+          <label>Status<select id="f-status">${opcoes(Object.keys(STATUS).filter(s => s !== "ok").map(s => [s, STATUS[s].rotulo]), filtro.status, "Todos")}</select></label>
+        </div>
+        ${blocos || `<div class="vazio">Nenhum resultado com esses filtros.</div>`}
+      </section>
+      ${correcoes.length ? `<section class="panel"><h2>O que corrigir nas planilhas (${correcoes.length})</h2>
+        <div class="sub">Divergências cuja causa é uma célula de planilha desatualizada ou errada.</div>
+        <div class="table-wrap"><table><thead><tr><th>Indicador</th><th>Recorte</th><th>Mês</th><th>Onde e o quê</th></tr></thead><tbody>
+        ${correcoes.map(c => `<tr><td>${esc((porCodigo[c.indicador] || {}).nome || c.indicador)}</td><td>${esc(c.recorte)}</td>
+          <td class="mono">${mes(c.periodo)}</td><td>${esc(c.correcao)}</td></tr>`).join("")}
+        </tbody></table></div></section>` : ""}
+      <section class="panel">
+        <h2>Fontes (${fontes.length})</h2>
+        <div class="sub">Cada planilha e cada tabela do BI que o hub lê, até quando vai o dado e se está em dia.</div>
+        <div class="table-wrap"><table><thead><tr><th>Fonte</th><th>Status</th><th>Dado até</th><th class="num">Linhas</th><th>Arquivo salvo em</th></tr></thead>
+        <tbody>${linhasFontes}</tbody></table></div>
+      </section>
+      <section class="panel">
+        <h2>Avisos da última execução (${avisos.length})</h2>
+        ${avisos.length ? `<div class="table-wrap"><table><thead><tr><th>Tipo</th><th>Fonte</th><th>Mensagem</th></tr></thead>
+          <tbody>${listaAvisos}</tbody></table></div>` : `<div class="vazio">Nenhum aviso.</div>`}
+      </section>`;
+
+    root.querySelectorAll(".placar .card").forEach(b => b.addEventListener("click", ()=>{
+      filtro.status = filtro.status === b.dataset.status ? "" : b.dataset.status; desenhar();
+    }));
+    [["f-indicador","indicador"],["f-recorte","recorte"],["f-status","status"]].forEach(([id, chave]) =>
+      document.getElementById(id).addEventListener("change", e => { filtro[chave] = e.target.value; desenhar(); }));
+  }
+
+  if(window.gualapackSession) carregar();
+  else document.addEventListener("gualapack-session-ready", carregar, { once:true });
+})();
+</script>
+</body>
+</html>
