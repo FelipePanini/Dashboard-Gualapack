@@ -6,8 +6,11 @@ status e com a linhagem de onde veio. Roda no PC com Python e um banco local
 (DuckDB), sem API do Google e sem copiar planilha para lugar nenhum.
 
 ```
-Área de Trabalho\Dados do Painel\     ← você atualiza as planilhas aqui
-      │  a cada 30 min: mudou algo? (Agendador de Tarefas, --se-mudou)
+pasta compartilhada (originais)       ← você atualiza as planilhas aqui
+      │  a cada 30 min: copia o que mudou (espelho)
+      ▼
+Área de Trabalho\Dados do Painel\     cópias que o hub lê
+      │  mudou algo? (Agendador de Tarefas, --se-mudou)
       ▼
 coleta: contrato de colunas, SHA-256, data máxima do dado
       ▼
@@ -43,10 +46,22 @@ e rodar `uv sync` dentro de `hub/`. Não precisa de administrador.
 ## Pasta de entrada
 
 `Área de Trabalho\Dados do Painel` — o caminho está em `pastas.entrada` no
-`config/fontes.local.yaml`.
+`config/fontes.local.yaml`. Ela guarda **cópias**: as planilhas são mantidas
+na pasta compartilhada (`pastas.originais`), onde os vínculos entre elas
+funcionam.
 
-- **Atualizar:** substitua a planilha pelo arquivo novo, com o mesmo nome.
-  Pode deixar o Excel aberto; o hub lê uma cópia.
+- **Atualizar:** trabalhe no original, na pasta compartilhada, e salve. Antes
+  de cada execução o hub copia pra pasta de entrada todo original da lista
+  `espelho` que estiver mais novo que a cópia (`src/hub/espelho.py`). O
+  original nunca é alterado; a cópia substituída fica guardada em
+  `data/espelho_substituidos`.
+- **Não edite a cópia.** Se a cópia ficar mais nova que o original, o hub
+  não sobrescreve e avisa no relatório: a mudança tem de ir pro original.
+- **Arquivo do mês e revisões:** o arquivo mensal novo (ex.: "10. ...
+  Outubro") entra sozinho quando aparece no original; revisão nova do
+  Sequenciamento Acumulado (Rev3) substitui a anterior.
+- Pode deixar o Excel aberto; o hub lê uma cópia. Se a cópia da pasta de
+  entrada estiver aberta, a troca fica pra próxima execução.
 - **Subpastas:** cada arquivo é achado pelo nome em qualquer subpasta. Pode
   reorganizar à vontade; só não deixe duas cópias com o mesmo nome (é erro,
   nunca palpite).

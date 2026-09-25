@@ -27,6 +27,21 @@ ano: 2026
 
 pastas:
   entrada: 'C:\Users\<voce>\<Área de Trabalho>\Dados do Painel'
+  # Pasta compartilhada onde as planilhas são mantidas (opcional).
+  originais: 'C:\Users\<voce>\<OneDrive>\<pasta compartilhada>'
+
+# Espelho (opcional): antes de cada execução, o original mais novo que a cópia
+# da pasta de entrada é copiado por cima dela (a cópia antiga fica guardada em
+# data/espelho_substituidos). Cópia editada à mão não é sobrescrita: vira aviso.
+# Caminho relativo a pastas.originais, ou absoluto. Aceita {ano} e curinga:
+#   curinga             série (um arquivo por mês): atualiza os que já estão
+#                       na pasta de entrada e traz o próximo quando aparece
+#   so_o_ultimo: true   revisões (Rev2 -> Rev3): fica só a última
+espelho:
+  - '02 - Indicadores\Indicadores Diário - {ano}.xlsx'
+  - 'Refugo\*SEQUENCIAMENTO DOS FARDOS DE APARAS JGR*{ano}.xlsx'
+  - original: 'Refugo\Sequenciamento Acumulado {ano} Rev*.xlsx'
+    so_o_ultimo: true
 
 # Publicação no Supabase: ver scripts/criar_usuario_hub.py e
 # sql/supabase/001_trusted.sql. Com ativa: false o hub só gera o relatório local.

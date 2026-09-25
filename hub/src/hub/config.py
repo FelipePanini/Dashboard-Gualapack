@@ -32,6 +32,10 @@ def carregar(nome_fontes: str = "fontes.local.yaml") -> dict:
         "ano": ano,
         # Pasta onde as planilhas são deixadas: é ela que o hub vigia e inventaria.
         "pasta_entrada": Path(pastas["entrada"]) if pastas.get("entrada") else None,
+        # Pasta compartilhada com os originais e a lista do que copiar dela
+        # pra pasta de entrada antes de cada execução (hub/espelho.py).
+        "pasta_originais": Path(pastas["originais"]) if pastas.get("originais") else None,
+        "espelho": fontes.get("espelho") or [],
         "fontes": fontes["fontes"],
         "indicadores": _ler("indicadores.yaml")["indicadores"],
         "recortes": _ler("recortes.yaml")["recortes"],

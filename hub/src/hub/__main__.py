@@ -15,7 +15,7 @@ import sys
 import time
 from datetime import date
 
-from hub import coleta, config, db, execucao, medicao, publicacao, relatorio, transformacao, validacao
+from hub import coleta, config, db, espelho, execucao, medicao, publicacao, relatorio, transformacao, validacao
 from hub.caminhos import CONFIG, DADOS, LOGS, SQL
 from hub.origens import Origens, localizar
 
@@ -67,6 +67,13 @@ def algo_mudou(cfg: dict) -> str | None:
 
 def executar(gatilho: str = "manual", so_se_mudou: bool = False) -> int:
     cfg = config.carregar()
+    # Primeiro traz da pasta compartilhada o que mudou: a cópia nova faz o
+    # "algo mudou" abaixo disparar a execução.
+    copiados, avisos_espelho = espelho.espelhar(cfg)
+    if copiados:
+        log.info("copiado da pasta compartilhada: %s", ", ".join(copiados))
+    for aviso in avisos_espelho:
+        log.warning("espelho: %s", aviso)
     if so_se_mudou:
         motivo = algo_mudou(cfg)
         if motivo is None:
@@ -78,6 +85,8 @@ def executar(gatilho: str = "manual", so_se_mudou: bool = False) -> int:
     con = db.conectar()
     run = execucao.iniciar(con, gatilho)
     log.info("execução %s iniciada (%s)", run, gatilho)
+    for aviso in avisos_espelho:  # entram no relatório e na página Qualidade dos dados
+        execucao.registrar_erro(con, run, None, aviso, codigo="espelho", gravidade="aviso")
 
     coleta.sincronizar_fontes(con, cfg["fontes"])
     coleta.inventariar_pasta(con, run, cfg["pasta_entrada"], cfg["fontes"])
