@@ -4,6 +4,8 @@
     uv run hub --se-mudou          só roda se algo mudou na pasta de entrada
                                    ou na configuração (é o que o agendador usa)
     uv run hub relatorio           só regenera o relatório da última execução
+    uv run hub publicar            reenvia pro Supabase tudo da última execução
+                                   (primeira vez, ou se o dado de lá se perdeu)
 """
 from __future__ import annotations
 
@@ -121,7 +123,7 @@ def executar(gatilho: str = "manual", so_se_mudou: bool = False) -> int:
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="hub", description="Data hub de produção — Gualapack Jaguariúna")
-    parser.add_argument("comando", nargs="?", default="executar", choices=["executar", "relatorio"])
+    parser.add_argument("comando", nargs="?", default="executar", choices=["executar", "relatorio", "publicar"])
     parser.add_argument("--gatilho", default="manual", help="manual | agendado | teste")
     parser.add_argument("--se-mudou", action="store_true",
                         help="só roda se algo mudou na pasta de entrada ou na configuração")
@@ -131,6 +133,15 @@ def main() -> None:
         if args.comando == "relatorio":
             con = db.conectar()
             log.info("relatório: %s", relatorio.gerar(con))
+            con.close()
+            return
+        if args.comando == "publicar":
+            con = db.conectar()
+            run = con.execute("select max(id) from processing_runs where finished_at is not null").fetchone()[0]
+            if run is None:
+                sys.exit("nenhuma execução terminada ainda: rode 'uv run hub' primeiro")
+            log.info("publicação da execução %s: %s", run,
+                     publicacao.publicar(con, run, config.carregar(), republicar=True))
             con.close()
             return
         sys.exit(executar(args.gatilho, args.se_mudou))

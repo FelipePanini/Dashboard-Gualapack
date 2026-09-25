@@ -1490,7 +1490,8 @@ async function loadRealData(periodoDe, periodoAte){
   const pDe  = periodoDe ? isoDate(periodoDe) : null;
   const pAte = periodoAte ? isoDate(periodoAte) : null;
   try{
-    const [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes, prodRes, statusRes, refugoProdRes, producaoKgRes] = await Promise.all([
+    const [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes, prodRes, statusRes, refugoProdRes, producaoKgRes,
+           hubMaqRes, hubParadasRes, hubGanttRes] = await Promise.all([
       // Resumo por máquina, perdas, downtime, ops e produtividade agora são
       // FUNÇÕES parametrizadas por período (p_de/p_ate) — é o que o
       // seletor de datas do topo filtra de verdade. As séries mensais
@@ -1515,6 +1516,12 @@ async function loadRealData(periodoDe, periodoAte){
       // antes eram uma segunda rodada que só começava depois desta.
       client.from("v_refugo_producao_maquina").select("*"),
       client.from("v_producao_kg_mensal").select("*"),
+      // Horas por máquina/código publicadas pelo data hub (apontamentos do
+      // BI). Fora do throw de propósito: enquanto o hub não publica, essas
+      // funções não existem e o painel segue com as fontes de antes.
+      client.rpc("rpc_hub_maquinas", { p_de: pDe, p_ate: pAte }),
+      client.rpc("rpc_hub_paradas", { p_de: pDe, p_ate: pAte }),
+      client.from("v_hub_ultimo_dia").select("*"),
     ]);
     const erro = [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes].find(r=>r.error);
     if(erro) throw erro.error;
@@ -1575,6 +1582,28 @@ async function loadRealData(periodoDe, periodoAte){
     }).filter(m=> PROCESSOS.includes(m.processo));
     if(MAQUINAS.length === 0) throw new Error("Nenhuma máquina com grupo físico reconhecido");
 
+    // TMR e horas pelo data hub, quando ele já publicou horas pro período.
+    // public.apontamentos vem da Base Apontamento do Excel, cuja consulta
+    // descarta as paradas sem OP: em ago/2026 o TMR saía de 4 a 29 p.p.
+    // acima do BI (L02 50% contra 21%). O hub publica os apontamentos do BI,
+    // que estão completos, e a regra que reproduz o Gráficos Tendência:
+    // PRODUZINDO ÷ (horas apontadas − FIM TURNO). Máquina sem hora no BI no
+    // período fica com 0 h, como já era a convenção pra máquina parada.
+    const HUB_HORAS = hubMaqRes && !hubMaqRes.error && (hubMaqRes.data||[]).length > 0;
+    if(HUB_HORAS){
+      const chave = s => String(s||"").trim().toUpperCase();
+      const porMaq = new Map(hubMaqRes.data.map(r=>[chave(r.maquina), r]));
+      MAQUINAS.forEach(m=>{
+        const h = porMaq.get(chave(m.id));
+        const tot  = h ? Number(h.horas_totais)||0 : 0;
+        const prod = h ? Number(h.horas_produzindo)||0 : 0;
+        const disp = tot - (h ? Number(h.horas_fim_turno)||0 : 0);
+        m.tmr = disp>0 ? Math.round(prod/disp*100) : 0;
+        m.horasProd = Math.round(prod);
+        m.horasTot = Math.round(tot);
+      });
+    }
+
     // Sem código curto separado do nome nos dados reais (isso existia só na
     // taxonomia fictícia do fallback) — cod:null sinaliza pros templates não
     // duplicarem "Refile · Refile".
@@ -1583,7 +1612,9 @@ async function loadRealData(periodoDe, periodoAte){
 
     CLASSIFICACOES = (classeRes.data||[]).map(r=>({ nome: r.classificacao, aparas: Number(r.apara_pct)||0, kg: Number(r.peso_bruto)||0 }));
 
-    DOWNTIME = (downtimeRes.data||[]).slice(0,8).map(r=>{
+    // Paradas e linha do tempo seguem a mesma fonte das horas acima.
+    const paradas = HUB_HORAS && !hubParadasRes.error ? hubParadasRes.data : downtimeRes.data;
+    DOWNTIME = (paradas||[]).slice(0,8).map(r=>{
       const c = corParada(r.cod_apont);
       return { nome: prettyCodigo(r.cod_desc).replace(/^\d+\s*-\s*/, ""), horas: Number(r.horas)||0, cor: c.cor, corDark: c.corDark };
     });
@@ -1630,7 +1661,8 @@ async function loadRealData(periodoDe, periodoAte){
     // Segmentos reais do Gantt: agrupa por máquina, hora do dia como float.
     const idsValidos = new Set(MAQUINAS.map(m=>m.id));
     const porMaquina = new Map();
-    (ganttRes.data||[]).forEach(r=>{
+    const eventos = HUB_HORAS && !hubGanttRes.error && (hubGanttRes.data||[]).length ? hubGanttRes.data : ganttRes.data;
+    (eventos||[]).forEach(r=>{
       if(!idsValidos.has(r.cod_recurso)) return;
       const ini = new Date(r.hora_inicio), fim = new Date(r.hora_fim);
       const dayStart = new Date(ini); dayStart.setHours(0,0,0,0);

@@ -10,11 +10,13 @@ com login; cadastro só com chave de convite).
 
 > **Em construção: o data hub ([`hub/`](./hub/README.md)).** Ele lê as
 > planilhas de uma pasta na Área de Trabalho, valida cada indicador contra a
-> fonte oficial e publica o resultado no Supabase, onde a página
-> **Qualidade dos dados** do painel (`demo/qualidade.html`) mostra cada
-> número, a fonte, o status e as divergências. Os cartões do painel ainda
-> vêm do fluxo abaixo; o próximo passo é eles lerem do hub, e aí o upload
-> para o Google Drive deixa de ser necessário.
+> fonte oficial e publica o resultado no Supabase. Quando ele publica, o
+> TMR, as paradas e a linha do tempo do painel saem dos apontamentos do BI
+> (a Base Apontamento do Excel perde as paradas sem OP e inflava o TMR), e
+> a página **Qualidade dos dados** (`demo/qualidade.html`) mostra cada
+> número, a fonte, o status e as divergências. O resto do painel ainda vem
+> do fluxo abaixo; quando tudo vier do hub, o upload para o Google Drive
+> deixa de ser necessário.
 
 ---
 

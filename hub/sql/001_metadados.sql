@@ -118,6 +118,15 @@ create table if not exists errors (
   criado_em  timestamp default current_timestamp
 );
 
+-- Meses de horas por máquina já publicados no Supabase. A assinatura é o md5
+-- do conteúdo do mês: só vai de novo o mês que mudou. "uv run hub publicar"
+-- limpa esta tabela e reenvia tudo.
+create table if not exists publicacao_horas (
+  mes          date primary key,
+  assinatura   varchar not null,
+  publicado_em timestamp default current_timestamp
+);
+
 create or replace table cfg.meses as
 select * from (values
   ('janeiro', 1), ('fevereiro', 2), ('marco', 3), ('abril', 4), ('maio', 5), ('junho', 6),

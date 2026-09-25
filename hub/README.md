@@ -20,7 +20,8 @@ data/hub.duckdb
       ▼
 relatorios/qualidade.html + validacao.csv + correcoes.csv
       ▼
-Supabase, schema trusted (só agregados)  →  painel: página "Qualidade dos dados"
+Supabase, schema trusted (só agregados)  →  painel: TMR, paradas, linha do tempo
+                                            e página "Qualidade dos dados"
 ```
 
 Nenhuma etapa usa IA. A atualização é determinística e não gasta tokens.
@@ -32,6 +33,7 @@ cd hub
 uv run hub                # coleta, valida e gera relatorios/qualidade.html
 uv run hub --se-mudou     # só roda se algo mudou (é o que o agendador chama)
 uv run hub relatorio      # só refaz o relatório da última execução
+uv run hub publicar       # reenvia tudo pro Supabase (primeira vez, ou se lá se perdeu)
 uv run pytest             # testes
 ```
 
@@ -78,14 +80,28 @@ schtasks /Delete /TN "Gualapack Data Hub" /F # remover
 
 ## Publicar no painel
 
-Ao fim de cada execução o hub publica no Supabase o resultado da validação,
-e a página **Qualidade dos dados** do painel (`demo/qualidade.html`, ícone de
-prancheta no menu) mostra tudo: placar por status, cada indicador mês a mês
-e recorte a recorte, o que corrigir nas planilhas, as fontes e os avisos.
+Ao fim de cada execução o hub publica no Supabase, e o painel usa de dois
+jeitos:
 
-Só sai do PC o que é agregado: valores por mês e recorte, o catálogo de
-indicadores, o estado de cada fonte (sem caminho de arquivo) e os avisos (com
-os caminhos apagados). Nada de linha de apontamento, operador ou cliente.
+- **Cartões de TMR, paradas e linha do tempo** passam a sair dos
+  apontamentos do BI (horas por máquina, dia e código), com a regra que
+  reproduz o Gráficos Tendência: PRODUZINDO ÷ (horas − FIM TURNO). Antes
+  saíam da Base Apontamento do Excel, que perde as paradas sem OP: em
+  agosto o TMR do painel ficava de 4 a 29 p.p. acima do BI (L02 50% contra
+  21%, R18 51% contra 37%). Enquanto o hub não publica, o painel segue como
+  era.
+- **Página Qualidade dos dados** (`demo/qualidade.html`, ícone de prancheta
+  no menu): placar por status, cada indicador mês a mês e recorte a recorte,
+  o que corrigir nas planilhas, as fontes e os avisos.
+
+Só sai do PC o que é agregado: horas por máquina/dia/código, os eventos do
+último dia (máquina, código, início, fim, OP), valores por mês e recorte, o
+catálogo de indicadores, o estado de cada fonte (sem caminho de arquivo) e os
+avisos (com os caminhos apagados). Nada de operador, observação ou cliente.
+As horas vão um mês por vez e só o mês que mudou.
+
+O TMR do painel fica tão atual quanto o `Dados_Produção.pbix` da pasta de
+entrada: troque o arquivo quando o BI for atualizado, como as planilhas.
 
 A escrita é feita por um **usuário técnico** do painel, só dele: a função
 `public.hub_publicar` confere a tabela `trusted.escritores` e troca os dados
@@ -101,11 +117,14 @@ Uma vez só, nesta ordem:
    chave quando pedir. O script cria o usuário e guarda a senha no Cofre.
 3. No Supabase, **SQL Editor** → rodar `sql/supabase/001_trusted.sql`. A
    última consulta tem de mostrar `autorizado = true`.
+4. Aqui em `hub/`: `uv run hub publicar`. Envia tudo da última execução
+   (o histórico de horas leva uns segundos). Recarregue o painel.
 
-Depois disso a próxima execução já publica (`uv run hub` pra não esperar o
-agendador). Com `publicacao.ativa: false` no `fontes.local.yaml` o hub só
-gera o relatório local. Se a publicação falhar (sem rede, por exemplo), a
-execução continua, o motivo vira aviso no relatório e a próxima tenta de novo.
+Depois disso cada execução publica sozinha. `uv run hub publicar` também
+serve pra reenviar tudo se o dado do Supabase se perder. Com
+`publicacao.ativa: false` no `fontes.local.yaml` o hub só gera o relatório
+local. Se a publicação falhar (sem rede, por exemplo), a execução continua,
+o motivo vira aviso no relatório e a próxima tenta de novo.
 
 ## Configuração
 
@@ -180,8 +199,9 @@ aguardando, divergente, validado.
 
 1. Indicadores de aparas, refugo, aderência e produtividade a partir das
    fontes já catalogadas (as que o painel web mostra).
-2. Publicação no Supabase: pronta no hub e na página do painel; falta fazer
-   os três passos de "Publicar no painel" (o SQL ainda não foi aplicado).
-3. Os cartões do painel lerem os números do hub (a tabela
-   `trusted.horas_maquina_dia` já existe pra isso). Aí o upload para o
-   Google Drive deixa de ser necessário.
+2. Publicação no Supabase: pronta no hub e no painel (TMR, paradas, linha
+   do tempo e página de qualidade); falta fazer os quatro passos de
+   "Publicar no painel" (o SQL ainda não foi aplicado).
+3. Levar para o hub o resto do que o painel mostra (aparas por máquina,
+   aderência, velocidade, produtividade). Aí o upload para o Google Drive
+   deixa de ser necessário.
