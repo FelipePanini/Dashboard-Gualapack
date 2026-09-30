@@ -162,8 +162,38 @@ Uma vez só, nesta ordem:
    última consulta tem de mostrar `funcoes_ok = true`.
 5. Aqui em `hub/`: `uv run hub publicar`. Envia tudo da última execução
    (o histórico leva uns segundos). Recarregue o painel.
+6. No **SQL Editor** → rodar `sql/supabase/003_conferencia.sql` (apara do
+   período, séries mensais reais e refugo por máquina e motivo). Tem de
+   mostrar `funcoes_ok = true`. Não precisa publicar de novo.
 
-Feitos em 25/09: os passos 1 a 3. Falta o 4 e o 5.
+Feitos: 1 a 3 em 25/09, 4 e 5 em 30/09. Falta o 6.
+
+### Conferência com o motor do BI (30/09)
+
+O painel foi aberto de verdade (Supabase real, um mês por vez, out/25 a
+set/26) e cada número comparado com o próprio modelo do BI Indicadores de
+Produção, consultado pelo Power BI Desktop (mesmo motor que desenha os
+visuais: filtros, relações e medidas DAX dele). Das 452 comparações, 421
+bateram. As diferenças e o que foi feito:
+
+- Cartões de apara (apontada, confirmada, diferença) mostravam sempre o
+  último mês, em qualquer período; no BI seguem o período →
+  `rpc_hub_apara_periodo` (003). Confirmado do mês em andamento passa a
+  aparecer no gráfico, como no BI.
+- Dez/2025: a planilha Base Aparas de 2025 tinha valores velhos da L04 → a
+  perda usa o Base Aparas Genérico sempre que ele cobre a data.
+- Set/2026: diferenças pequenas de horário de atualização (BI atualizado
+  depois das planilhas), não de conta.
+- Números desenhados sem dado: linhas de tendência dos cartões sorteadas,
+  "TMR — últimos 12 meses" e refugo por motivo do detalhe da máquina, a tela
+  WIP & Carteira e frases fixas do assistente → trocados por séries reais
+  (`rpc_hub_mensal`, `rpc_hub_perda_maquina_motivo`) ou por "sem dados".
+
+Bateram em todos os meses: TMR, velocidade, perda e aderência por máquina;
+horas por parada; OPs com mais refugo; apara por classificação; séries do
+gráfico Aparas GPK; produção mensal; totais de TMR, velocidade e aderência.
+O BI não tem TMR de 2025 (a tabela MachineCard dele começa em 2026); o painel
+tem, pelo Machine Card de 2025.
 
 Depois disso cada execução publica sozinha. `uv run hub publicar` também
 serve pra reenviar tudo se o dado do Supabase se perder. Com

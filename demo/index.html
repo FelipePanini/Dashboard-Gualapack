@@ -1134,7 +1134,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 
       <!-- ============ WIP & CARTEIRA ============ -->
       <div class="view" id="view-wip">
-        <div class="view-notice">Esta visão ainda não está conectada a uma base real de WIP/Carteira &mdash; os números abaixo são apenas de referência, mantidos aqui até que uma planilha desse tipo entre na carga diária.</div>
+        <div class="view-notice">Esta visão ainda não está conectada a uma base real de WIP/Carteira &mdash; fica sem dados até uma planilha ou BI desse tipo entrar no hub.</div>
         <section class="kpi-row" id="wip-kpis"></section>
 
         <section class="grid-2">
@@ -1415,23 +1415,6 @@ const FALLBACK = {
     { mes:"set", peso_bruto_kg: 601200, refugo_kg: 46700 },
   ],
 };
-/* Etapas de WIP e carteira — nenhuma tabela real disso foi conectada ainda
-   (não veio nenhum BI de WIP/Carteira na carga). Números de referência, com
-   aviso na própria aba WIP & Carteira. */
-const WIP_ETAPAS = [
-  { nome:"IMPRESSO",           metros: 486200, dc: 318400 },
-  { nome:"WIP INTERMEDIÁRIO",  metros: 312700, dc: 224900 },
-  { nome:"CORTE",              metros: 198400, dc: 161300 },
-  { nome:"PAPEL",              metros:  87600, dc:  52100 },
-];
-const CLIENTES = [
-  "CRISTALINA ALIMENTOS LTDA",
-  "UNILEVER BRASIL INDUSTRIAL LTDA",
-  "GUALAPACK IPERÓ",
-  "GPK JGR / OF",
-  "INTERCOMPANY",
-];
-
 /* Preenchidos por loadRealData() (real) ou applyFallback() (referência) —
    todo o resto do arquivo só lê estas variáveis, nunca sabe qual das duas
    fontes alimentou elas. */
@@ -1453,6 +1436,9 @@ function applyFallback(){
   USANDO_DADOS_REAIS = false;
   window.HUB_TOTAIS = null;
   window.PERDA_POR_MAQ = null;
+  window.APARA_PERIODO = null;
+  window.SERIE_MENSAL = null;
+  window.PERDA_MAQ_MOTIVO = null;
   MAQUINAS = FALLBACK.MAQUINAS.map(m=>({...m}));
   const FATOR_KM = 8; // converte horas × m/min de referência em km lineares do período
   MAQUINAS.forEach(m=>{
@@ -1494,7 +1480,7 @@ async function loadRealData(periodoDe, periodoAte){
   try{
     const [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes, prodRes, statusRes, refugoProdRes, producaoKgRes,
            hubMaqRes, hubParadasRes, hubGanttRes, hubMotivoRes, hubRefugoMaqRes, hubOpsRes, hubClasseRes, hubAparaRes,
-           hubFontesRes] = await Promise.all([
+           hubFontesRes, hubAparaPeriodoRes, hubMensalRes, hubPerdaMaqMotivoRes] = await Promise.all([
       // Resumo por máquina, perdas, downtime, ops e produtividade agora são
       // FUNÇÕES parametrizadas por período (p_de/p_ate) — é o que o
       // seletor de datas do topo filtra de verdade. As séries mensais
@@ -1533,6 +1519,11 @@ async function loadRealData(periodoDe, periodoAte){
       client.rpc("rpc_hub_classificacao", { p_de: pDe, p_ate: pAte }),
       client.from("v_hub_apara_mensal").select("*"),
       client.from("v_hub_fontes").select("fonte,dado_ate"),
+      // 003_conferencia.sql: apara do período, série mensal real das linhas
+      // de tendência e perda por máquina e motivo.
+      client.rpc("rpc_hub_apara_periodo", { p_de: pDe, p_ate: pAte }),
+      client.rpc("rpc_hub_mensal", { p_meses: 13 }),
+      client.rpc("rpc_hub_perda_maquina_motivo", { p_de: pDe, p_ate: pAte }),
     ]);
     const erro = [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes].find(r=>r.error);
     if(erro) throw erro.error;
@@ -1730,6 +1721,9 @@ async function loadRealData(periodoDe, periodoAte){
     const HUB2 = HUB_HORAS && "metros" in hubMaqRes.data[0];
     window.HUB_TOTAIS = null;
     window.PERDA_POR_MAQ = null;
+    window.APARA_PERIODO = null;
+    window.SERIE_MENSAL = null;
+    window.PERDA_MAQ_MOTIVO = null;
     if(HUB2){
       const n = v => Number(v)||0;
       const chave = s => String(s||"").trim().toUpperCase();
@@ -1788,13 +1782,67 @@ async function loadRealData(periodoDe, periodoAte){
           MESES = serie.map(r=>fmtMes(String(r.mes).slice(0,10)));
           APARAS_MENSAL = {
             apontado: serie.map(r=> r.apontado_pct!=null ? n(r.apontado_pct) : null),
-            // mês corrente fora do confirmado, como acima: a balança fecha no fim do mês
-            confirmado: serie.map(r=> r.confirmado_pct!=null && String(r.mes).slice(0,7) < mesCorrente ? n(r.confirmado_pct) : null),
+            // o mês em andamento entra, como no BI (Perda GPK mostra o parcial)
+            confirmado: serie.map(r=> r.confirmado_pct!=null ? n(r.confirmado_pct) : null),
           };
           PRODUCAO_KG_MENSAL = serie.map(r=>({
             mes: fmtMes(String(r.mes).slice(0,10)), peso_bruto_kg: n(r.peso_bruto_rebs), refugo_kg: n(r.refugo),
           }));
         }
+      }
+      // Cartões de apara do PERÍODO escolhido, como os cartões Apontado e
+      // Confirmado do BI (antes mostravam sempre o último mês da série).
+      if(!hubAparaPeriodoRes.error && (hubAparaPeriodoRes.data||[]).length){
+        const r = hubAparaPeriodoRes.data[0];
+        window.APARA_PERIODO = {
+          apontado: r.apontado_pct != null ? n(r.apontado_pct) : null,
+          confirmado: r.confirmado_pct != null ? n(r.confirmado_pct) : null,
+        };
+      }
+      // Série mensal real (meses fechados) das linhas de tendência dos
+      // cartões e do "TMR — últimos 12 meses" do detalhe da máquina.
+      if(!hubMensalRes.error && (hubMensalRes.data||[]).length){
+        const porMes = new Map(), porMaqMes = new Map();
+        const zero = () => ({ tot:0, prod:0, metros:0, plan:0, prodz:0, m2:0, hm2:0, perda:0 });
+        hubMensalRes.data.forEach(r=>{
+          const mes = String(r.mes).slice(0,7);
+          if(mes >= mesCorrente) return;          // mês aberto fica de fora da tendência
+          const t = porMes.get(mes) || zero();
+          t.tot += n(r.horas_totais); t.prod += n(r.horas_produzindo); t.metros += n(r.metros);
+          t.plan += n(r.planejado); t.prodz += n(r.produzido); t.m2 += n(r.m2); t.hm2 += n(r.horas_m2);
+          t.perda += n(r.perda_kg);
+          porMes.set(mes, t);
+          const id = chave(r.maquina);
+          const pm = porMaqMes.get(id) || new Map();
+          pm.set(mes, { tot: n(r.horas_totais), prod: n(r.horas_produzindo) });
+          porMaqMes.set(id, pm);
+        });
+        const meses = [...porMes.keys()].sort().slice(-12);
+        const razao = (a, b) => b > 0 ? a / b : null;
+        const col = f => meses.map(m => f(porMes.get(m)));
+        window.SERIE_MENSAL = {
+          meses,
+          tmr: col(t => razao(100*t.prod, t.tot)),
+          vel: col(t => razao(t.metros, 60*t.prod)),
+          ader: col(t => razao(100*t.prodz, t.plan)),
+          perdaT: col(t => t.perda/1000),
+          prodt: col(t => razao(t.m2, t.hm2)),
+          horasProd: col(t => t.prod),
+          planKm: col(t => t.plan/1000), realKm: col(t => t.prodz/1000), gapKm: col(t => (t.plan - t.prodz)/1000),
+          porMaq: new Map([...porMaqMes].map(([id, pm]) => [id, {
+            tmr: meses.map(m => { const x = pm.get(m); return x ? razao(100*x.prod, x.tot) : null; }),
+          }])),
+        };
+      }
+      if(!hubPerdaMaqMotivoRes.error){
+        const porMaqMotivo = new Map();
+        (hubPerdaMaqMotivoRes.data||[]).forEach(r=>{
+          const id = chave(r.maquina);
+          const lista = porMaqMotivo.get(id) || [];
+          lista.push({ nome: prettyCodigo(r.tipo), kg: n(r.kg) });
+          porMaqMotivo.set(id, lista);
+        });
+        window.PERDA_MAQ_MOTIVO = porMaqMotivo;
       }
       if(!hubFontesRes.error){
         const usadas = new Set(["machine_card.horas", "base_aparas.prod", "base_aparas.generico", "aderencia.diaria",
@@ -1839,15 +1887,24 @@ function aparasStatus(v){
 const statusLabel = { good:"Dentro da meta", warning:"Atenção", critical:"Crítico" };
 const statusCor   = { good:"var(--good)", warning:"var(--warning)", critical:"var(--critical)" };
 
+// Linha de tendência de uma série REAL. Mês sem dado quebra a linha; sem ao
+// menos dois pontos, não desenha nada ("" — nada de linha inventada).
 function sparkPath(data, w, h, pad=2){
-  const min = Math.min(...data), max = Math.max(...data);
+  if(!Array.isArray(data)) return "";
+  const vals = data.filter(v=> v != null && Number.isFinite(v));
+  if(vals.length < 2) return "";
+  const min = Math.min(...vals), max = Math.max(...vals);
   const range = (max-min)||1;
   const step = (w-pad*2)/(data.length-1);
+  let comeca = true;
   return data.map((v,i)=>{
+    if(v == null || !Number.isFinite(v)){ comeca = true; return ""; }
     const x = pad + i*step;
     const y = pad + (h-pad*2) * (1 - (v-min)/range);
-    return `${i===0?"M":"L"}${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(" ");
+    const cmd = comeca ? "M" : "L";
+    comeca = false;
+    return `${cmd}${x.toFixed(1)},${y.toFixed(1)}`;
+  }).filter(Boolean).join(" ");
 }
 
 function easeOutExpo(t){ return t===1 ? 1 : 1 - Math.pow(2, -10*t); }
@@ -2061,27 +2118,34 @@ function renderKpis(container, kpis){
     const div = document.createElement("div");
     div.className = "kpi";
     const uid = container.id + "-" + ki;
+    const semValor = k.value == null || !Number.isFinite(k.value);
     div.innerHTML = `
       <div class="kpi-label">${esc(k.label)}</div>
-      <div class="kpi-value mono" id="kv-${uid}">0${k.suffix||""}</div>
+      <div class="kpi-value mono" id="kv-${uid}">${semValor ? "—" : "0"+(k.suffix||"")}</div>
       <div class="kpi-delta ${k.dir}">${arrow} ${esc(k.delta)}</div>
       <svg class="kpi-spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
-        <path d="${path}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
+        ${path ? `<path d="${path}" fill="none" stroke="${color}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"
           stroke-dasharray="200" stroke-dashoffset="200">
           <animate attributeName="stroke-dashoffset" from="200" to="0" dur="1s" begin="${(0.15+ki*0.06).toFixed(2)}s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
-        </path>
+        </path>` : ""}
       </svg>`;
     container.appendChild(div);
-    setTimeout(()=> animateCount(div.querySelector(`#kv-${uid}`), k.value, k.suffix||"", k.decimals??0), 150 + ki*60);
+    if(!semValor) setTimeout(()=> animateCount(div.querySelector(`#kv-${uid}`), k.value, k.suffix||"", k.decimals??0), 150 + ki*60);
   });
 }
 
-/* Séries auxiliares para os sparklines dos KPIs */
-function wobble(base, amp, n=12){
-  const out=[]; let v=base;
-  for(let i=0;i<n;i++){ v += Math.sin(i*0.9+base)*amp*0.4 + (Math.random()-0.5)*amp; out.push(v); }
-  return out;
+/* Séries das linhas de tendência: só dado real (meses fechados, do hub).
+   Antes eram curvas sorteadas em volta do valor atual ("wobble") — pareciam
+   histórico e não eram. Sem série real, o cartão fica sem a linha. */
+function serieMensal(chave){
+  return window.SERIE_MENSAL ? window.SERIE_MENSAL[chave] || null : null;
 }
+function serieMaquina(id){
+  const s = window.SERIE_MENSAL && window.SERIE_MENSAL.porMaq.get(String(id).trim().toUpperCase());
+  return s ? s.tmr : null;
+}
+// "12,3%" ou "—": cartão de período sem medição não vira 0%.
+const fmtPct = v => v == null || !Number.isFinite(v) ? "—" : fmt1(v)+"%";
 
 /* Tudo abaixo lê MAQUINAS/TIPOS_PERDA/etc — só pode rodar depois que
    loadRealData()/applyFallback() já preencheram essas variáveis. Por isso
@@ -2093,8 +2157,10 @@ function renderDashboard(){
 // Último valor COM dado, não o último da série: as duas séries terminam em
 // meses diferentes, e ler a última posição pegava um mês vazio.
 const ultimoValido = arr => { for(let i=arr.length-1;i>=0;i--) if(arr[i]!=null) return arr[i]; return null; };
-const aparasMedia   = ultimoValido(APARAS_MENSAL.apontado);
-const confirmMedia  = ultimoValido(APARAS_MENSAL.confirmado);
+// Com o hub (003), apara do PERÍODO escolhido, como os cartões do BI; sem ele,
+// o último mês da série, como antes.
+const aparasMedia   = window.APARA_PERIODO ? window.APARA_PERIODO.apontado : ultimoValido(APARAS_MENSAL.apontado);
+const confirmMedia  = window.APARA_PERIODO ? window.APARA_PERIODO.confirmado : ultimoValido(APARAS_MENSAL.confirmado);
 // Máquina sem hora apontada no período entra como TMR 0% e derruba a
 // média de quem está rodando — a REB 03 (cadastrada e parada) e, desde que
 // a planilha passou a trazer só as rebobinadeiras, mais 10 outras. Média só
@@ -2111,17 +2177,17 @@ const perdaTotalKg  = TIPOS_PERDA.reduce((a,t)=>a+t.kg,0);
 
 const kpisGerais = [
   { label:"Apara apontada", value:aparasMedia, suffix:"%", decimals:1,
-    delta:`meta ${fmt1(META_APARAS)}% · confirmado ${fmt1(confirmMedia)}%`,
+    delta:`meta ${fmt1(META_APARAS)}% · confirmado ${fmtPct(confirmMedia)}`,
     dir: aparasMedia <= META_APARAS ? "up" : "down", spark: APARAS_MENSAL.apontado.slice() },
   { label:"TMR médio", value:tmrMedio, suffix:"%", decimals:1,
-    delta:"tempo de máquina rodando", dir:"up", spark: wobble(tmrMedio, 3) },
+    delta:"tempo de máquina rodando", dir:"up", spark: serieMensal("tmr") },
 ];
 if(produtividade != null){
   kpisGerais.push({ label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:0,
-    delta:"m² ÷ horas de máquina produzindo", dir:"up", spark: wobble(produtividade, 8) });
+    delta:"m² ÷ horas de máquina produzindo", dir:"up", spark: serieMensal("prodt") });
 }
 kpisGerais.push({ label:"Aderência ao plano", value:aderMedia, suffix:"%", decimals:1,
-    delta:"km lineares realizados ÷ planejados", dir: aderMedia>=90?"up":"down", spark: wobble(aderMedia, 4) });
+    delta:"km lineares realizados ÷ planejados", dir: aderMedia>=90?"up":"down", spark: serieMensal("ader") });
 renderKpis(document.getElementById("kpi-row"), kpisGerais);
 
 /* Gráfico principal: apara apontada x confirmada */
@@ -2194,9 +2260,9 @@ renderMotivoChart();
     const lista = filtro==="all" ? MAQUINAS : MAQUINAS.filter(m=>m.processo===filtro);
     grid.innerHTML = lista.map(m=>{
       const w=128,h=40;
-      const trend = wobble(m.tmr, 4, 7);
+      const trend = (serieMaquina(m.id) || []).slice(-7);   // últimos 7 meses fechados, reais
       const path = sparkPath(trend, w, h);
-      const area = path + ` L${w-2},${h-2} L2,${h-2} Z`;
+      const area = path ? path + ` L${w-2},${h-2} L2,${h-2} Z` : "";
       const st = tmrStatus(m.tmr);
       const cor = statusCor[st];
       // id do gradiente sem espaço: "url(#mg-REB 05)" é referência inválida e
@@ -2251,6 +2317,10 @@ renderMotivoChart();
 // Diferença do MESMO mês: o último com apontado e confirmado. O apontado do
 // mês aberto contra o confirmado do mês anterior comparava meses diferentes.
 function diferencaMesmoMes(){
+  if(window.APARA_PERIODO){   // com o hub: o próprio período escolhido
+    const { apontado: a, confirmado: c } = window.APARA_PERIODO;
+    return a != null && c != null ? c - a : null;
+  }
   const { apontado, confirmado } = APARAS_MENSAL;
   for(let i = apontado.length - 1; i >= 0; i--){
     if(apontado[i] != null && confirmado[i] != null) return confirmado[i] - apontado[i];
@@ -2259,13 +2329,14 @@ function diferencaMesmoMes(){
 }
 renderKpis(document.getElementById("aparas-kpis"), [
   { label:"Refugo total", value: perdaTotalKg/1000, suffix:" t", decimals:1,
-    delta:"acumulado do período", dir:"down", spark: wobble(perdaTotalKg/1000, 12) },
+    delta:"acumulado do período", dir:"down", spark: serieMensal("perdaT") },
   { label:"Apara apontada", value: aparasMedia, suffix:"%", decimals:1,
-    delta:`meta ${fmt1(META_APARAS)}%`, dir: aparasMedia<=META_APARAS?"up":"down", spark: APARAS_MENSAL.apontado.slice() },
+    delta:`meta ${fmt1(META_APARAS)}%`, dir: aparasMedia != null && aparasMedia<=META_APARAS?"up":"down", spark: APARAS_MENSAL.apontado.slice() },
   { label:"Apara confirmada", value: confirmMedia, suffix:"%", decimals:1,
     delta:"medição por balança", dir:"down", spark: APARAS_MENSAL.confirmado.slice() },
   { label:"Diferença apont. x conf.", value: diferencaMesmoMes(), suffix:" p.p.", decimals:1,
-    delta:"quanto o apontamento subestima", dir:"down", spark: wobble(1.1, .5) },
+    delta:"quanto o apontamento subestima", dir:"down",
+    spark: APARAS_MENSAL.confirmado.map((c,i)=> c != null && APARAS_MENSAL.apontado[i] != null ? c - APARAS_MENSAL.apontado[i] : null) },
 ]);
 
 hBarChart(document.getElementById("perda-tipo-chart"), TIPOS_PERDA.map(t=>({
@@ -2358,15 +2429,15 @@ hBarChart(document.getElementById("refugo-producao-chart"), REFUGO_PRODUCAO_MAQU
                  : MAQ_VEL.reduce((a,m)=>a+m.vel,0)/MAQ_VEL.length;
 
   const kpisProd = [
-    { label:"TMR médio", value:tmrMedio, suffix:"%", decimals:1, delta:"horas produzindo ÷ horas totais", dir:"up", spark: wobble(tmrMedio,3) },
+    { label:"TMR médio", value:tmrMedio, suffix:"%", decimals:1, delta:"horas produzindo ÷ horas totais", dir:"up", spark: serieMensal("tmr") },
   ];
   if(produtividade != null){
-    kpisProd.push({ label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:0, delta:"m² ÷ horas de máquina produzindo", dir:"up", spark: wobble(produtividade,8) });
+    kpisProd.push({ label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:0, delta:"m² ÷ horas de máquina produzindo", dir:"up", spark: serieMensal("prodt") });
   }
   if(velDisponivel){
-    kpisProd.push({ label:"Velocidade média", value:velMedia, suffix:" m/min", decimals:0, delta:"média ponderada das máquinas", dir:"flat", spark: wobble(velMedia,14) });
+    kpisProd.push({ label:"Velocidade média", value:velMedia, suffix:" m/min", decimals:0, delta:"média ponderada das máquinas", dir:"flat", spark: serieMensal("vel") });
   }
-  kpisProd.push({ label:"Horas produzindo", value:horasProd, suffix:" h", decimals:0, delta:`de ${fmt(horasTot)} h totais`, dir:"up", spark: wobble(horasProd/12,20) });
+  kpisProd.push({ label:"Horas produzindo", value:horasProd, suffix:" h", decimals:0, delta:`de ${fmt(horasTot)} h totais`, dir:"up", spark: serieMensal("horasProd") });
   renderKpis(document.getElementById("prod-kpis"), kpisProd);
 
   hBarChart(document.getElementById("tmr-chart"), MAQUINAS.slice().sort((a,b)=>b.tmr-a.tmr).map(m=>({
@@ -2424,10 +2495,10 @@ hBarChart(document.getElementById("refugo-producao-chart"), REFUGO_PRODUCAO_MAQU
   const planTot = window.HUB_TOTAIS ? window.HUB_TOTAIS.planKm : MAQUINAS.reduce((a,m)=>a+m.planKm,0);
   const realTot = window.HUB_TOTAIS ? window.HUB_TOTAIS.realKm : MAQUINAS.reduce((a,m)=>a+m.realKm,0);
   renderKpis(document.getElementById("ader-kpis"), [
-    { label:"Aderência ao plano", value: realTot/planTot*100, suffix:"%", decimals:1, delta:"km lineares realizados ÷ planejados", dir:"down", spark: wobble(aderMedia,4) },
-    { label:"Planejado", value: planTot, suffix:" km", decimals:0, delta:"programação do período", dir:"flat", spark: wobble(planTot/12,30) },
-    { label:"Realizado", value: realTot, suffix:" km", decimals:0, delta:"apontado pelas máquinas", dir:"up", spark: wobble(realTot/12,30) },
-    { label:"GAP", value: planTot-realTot, suffix:" km", decimals:0, delta:"o que faltou para o plano", dir:"down", spark: wobble((planTot-realTot)/12,8) },
+    { label:"Aderência ao plano", value: realTot/planTot*100, suffix:"%", decimals:1, delta:"km lineares realizados ÷ planejados", dir:"down", spark: serieMensal("ader") },
+    { label:"Planejado", value: planTot, suffix:" km", decimals:0, delta:"programação do período", dir:"flat", spark: serieMensal("planKm") },
+    { label:"Realizado", value: realTot, suffix:" km", decimals:0, delta:"apontado pelas máquinas", dir:"up", spark: serieMensal("realKm") },
+    { label:"GAP", value: planTot-realTot, suffix:" km", decimals:0, delta:"o que faltou para o plano", dir:"down", spark: serieMensal("gapKm") },
   ]);
 
   const holder = document.getElementById("ader-chart");
@@ -2632,102 +2703,27 @@ window.renderGanttForTheme = renderGantt;
 })();
 
 /* ============ VIEW: WIP & CARTEIRA ============ */
+// Nenhuma base real de WIP ou carteira está ligada ao painel. Esta visão
+// mostrava números montados no código (etapas e clientes fixos, "produzido"
+// = carteira × 0,86, "faturado" = × 0,79) e ainda exportava isso em CSV.
+// Regra do projeto: nunca mostrar dado fictício — fica "sem dados" até
+// uma base de WIP/carteira entrar no hub.
 (function(){
-  const wipTot = WIP_ETAPAS.reduce((a,w)=>a+w.metros,0);
-  const dcTot  = WIP_ETAPAS.reduce((a,w)=>a+w.dc,0);
-  const carteiraKg = CLASSIFICACOES.reduce((a,c)=>a+c.kg,0);
-  const produzidoKg = Math.round(carteiraKg*0.86);
-  const faturadoKg  = Math.round(carteiraKg*0.79);
-
   renderKpis(document.getElementById("wip-kpis"), [
-    { label:"WIP total", value: wipTot/1000, suffix:" km", decimals:1, delta:"metros lineares em processo", dir:"flat", spark: wobble(wipTot/1000,60) },
-    { label:"Dentro da carteira", value: dcTot/wipTot*100, suffix:"%", decimals:1, delta:`${fmt(dcTot/1000)} km com pedido firme`, dir:"up", spark: wobble(dcTot/wipTot*100,4) },
-    { label:"Carteira do mês", value: carteiraKg/1000, suffix:" t", decimals:1, delta:"quantidade de entrega prevista", dir:"flat", spark: wobble(carteiraKg/1000,20) },
-    { label:"Produzido", value: produzidoKg/1000, suffix:" t", decimals:1, delta:`${fmt1(produzidoKg/carteiraKg*100)}% da carteira`, dir:"up", spark: wobble(produzidoKg/1000,20) },
+    { label:"WIP total", value:null, suffix:" km", decimals:1, delta:"sem base de WIP ligada", dir:"flat", spark:null },
+    { label:"Dentro da carteira", value:null, suffix:"%", decimals:1, delta:"sem base de carteira ligada", dir:"flat", spark:null },
+    { label:"Carteira do mês", value:null, suffix:" t", decimals:1, delta:"sem base de carteira ligada", dir:"flat", spark:null },
+    { label:"Produzido", value:null, suffix:" t", decimals:1, delta:"sem base de carteira ligada", dir:"flat", spark:null },
   ]);
-
-  hBarChart(document.getElementById("wip-chart"), WIP_ETAPAS.map(w=>({
-    label:w.nome, value:w.metros, display: fmt1(w.metros/1000)+" km",
-    color:"var(--series-2)", color2:"var(--series-4)",
-    tip:`<b>${esc(w.nome)}</b><br>${fmt(w.metros)} m em processo<br>${fmt1(w.dc/w.metros*100)}% dentro da carteira`
-  })), { idPrefix:"wip", labelW:150, valueW:64, rowH:32, aria:"WIP por etapa" });
-
-  // Carteira x Produzido x Faturado por classificação
-  const holder = document.getElementById("carteira-chart");
-  const legend = document.getElementById("carteira-legend");
-  const cores = ["var(--series-2)","var(--series-4)","var(--good)"];
-  const nomes = ["Carteira","Produzido","Faturado"];
-  const W=460, rowH=46, gap=10, H=CLASSIFICACOES.length*(rowH+gap);
-  const labelW=150, barMax=W-labelW-52;
-  const maxKg = Math.max(...CLASSIFICACOES.map(c=>c.kg));
-
-  holder.innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Carteira, produzido e faturado por classificação">
-    ${CLASSIFICACOES.map((c,i)=>{
-      const y=i*(rowH+gap);
-      const vals=[c.kg, Math.round(c.kg*0.86), Math.round(c.kg*0.79)];
-      return `<g class="crow" data-i="${i}">
-        <rect x="-6" y="${y-3}" width="${W+6}" height="${rowH+6}" rx="6" fill="transparent"/>
-        <text x="0" y="${y+rowH/2+4}" font-size="10.5" fill="var(--text-secondary)" font-family="Public Sans">${esc(c.nome)}</text>
-        ${vals.map((v,vi)=>{
-          const bw=(v/maxKg)*barMax, by=y+vi*13;
-          return `<rect x="${labelW}" y="${by}" width="0" height="10" rx="2.5" fill="${cores[vi]}">
-            <animate attributeName="width" from="0" to="${bw.toFixed(1)}" dur="0.7s" begin="${(i*0.05+vi*0.06).toFixed(2)}s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
-          </rect>`;
-        }).join("")}
-        <text x="${W-2}" y="${y+rowH/2+4}" text-anchor="end" font-size="10.5" font-family="IBM Plex Mono, monospace" fill="var(--text-primary)" font-weight="600">${fmt(c.kg/1000)}t</text>
-      </g>`;
-    }).join("")}
-  </svg>`;
-  legend.innerHTML = nomes.map((n,i)=>`<span class="legend-item" style="cursor:default;"><span class="legend-dot" style="background:${cores[i]}"></span>${n}</span>`).join("");
-  holder.querySelectorAll(".crow").forEach(g=>{
-    const c = CLASSIFICACOES[+g.dataset.i];
-    g.addEventListener("mousemove", e=> attachTip(holder,
-      `<b>${esc(c.nome)}</b><br>Carteira ${fmt(c.kg)} kg<br>Produzido ${fmt(c.kg*0.86)} kg<br>Faturado ${fmt(c.kg*0.79)} kg`, e));
-    g.addEventListener("mouseleave", ()=> clearTip(holder));
-  });
-
-  // tabela WIP
-  const linhas = [];
-  CLIENTES.forEach((cli,ci)=>{
-    WIP_ETAPAS.slice(0,3).forEach((et,ei)=>{
-      if((ci+ei) % 2 === 0 || ci < 2){
-        const metros = Math.round(et.metros / (4+ci) * (1 - ei*0.18));
-        const dc = (ci+ei) % 3 !== 0;
-        linhas.push({
-          cliente: cli,
-          // guarda contra CLASSIFICACOES vazia: com o filtro de datas dá pra
-          // escolher um dia sem nenhum apontamento classificado, e
-          // "% 0" (módulo por zero) vira NaN — CLASSIFICACOES[NaN] é
-          // undefined e travava a tabela de WIP inteira.
-          classe: (CLASSIFICACOES[(ci+ei) % CLASSIFICACOES.length] || {nome:"—"}).nome,
-          etapa: et.nome,
-          carteira: Math.round(metros*0.42),
-          metros, dc
-        });
-      }
-    });
-  });
-  const tbody = document.querySelector("#wip-table tbody");
-  tbody.innerHTML = linhas.map(l=>`<tr>
-    <td>${esc(l.cliente)}</td>
-    <td>${esc(l.classe)}</td>
-    <td>${esc(l.etapa)}</td>
-    <td class="mono">${fmt(l.carteira)} kg</td>
-    <td class="mono">${fmt(l.metros)} m</td>
-    <td><span class="status-pill status-${l.dc?'good':'warning'}"><span class="dot" style="background:currentColor"></span>${l.dc?'DC — dentro':'FC — fora'}</span></td>
-  </tr>`).join("");
-
-  document.getElementById("wip-export").addEventListener("click", ()=>{
-    const header = "Cliente,Classificacao,Etapa,Carteira_kg,Metros_WIP,Situacao\n";
-    const csv = header + linhas.map(l=>
-      `"${l.cliente}","${l.classe}","${l.etapa}",${l.carteira},${l.metros},${l.dc?'DC':'FC'}`
-    ).join("\n");
-    const blob = new Blob([csv], { type:"text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url; a.download = `wip-carteira-${new Date().toISOString().slice(0,10)}.csv`;
-    document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
-  });
+  const vazio = `<div class="empty-state">Sem dados: nenhuma base de WIP ou carteira está ligada ao painel ainda.</div>`;
+  document.getElementById("wip-chart").innerHTML = vazio;
+  document.getElementById("carteira-chart").innerHTML = vazio;
+  document.getElementById("carteira-legend").innerHTML = "";
+  document.querySelector("#wip-table tbody").innerHTML =
+    `<tr><td colspan="6"><div class="empty-state">Sem dados de WIP por cliente.</div></td></tr>`;
+  const exportar = document.getElementById("wip-export");
+  exportar.disabled = true;
+  exportar.title = "Sem dados de WIP para exportar";
 })();
 
 /* ============ troca de views (menu lateral) ============ */
@@ -2756,13 +2752,17 @@ window.renderGanttForTheme = renderGantt;
   function open(m){
     titleEl.textContent = m.nome;
     eyebrowEl.textContent = m.processo + (m.rota!=="—" ? " · "+m.rota : "");
-    const trend = wobble(m.tmr, 4, 12);
+    // Histórico real (12 meses fechados, do hub). Antes era uma curva sorteada.
+    const trend = serieMaquina(m.id) || [];
     const w=300,h=90;
     const path = sparkPath(trend, w, h);
     const st = tmrStatus(m.tmr);
     const cor = statusCor[st];
-    const perdaMaq = Math.round(perdaTotalKg * (m.aparas/MAQUINAS.reduce((a,x)=>a+x.aparas,0)));
-    const topMotivos = TIPOS_PERDA.slice(0,4);
+    // Refugo da própria máquina no período, por motivo (hub). Antes era o
+    // total da fábrica repartido pela apara, em proporções fixas por motivo.
+    const idMaq = String(m.id).trim().toUpperCase();
+    const perdaMaq = window.PERDA_POR_MAQ ? Math.round(window.PERDA_POR_MAQ.get(idMaq) || 0) : null;
+    const topMotivos = window.PERDA_MAQ_MOTIVO ? (window.PERDA_MAQ_MOTIVO.get(idMaq) || []).slice(0,4) : [];
 
     bodyEl.innerHTML = `
       <div class="drawer-metrics">
@@ -2772,13 +2772,13 @@ window.renderGanttForTheme = renderGantt;
       </div>
 
       <div class="drawer-section-title">TMR — últimos 12 meses</div>
-      <svg width="100%" viewBox="0 0 ${w} ${h}" style="display:block;">
+      ${path ? `<svg width="100%" viewBox="0 0 ${w} ${h}" style="display:block;">
         <defs><linearGradient id="dg" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="${cor}" stop-opacity="0.3"/><stop offset="100%" stop-color="${cor}" stop-opacity="0"/>
         </linearGradient></defs>
         <path d="${path} L${w-2},${h-2} L2,${h-2} Z" fill="url(#dg)"/>
         <path d="${path}" fill="none" stroke="${cor}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
+      </svg>` : `<div class="empty-state">Sem histórico mensal desta máquina.</div>`}
 
       <div class="drawer-section-title">Indicadores do recurso</div>
       <div class="drawer-bars">
@@ -2803,11 +2803,11 @@ window.renderGanttForTheme = renderGantt;
       <div class="drawer-facas-item"><span>Horas totais</span><span class="mono">${fmt(m.horasTot)} h</span></div>
       <div class="drawer-facas-item"><span>Downtime</span><span class="mono">${fmt(m.horasTot-m.horasProd)} h</span></div>
 
-      <div class="drawer-section-title">Refugo — ${fmt(perdaMaq)} kg no período</div>
-      ${topMotivos.map((t,i)=>`<div class="drawer-facas-item">
-        <span>${t.cod ? `${t.cod} · ${esc(t.nome)}` : esc(t.nome)}</span>
-        <span class="mono">${fmt(perdaMaq * [0.34,0.26,0.22,0.18][i])} kg</span>
-      </div>`).join("")}
+      <div class="drawer-section-title">Refugo — ${perdaMaq == null ? "—" : fmt(perdaMaq) + " kg"} no período</div>
+      ${topMotivos.length ? topMotivos.map(t=>`<div class="drawer-facas-item">
+        <span>${esc(t.nome)}</span>
+        <span class="mono">${fmt(t.kg)} kg</span>
+      </div>`).join("") : `<div class="empty-state">Sem refugo por motivo desta máquina no período.</div>`}
     `;
 
     document.body.classList.add("no-scroll");
@@ -2866,10 +2866,16 @@ window.renderGanttForTheme = renderGantt;
   function answerFor(qRaw){
     const q = qRaw.toLowerCase();
     if(q.includes("apara") || q.includes("refugo") || q.includes("perda")){
-      return `A apara apontada fechou em <b>${fmt1(aparasMedia)}%</b> contra <b>${fmt1(confirmMedia)}%</b> confirmado na balança — uma diferença de ${fmt1(confirmMedia-aparasMedia)} p.p. que costuma indicar apontamento incompleto no chão de fábrica.<br><br>O maior ofensor é <b>${esc(maiorMotivo.nome)}</b> (${fmt(maiorMotivo.kg)} kg, ${fmt1(maiorMotivo.kg/perdaTotalKg*100)}% do refugo), e a máquina mais crítica é a <b>${esc(piorApara.nome)}</b> com ${fmt1(piorApara.aparas)}%.`;
+      const dif = diferencaMesmoMes();
+      return `No período, a apara apontada está em <b>${fmtPct(aparasMedia)}</b> e a confirmada na balança em <b>${fmtPct(confirmMedia)}</b>`
+        + (dif != null ? ` — ${fmt1(dif)} p.p. de diferença.` : ".")
+        + `<br><br>O maior ofensor é <b>${esc(maiorMotivo.nome)}</b> (${fmt(maiorMotivo.kg)} kg, ${fmt1(maiorMotivo.kg/perdaTotalKg*100)}% do refugo), e a máquina com maior apara é a <b>${esc(piorApara.nome)}</b> com ${fmt1(piorApara.aparas)}%.`;
     }
     if(q.includes("tmr") || q.includes("parada") || q.includes("disponib")){
-      return `O TMR médio das ${MAQUINAS.length} máquinas está em <b>${fmt1(tmrMedio)}%</b>. A <b>${esc(piorTMR.nome)}</b> (${esc(piorTMR.processo)}) é a mais crítica, com ${piorTMR.tmr}% — são ${fmt(piorTMR.horasTot-piorTMR.horasProd)} h de parada no período.<br><br>Olhando o Pareto, as paradas se concentram em <b>Parada Produtiva</b> e <b>Setup</b>; atacar o setup costuma dar o retorno mais rápido.`;
+      // as duas maiores paradas vêm do dado do período (antes o texto era fixo)
+      const topParadas = DOWNTIME.slice(0,2).map(d=>`<b>${esc(d.nome)}</b> (${fmt(d.horas)} h)`);
+      return `O TMR das ${MAQUINAS.length} máquinas está em <b>${fmt1(tmrMedio)}%</b>. A <b>${esc(piorTMR.nome)}</b> (${esc(piorTMR.processo)}) é a mais crítica, com ${piorTMR.tmr}% — são ${fmt(piorTMR.horasTot-piorTMR.horasProd)} h de parada no período.`
+        + (topParadas.length ? `<br><br>No período, as maiores paradas são ${topParadas.join(" e ")}.` : "");
     }
     if(q.includes("aderên") || q.includes("aderen") || q.includes("plano") || q.includes("planejad")){
       return `A aderência ao planejado está em <b>${fmt1(aderMedia)}%</b>. O gargalo é <b>${esc(piorProc.nome)}</b>, com ${fmt1(piorProc.pct)}% (${fmt(piorProc.realizado)} de ${fmt(piorProc.planejado)} km lineares).<br><br>Como corte fica no fim da rota, atraso em impressão e laminação se acumula ali — vale checar o WIP intermediário antes de replanejar.`;
@@ -2885,11 +2891,11 @@ window.renderGanttForTheme = renderGantt;
       return partProdutividade + partVelocidade;
     }
     if(q.includes("classific") || q.includes("produto") || q.includes("estrutura")){
-      return `Por classificação, a <b>${esc(piorClasse.nome)}</b> tem a maior apara: <b>${fmt1(piorClasse.aparas)}%</b> (meta ${fmt1(META_APARAS)}%). As estruturas laminadas mais simples ficam bem melhor — quanto mais camadas, mais acerto e mais refugo.`;
+      const melhorClasse = CLASSIFICACOES.slice().sort((a,b)=>a.aparas-b.aparas)[0];
+      return `Por classificação, a <b>${esc(piorClasse.nome)}</b> tem a maior apara: <b>${fmt1(piorClasse.aparas)}%</b> (meta ${fmt1(META_APARAS)}%). A menor é a <b>${esc(melhorClasse.nome)}</b>, com ${fmt1(melhorClasse.aparas)}%.`;
     }
     if(q.includes("wip") || q.includes("carteira") || q.includes("estoque")){
-      const wipTot = WIP_ETAPAS.reduce((a,w)=>a+w.metros,0);
-      return `Há <b>${fmt1(wipTot/1000)} km lineares</b> em WIP, sendo a maior parte em <b>${esc(WIP_ETAPAS[0].nome)}</b> (${fmt1(WIP_ETAPAS[0].metros/1000)} km). Material fora da carteira (FC) é o que mais preocupa: já consumiu capacidade sem pedido firme associado.`;
+      return `Ainda não tenho WIP nem carteira: nenhuma base desse tipo está ligada ao painel.`;
     }
     if(q.includes("máquina") || q.includes("maquina") || q.includes("pior") || q.includes("problema") || q.includes("crític")){
       return `Os dois pontos que mais pesam agora:<br><br>1. <b>${esc(piorTMR.nome)}</b> — TMR de apenas ${piorTMR.tmr}%, puxando a disponibilidade geral para baixo.<br>2. <b>${esc(piorApara.nome)}</b> — ${fmt1(piorApara.aparas)}% de apara, bem acima da meta de ${fmt1(META_APARAS)}%.<br><br>Se for para priorizar um, comece pela ${esc(piorApara.nome)}: refugo vira perda de material, não só de tempo.`;
