@@ -166,7 +166,7 @@ Uma vez só, nesta ordem:
    período, séries mensais reais e refugo por máquina e motivo). Tem de
    mostrar `funcoes_ok = true`. Não precisa publicar de novo.
 
-Feitos: 1 a 3 em 25/09, 4 e 5 em 30/09. Falta o 6.
+Feitos: 1 a 3 em 25/09, 4 a 6 em 30/09.
 
 ### Conferência com o motor do BI (30/09)
 
@@ -194,6 +194,20 @@ horas por parada; OPs com mais refugo; apara por classificação; séries do
 gráfico Aparas GPK; produção mensal; totais de TMR, velocidade e aderência.
 O BI não tem TMR de 2025 (a tabela MachineCard dele começa em 2026); o painel
 tem, pelo Machine Card de 2025.
+
+Depois do 003 aplicado (30/09, tarde), a mesma conferência no Supabase real:
+428 de 452 iguais. O resto:
+
+- 13 casos de máquina sem programação no mês (Revisora 01, Coating 01 em
+  mai–jun, R12 depois de julho): o BI mostra 0,00%, o painel deixa sem valor
+  (regra do projeto: sem dado não é 0%). Mês inteiro sem programação (out/25,
+  antes da base de aderência) mostra "Sem dados de programação no período".
+- 3 casos de motivo de perda em branco: mesmo kg; o painel chama de "Sem
+  motivo informado".
+- 8 casos em set/26, mês em andamento, todos de horário: o BI foi atualizado
+  às 09:53; a Refugo Aparas (confirmada) e a Aderência Semanal foram gravadas
+  depois, e o BI lê a Perda Sistêmica direto do banco, então tem as perdas de
+  hoje que a Base Aparas ainda não tinha. Até o dia anterior, perda igual.
 
 Depois disso cada execução publica sozinha. `uv run hub publicar` também
 serve pra reenviar tudo se o dado do Supabase se perder. Com
@@ -277,11 +291,13 @@ aguardando, divergente, validado.
 
 ## Próximos passos
 
-1. Rodar o `002_cartoes.sql` e `uv run hub publicar` (passos 4 e 5 de
-   "Publicar no painel"). Com isso nenhum cartão depende mais do Google
-   Drive, a não ser a lista de máquinas e grupos, que ainda vem do fluxo antigo.
+1. Lista de máquinas e grupos: é o que ainda vem do fluxo antigo (Google
+   Drive); todos os números já saem do hub (002 e 003 aplicados em 30/09).
 2. Produtividade: o painel mostra m² ÷ hora de máquina. A do BI (m² ÷ hora
    trabalhada) depende de duas planilhas paradas (Produção M² em jan/2026,
    Disponibilidade em fev/2026) e da planilha de horas de pessoas.
 3. Desligar o fluxo antigo (Google Drive + GitHub Actions) quando o dono
    confirmar que o painel pelo hub está certo.
+4. Opcional: ler as consultas do SQL Server direto (só leitura), como o BI
+   já faz com a Perda Sistêmica. O dia corrente ficaria igual ao BI sem
+   depender de a planilha ser salva.

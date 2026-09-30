@@ -1428,7 +1428,7 @@ function calcAderenciaProcesso(maquinas){
     const ms = maquinas.filter(m=>m.processo===p);
     const planejado = ms.reduce((a,m)=>a+m.planKm,0);
     const realizado = ms.reduce((a,m)=>a+m.realKm,0);
-    return { nome:p, planejado, realizado, pct: planejado>0 ? realizado/planejado*100 : 0 };
+    return { nome:p, planejado, realizado, pct: planejado>0 ? realizado/planejado*100 : null };
   });
 }
 
@@ -1579,7 +1579,7 @@ async function loadRealData(periodoDe, periodoAte){
         aparas: pesoBruto>0 ? kgPerda/pesoBruto*100 : 0,
         horasProd: Math.round(horasProd), horasTot: Math.round(horasTot),
         planKm: Math.round(planKm), realKm: Math.round(realKm),
-        aderencia: planKm>0 ? realKm/planKm*100 : 0,
+        aderencia: planKm>0 ? realKm/planKm*100 : null,
       };
     }).filter(m=> PROCESSOS.includes(m.processo));
     if(MAQUINAS.length === 0) throw new Error("Nenhuma máquina com grupo físico reconhecido");
@@ -1742,7 +1742,8 @@ async function loadRealData(periodoDe, periodoAte){
         // quantidades da Aderência em metros (o BI divide por 1000 pra mostrar km)
         m.planKm = Math.round(n(h.planejado)/1000);
         m.realKm = Math.round(n(h.produzido)/1000);
-        m.aderencia = n(h.planejado)>0 ? n(h.produzido)/n(h.planejado)*100 : 0;
+        // sem programação no período não é 0%: fica sem valor (o BI deixa em branco)
+        m.aderencia = n(h.planejado)>0 ? n(h.produzido)/n(h.planejado)*100 : null;
       });
       // Cartões gerais somam todas as máquinas do período, como os cartões do BI
       // (média de percentuais não é o número do BI).
@@ -1751,7 +1752,7 @@ async function loadRealData(periodoDe, periodoAte){
         tmr: soma("horas_totais")>0 ? soma("horas_produzindo")/soma("horas_totais")*100 : 0,
         vel: soma("horas_produzindo")>0 ? soma("metros")/soma("horas_produzindo")/60 : null,
         planKm: soma("planejado")/1000, realKm: soma("produzido")/1000,
-        aderencia: soma("planejado")>0 ? soma("produzido")/soma("planejado")*100 : 0,
+        aderencia: soma("planejado")>0 ? soma("produzido")/soma("planejado")*100 : null,
       };
       PRODUTIVIDADE = soma("horas_m2")>0 ? soma("m2")/soma("horas_m2") : null;
       ADERENCIA_PROCESSO = calcAderenciaProcesso(MAQUINAS);
@@ -1828,7 +1829,9 @@ async function loadRealData(periodoDe, periodoAte){
           perdaT: col(t => t.perda/1000),
           prodt: col(t => razao(t.m2, t.hm2)),
           horasProd: col(t => t.prod),
-          planKm: col(t => t.plan/1000), realKm: col(t => t.prodz/1000), gapKm: col(t => (t.plan - t.prodz)/1000),
+          // mês sem programação fica sem ponto (não é plano zero)
+          planKm: col(t => t.plan > 0 ? t.plan/1000 : null), realKm: col(t => t.plan > 0 ? t.prodz/1000 : null),
+          gapKm: col(t => t.plan > 0 ? (t.plan - t.prodz)/1000 : null),
           porMaq: new Map([...porMaqMes].map(([id, pm]) => [id, {
             tmr: meses.map(m => { const x = pm.get(m); return x ? razao(100*x.prod, x.tot) : null; }),
           }])),
@@ -2171,7 +2174,7 @@ const baseTmr       = MAQ_ATIVAS.length ? MAQ_ATIVAS : MAQUINAS;
 // Com o hub, TMR e aderência são os totais do período (como os cartões do BI).
 const tmrMedio      = window.HUB_TOTAIS ? window.HUB_TOTAIS.tmr : baseTmr.reduce((a,m)=>a+m.tmr,0)/baseTmr.length;
 const aderMedia     = window.HUB_TOTAIS ? window.HUB_TOTAIS.aderencia
-                                        : ADERENCIA_PROCESSO.reduce((a,p)=>a+p.pct,0)/ADERENCIA_PROCESSO.length;
+                                        : (ps => ps.length ? ps.reduce((a,p)=>a+p.pct,0)/ps.length : null)(ADERENCIA_PROCESSO.filter(p=>p.pct != null));
 const produtividade = PRODUTIVIDADE; // m²/h — null quando nenhuma base carregada traz essa métrica
 const perdaTotalKg  = TIPOS_PERDA.reduce((a,t)=>a+t.kg,0);
 
@@ -2494,18 +2497,23 @@ hBarChart(document.getElementById("refugo-producao-chart"), REFUGO_PRODUCAO_MAQU
   // as da programação no período, como o cartão do BI.
   const planTot = window.HUB_TOTAIS ? window.HUB_TOTAIS.planKm : MAQUINAS.reduce((a,m)=>a+m.planKm,0);
   const realTot = window.HUB_TOTAIS ? window.HUB_TOTAIS.realKm : MAQUINAS.reduce((a,m)=>a+m.realKm,0);
+  // período sem programação (ex.: antes da base de aderência começar): "—", não 0 km
+  const semPlano = !(planTot > 0);
   renderKpis(document.getElementById("ader-kpis"), [
-    { label:"Aderência ao plano", value: realTot/planTot*100, suffix:"%", decimals:1, delta:"km lineares realizados ÷ planejados", dir:"down", spark: serieMensal("ader") },
-    { label:"Planejado", value: planTot, suffix:" km", decimals:0, delta:"programação do período", dir:"flat", spark: serieMensal("planKm") },
-    { label:"Realizado", value: realTot, suffix:" km", decimals:0, delta:"apontado pelas máquinas", dir:"up", spark: serieMensal("realKm") },
-    { label:"GAP", value: planTot-realTot, suffix:" km", decimals:0, delta:"o que faltou para o plano", dir:"down", spark: serieMensal("gapKm") },
+    { label:"Aderência ao plano", value: semPlano ? null : realTot/planTot*100, suffix:"%", decimals:1, delta:"km lineares realizados ÷ planejados", dir:"down", spark: serieMensal("ader") },
+    { label:"Planejado", value: semPlano ? null : planTot, suffix:" km", decimals:0, delta:"programação do período", dir:"flat", spark: serieMensal("planKm") },
+    { label:"Realizado", value: semPlano ? null : realTot, suffix:" km", decimals:0, delta:"apontado pelas máquinas", dir:"up", spark: serieMensal("realKm") },
+    { label:"GAP", value: semPlano ? null : planTot-realTot, suffix:" km", decimals:0, delta:"o que faltou para o plano", dir:"down", spark: serieMensal("gapKm") },
   ]);
 
   const holder = document.getElementById("ader-chart");
-  const dados = MAQUINAS.map(m=>({ nome:m.nome, plan:m.planKm, real:m.realKm, pct:m.aderencia }));
+  // só máquinas com programação no período; sem plano, a barra seria 0 ÷ 0
+  const dados = MAQUINAS.filter(m=>m.aderencia != null && m.planKm > 0)
+                        .map(m=>({ nome:m.nome, plan:m.planKm, real:m.realKm, pct:m.aderencia }));
   const W=700, colW = W/dados.length, H=210, padB=34, padT=10, plotH=H-padB-padT;
   const maxV = Math.max(...dados.map(d=>d.plan));
-  holder.innerHTML = `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Planejado contra realizado por máquina">
+  holder.innerHTML = !dados.length ? `<div class="empty-state">Sem dados de programação no período.</div>`
+    : `<svg width="100%" viewBox="0 0 ${W} ${H}" role="img" aria-label="Planejado contra realizado por máquina">
     <style>.acol:hover .abar{ filter:brightness(1.1); }</style>
     ${[0,0.5,1].map(f=>{
       const y=padT+plotH*(1-f);
@@ -2536,19 +2544,20 @@ hBarChart(document.getElementById("refugo-producao-chart"), REFUGO_PRODUCAO_MAQU
   });
 
   document.getElementById("proc-grid").innerHTML = ADERENCIA_PROCESSO.map(p=>{
-    const st = p.pct>=88 ? "good" : p.pct>=82 ? "warning" : "critical";
-    const R=32, C=2*Math.PI*R, off=C*(1-p.pct/100);
+    const semValor = p.pct == null;   // processo sem programação no período
+    const st = semValor ? null : p.pct>=88 ? "good" : p.pct>=82 ? "warning" : "critical";
+    const R=32, C=2*Math.PI*R, off=semValor ? C : C*(1-p.pct/100);
     return `<div class="proc-card glass-live">
       <svg width="86" height="86" viewBox="0 0 86 86">
         <circle cx="43" cy="43" r="${R}" fill="none" stroke="var(--surface-sunken)" stroke-width="8"/>
-        <circle cx="43" cy="43" r="${R}" fill="none" stroke="${statusCor[st]}" stroke-width="8" stroke-linecap="round"
+        ${semValor ? "" : `<circle cx="43" cy="43" r="${R}" fill="none" stroke="${statusCor[st]}" stroke-width="8" stroke-linecap="round"
           stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${C.toFixed(1)}" transform="rotate(-90 43 43)">
           <animate attributeName="stroke-dashoffset" from="${C.toFixed(1)}" to="${off.toFixed(1)}" dur="1s" fill="freeze" calcMode="spline" keySplines="0.22 1 0.36 1" keyTimes="0;1"/>
-        </circle>
-        <text x="43" y="48" text-anchor="middle" font-size="17" font-weight="700" fill="var(--text-primary)" font-family="IBM Plex Mono, monospace">${Math.round(p.pct)}%</text>
+        </circle>`}
+        <text x="43" y="48" text-anchor="middle" font-size="17" font-weight="700" fill="var(--text-primary)" font-family="IBM Plex Mono, monospace">${semValor ? "—" : Math.round(p.pct)+"%"}</text>
       </svg>
       <div class="proc-name">${esc(p.nome)}</div>
-      <div class="proc-sub mono">${fmt(p.realizado)} / ${fmt(p.planejado)} km</div>
+      <div class="proc-sub mono">${semValor ? "sem programação no período" : `${fmt(p.realizado)} / ${fmt(p.planejado)} km`}</div>
     </div>`;
   }).join("");
 })();
@@ -2657,6 +2666,11 @@ window.renderGanttForTheme = renderGantt;
   if(!holder) return;
   const dados = DOWNTIME.map(d=>({ nome:d.nome, horas:d.horas, cor: isDark()?d.corDark:d.cor }));
   const tot = dados.reduce((a,d)=>a+d.horas,0);
+  // período sem parada apontada: sem isso os eixos viram "-Infinityh"
+  if(!(tot > 0)){
+    holder.innerHTML = `<div class="empty-state">Sem paradas apontadas no período.</div>`;
+    return;
+  }
   let acc = 0;
   dados.forEach(d=>{ acc += d.horas; d.acum = acc/tot*100; });
 
@@ -2861,7 +2875,7 @@ window.renderGanttForTheme = renderGantt;
   const piorApara = MAQUINAS.slice().sort((a,b)=>b.aparas-a.aparas)[0];
   const maiorMotivo = TIPOS_PERDA[0];
   const piorClasse = CLASSIFICACOES.slice().sort((a,b)=>b.aparas-a.aparas)[0];
-  const piorProc  = ADERENCIA_PROCESSO.slice().sort((a,b)=>a.pct-b.pct)[0];
+  const piorProc  = ADERENCIA_PROCESSO.filter(p=>p.pct != null).sort((a,b)=>a.pct-b.pct)[0];
 
   function answerFor(qRaw){
     const q = qRaw.toLowerCase();
@@ -2878,6 +2892,8 @@ window.renderGanttForTheme = renderGantt;
         + (topParadas.length ? `<br><br>No período, as maiores paradas são ${topParadas.join(" e ")}.` : "");
     }
     if(q.includes("aderên") || q.includes("aderen") || q.includes("plano") || q.includes("planejad")){
+      if(aderMedia == null || !piorProc)
+        return "Não há programação no período escolhido, então não tenho como calcular a aderência ao plano.";
       return `A aderência ao planejado está em <b>${fmt1(aderMedia)}%</b>. O gargalo é <b>${esc(piorProc.nome)}</b>, com ${fmt1(piorProc.pct)}% (${fmt(piorProc.realizado)} de ${fmt(piorProc.planejado)} km lineares).<br><br>Como corte fica no fim da rota, atraso em impressão e laminação se acumula ali — vale checar o WIP intermediário antes de replanejar.`;
     }
     if(q.includes("velocidad") || q.includes("produtiv") || q.includes("vazão") || q.includes("vazao")){
