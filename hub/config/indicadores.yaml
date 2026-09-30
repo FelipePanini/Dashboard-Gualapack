@@ -138,15 +138,17 @@ indicadores:
     dono: Aparas
     definicao: >
       Soma dos kg de perda apontados (código 40), a base do gráfico Perda por
-      Motivos. Confere os dois BIs entre si e com a BASE_DETALHE do Base Aparas.
+      Motivos. Confere o BI Indicadores Produção com a BASE_DETALHE do Base Aparas.
     fonte_oficial: pbi_ind.perda_sistemica
     tolerancia_pct: 0.005
     status_definicao: oficial
+    notas: >
+      Até 30/09 conferia também o BI Dados de Produção. Nessa data o dono
+      manteve na tabela Dados os filtros de WIP e REVISÃO, que tiram a perda
+      dessas OPs: os dois BIs passam a diferir por definição.
     medicoes:
       - fonte: pbi_ind.perda_sistemica
         regra: indicadores/perda_kg_bi_indicadores.sql
-      - fonte: pbi.apontamentos
-        regra: indicadores/perda_kg_bi_dados.sql
       - fonte: hub.calculo
         regra: indicadores/perda_kg_planilha.sql
         usa: [base_aparas.generico, base_aparas_2025.detalhe]
@@ -185,7 +187,7 @@ indicadores:
         regra: indicadores/tmr_referencia.sql
       - fonte: hub.calculo
         regra: indicadores/tmr_hub.sql
-        usa: [pbi.apontamentos, indicadores.classificacao]
+        usa: [machine_card.horas, machine_card_2025.horas]
 
   - codigo: SETUP_PCT
     versao: 1
@@ -203,7 +205,7 @@ indicadores:
         regra: indicadores/setup_referencia.sql
       - fonte: hub.calculo
         regra: indicadores/setup_hub.sql
-        usa: [pbi.apontamentos, indicadores.classificacao]
+        usa: [machine_card.horas, machine_card_2025.horas]
 
   - codigo: INATIVO_PCT
     versao: 1
@@ -221,7 +223,7 @@ indicadores:
         regra: indicadores/inativo_referencia.sql
       - fonte: hub.calculo
         regra: indicadores/inativo_hub.sql
-        usa: [pbi.apontamentos, indicadores.classificacao]
+        usa: [machine_card.horas, machine_card_2025.horas]
 
   - codigo: HORAS_APONTADAS
     versao: 2

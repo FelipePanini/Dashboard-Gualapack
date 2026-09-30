@@ -1,21 +1,19 @@
--- Horas por mês × recorte × classe oficial: a base dos indicadores de TMR.
+-- Horas por mês × recorte × classe: a base da conferência do Gráficos
+-- Tendência (TMR_GRAFICOS_PCT, SETUP_PCT, INATIVO_PCT).
 --
--- Vem do BI (tabela Dados do .pbix), não da Base Apontamento do Excel.
--- Decidido por evidência em 24/09: a Base Apontamento do Indicadores Diário
--- está com apontamentos faltando (R18 em agosto: 171 h a menos; Roto: menos
--- da metade das horas), e o BI tem o mês inteiro. Com o BI, o TMR bate com o
--- Gráficos Tendência (Corte igual em todos os meses; R18, L04 e Roto com
--- erro médio abaixo de 0,3 p.p.). A diferença entre as duas cópias aparece
--- no indicador HORAS_APONTADAS.
--- Código sem cadastro entra como 'SEM CLASSIFICACAO'.
+-- Vem da tabela Horas do Machine Card, que tem todo o tempo de máquina, com a
+-- classe de cada apontamento. Até 30/09 vinha da tabela Dados do BI Dados de
+-- Produção; nessa data o dono manteve nela os filtros de WIP e REVISÃO, que
+-- também tiram as paradas sem OP (Processo vazio) — sem elas o TMR sobe. A
+-- Base Apontamento do Excel tem o mesmo filtro e por isso também não serve.
+-- Classe vazia entra como 'SEM CLASSIFICACAO'.
 create or replace table clean.horas_classe as
 select date_trunc('month', a.dia)::date           as periodo,
        rm.recorte,
-       coalesce(c.classe, 'SEM CLASSIFICACAO')    as classe,
+       coalesce(a.classe, 'SEM CLASSIFICACAO')    as classe,
        sum(a.horas)                               as horas
-from clean.pbi_apontamento a
-join cfg.recorte_maquina rm     on rm.maquina = a.maquina
-left join clean.classificacao c on c.cod = a.cod_apont
+from clean.machine_card a
+join cfg.recorte_maquina rm on rm.maquina = a.maquina
 cross join cfg.parametros p
 where year(a.dia) = p.ano
 group by all;
