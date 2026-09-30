@@ -668,6 +668,13 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
 /* ---------- views ---------- */
 .view{ display:none; }
 .view.active{ display:block; animation: view-in .45s var(--ease); }
+/* falha ao carregar do banco: só o aviso, nenhuma tela com número */
+.content.sem-dados > .view{ display:none !important; }
+.falha-carga{ max-width:640px; margin:48px auto; padding:28px 30px; }
+.falha-carga h2{ font-size:18px; margin:0 0 10px; color:var(--text-primary); }
+.falha-carga p{ color:var(--text-secondary); font-size:13.5px; line-height:1.55; margin:0 0 16px; }
+.falha-carga .falha-acoes{ display:flex; gap:10px; flex-wrap:wrap; }
+.falha-carga .falha-detalhe{ margin:18px 0 0; font-size:11.5px; color:var(--text-muted); word-break:break-word; }
 @keyframes view-in{ from{ opacity:0; transform:translateY(10px); } to{ opacity:1; transform:none; } }
 .view > section.panel, .view > section.grid-2, .view > section.kpi-row{ margin-bottom:16px; }
 .view > section:last-child{ margin-bottom:0; }
@@ -1466,10 +1473,14 @@ function applyFallback(){
 // voltar um dia, dependendo da hora e do fuso do navegador).
 function isoDate(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 
+// Devolve o erro quando não consegue carregar (quem chama tenta de novo e,
+// se falhar outra vez, mostra o aviso de falha), ou nada quando carregou.
 async function loadRealData(periodoDe, periodoAte){
   const cfg = window.SUPABASE_CONFIG;
-  const configured = cfg && !cfg.url.includes("SEU-PROJETO") && window.gualapackAuth;
-  if(!configured){ applyFallback(); return; }
+  // Valores de referência só na pré-visualização local, sem Supabase
+  // configurado. Com o Supabase, falha vira aviso, nunca número de exemplo.
+  if(!cfg || cfg.url.includes("SEU-PROJETO")){ applyFallback(); return null; }
+  if(!window.gualapackAuth) return new Error("o cliente do Supabase não carregou");
 
   const client = window.gualapackAuth;
   // p_ate é EXCLUSIVO (bate com o "< p_ate" das funções no banco) — pra
@@ -1525,7 +1536,12 @@ async function loadRealData(periodoDe, periodoAte){
       client.rpc("rpc_hub_mensal", { p_meses: 13 }),
       client.rpc("rpc_hub_perda_maquina_motivo", { p_de: pDe, p_ate: pAte }),
     ]);
-    const erro = [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes].find(r=>r.error);
+    // Com o hub publicado (002), das consultas antigas só a lista de máquinas
+    // ainda é necessária: as outras têm equivalente no hub. Em 30/09 um 401
+    // e um 500 nelas derrubaram o painel inteiro pros valores de referência.
+    const HUB_ATIVO = !hubMaqRes.error && (hubMaqRes.data||[]).length > 0 && "metros" in hubMaqRes.data[0];
+    const essenciais = HUB_ATIVO ? [maqRes] : [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes];
+    const erro = essenciais.find(r=>r.error);
     if(erro) throw erro.error;
     if(!maqRes.data || maqRes.data.length === 0) throw new Error("v_maquinas_resumo veio vazia");
 
@@ -1648,10 +1664,11 @@ async function loadRealData(periodoDe, periodoAte){
         confirmado: mesesOrdenados.map(m=> porMes.get(m).confirmado ?? null),
       };
     }else{
-      // histórico real curto demais pra formar uma série — usa a referência
-      // só nesse gráfico, sem afetar o resto do painel real.
-      MESES = FALLBACK.MESES.slice();
-      APARAS_MENSAL = { apontado: FALLBACK.APARAS_MENSAL.apontado.slice(), confirmado: FALLBACK.APARAS_MENSAL.confirmado.slice() };
+      // histórico real curto demais pra formar uma série: gráfico sem dados
+      // (antes caía na série de referência, que parecia real). Com o hub, a
+      // série vem de v_hub_apara_mensal mais abaixo.
+      MESES = [];
+      APARAS_MENSAL = { apontado: [], confirmado: [] };
     }
 
     OPS = (opsRes.data||[]).slice(0,12).map(r=>({
@@ -1691,7 +1708,8 @@ async function loadRealData(periodoDe, periodoAte){
     }
 
     // Refugo por máquina / produção em kg — erro aqui não trava o resto do
-    // painel, só esses dois gráficos caem na referência.
+    // painel, só esses dois gráficos ficam sem dados (com o hub, eles vêm dele
+    // mais abaixo).
     try{
       if(refugoProdRes.error) throw refugoProdRes.error;
       if(producaoKgRes.error) throw producaoKgRes.error;
@@ -1703,9 +1721,9 @@ async function loadRealData(periodoDe, periodoAte){
         peso_bruto_kg: Number(r.peso_bruto_kg)||0, refugo_kg: Number(r.refugo_kg)||0,
       }));
     }catch(err){
-      console.error("Falha ao carregar refugo por máquina / produção em kg — usando referência só nesses gráficos:", err);
-      REFUGO_PRODUCAO_MAQUINA = FALLBACK.REFUGO_PRODUCAO_MAQUINA.map(r=>({...r}));
-      PRODUCAO_KG_MENSAL = FALLBACK.PRODUCAO_KG_MENSAL.map(p=>({...p}));
+      console.error("Falha ao carregar refugo por máquina / produção em kg — esses gráficos ficam sem dados:", err);
+      REFUGO_PRODUCAO_MAQUINA = [];
+      PRODUCAO_KG_MENSAL = [];
     }
 
     // ===== Cartões pelo data hub: regras do BI Indicadores Produção =====
@@ -1858,9 +1876,12 @@ async function loadRealData(periodoDe, periodoAte){
     }
 
     USANDO_DADOS_REAIS = true;
+    return null;
   }catch(err){
-    console.error("Falha ao carregar dados reais do painel — usando referência:", err);
-    applyFallback();
+    // Não cai mais nos valores de referência: pareciam dado real e só o selo
+    // "Referência" do topo avisava (regra do projeto: nunca dado fictício).
+    console.error("Falha ao carregar dados reais do painel:", err);
+    return err || new Error("falha desconhecida");
   }
 }
 
@@ -1949,6 +1970,10 @@ function clearTip(holder){
    Gráfico de barras horizontais reutilizável
    ------------------------------------------------------------------------- */
 function hBarChart(holder, rows, opts={}){
+  if(!rows.length){
+    holder.innerHTML = `<div class="empty-state">Sem dados no período.</div>`;
+    return;
+  }
   const labelW = opts.labelW ?? 130;
   const valueW = opts.valueW ?? 62;
   const rowH = opts.rowH ?? 30, gap = 8;
@@ -2967,7 +2992,7 @@ if(dataTag){
 const footerNote = document.getElementById("footer-note");
 if(footerNote){
   footerNote.innerHTML = USANDO_DADOS_REAIS
-    ? `Painel interno de Produção &middot; Gualapack Jaguariúna &middot; indicadores, máquinas e motivos de perda vêm das bases reais de Produção, sincronizadas diariamente &mdash; WIP &amp; Carteira ainda usa dados de referência (ver aviso na própria aba).`
+    ? `Painel interno de Produção &middot; Gualapack Jaguariúna &middot; indicadores, máquinas e motivos de perda vêm das bases reais de Produção, sincronizadas diariamente &mdash; WIP &amp; Carteira ainda não tem base ligada (ver aviso na própria aba).`
     : `Painel interno de Produção &middot; Gualapack Jaguariúna &middot; indicadores, máquinas e motivos de perda espelhados dos BIs de Produção &mdash; valores numéricos de referência até a conexão com a fonte de dados.`;
 }
 
@@ -3053,8 +3078,17 @@ if(footerNote){
   const label = document.getElementById("live-label");
 
   function refreshStatus(){
-    const real = window.USANDO_DADOS_REAIS === true;
+    // "let" no topo do script não vira window.USANDO_DADOS_REAIS: lido assim,
+    // era sempre undefined e o status dizia "Referência" com dado real.
+    const real = USANDO_DADOS_REAIS === true;
     btn.setAttribute("aria-pressed", String(real));
+    if(window.FALHA_CARGA){
+      dot.style.background = "var(--critical)";
+      dot.style.animationPlayState = "paused";
+      label.textContent = "Sem dados";
+      btn.title = "A leitura do banco falhou; nenhum número é mostrado.";
+      return;
+    }
     dot.style.background = real ? "var(--good)" : "var(--text-muted)";
     dot.style.animationPlayState = real ? "running" : "paused";
     // "Atualizado" era sempre verde quando o dado vinha do Supabase, mesmo
@@ -3308,11 +3342,49 @@ function periodoDaUrl(){
 }
 function addDaysGlobal(d,n){ const r=new Date(d); r.setDate(r.getDate()+n); return r; }
 
+/* Leitura do banco falhou duas vezes: nenhum número na tela, só o aviso.
+   Antes o painel desenhava os valores de referência como se fossem reais. */
+function mostrarFalhaCarga(err){
+  window.FALHA_CARGA = err;
+  USANDO_DADOS_REAIS = false;
+  document.querySelector(".content").classList.add("sem-dados");
+  const fab = document.getElementById("assistant-fab");
+  if(fab) fab.style.display = "none";   // o CSS do botão passa por cima do "hidden"
+  const tag = document.getElementById("data-source-tag");
+  if(tag){
+    tag.innerHTML = `<span class="dot"></span>Sem dados &middot; falha ao carregar`;
+    tag.title = "O painel não conseguiu ler o banco; nenhum número é mostrado.";
+    tag.style.borderColor = "var(--critical)";
+  }
+  const detalhe = String((err && (err.message || err.code)) || err || "").slice(0, 160);
+  const aviso = document.createElement("section");
+  aviso.className = "panel falha-carga";
+  aviso.setAttribute("role", "alert");
+  aviso.innerHTML = `<h2>Não consegui carregar os dados do painel</h2>
+    <p>A leitura do banco falhou duas vezes seguidas. Para não mostrar número errado, o painel fica sem dados até carregar de novo.</p>
+    <div class="falha-acoes">
+      <button type="button" class="pill-select" id="falha-tentar">Tentar de novo</button>
+      <button type="button" class="icon-btn" id="falha-sair">Sair e entrar de novo</button>
+    </div>
+    ${detalhe ? `<p class="falha-detalhe mono">Detalhe: ${esc(detalhe)}</p>` : ""}`;
+  document.querySelector(".content").prepend(aviso);
+  document.getElementById("falha-tentar").addEventListener("click", ()=> location.reload());
+  document.getElementById("falha-sair").addEventListener("click", ()=> document.getElementById("logout-btn").click());
+  const nota = document.getElementById("footer-note");
+  if(nota) nota.innerHTML = `Painel interno de Produção &middot; Gualapack Jaguariúna &middot; sem dados: a leitura do banco falhou.`;
+}
+
 async function boot(){
   const { de, ate } = periodoDaUrl();
   try{
-    await loadRealData(de, ate);
-    renderDashboard();
+    let falha = await loadRealData(de, ate);
+    if(falha){
+      // Falha passageira (sessão recém-renovada, banco demorando): mais uma tentativa.
+      await new Promise(r=>setTimeout(r, 1500));
+      falha = await loadRealData(de, ate);
+    }
+    if(falha) mostrarFalhaCarga(falha);
+    else renderDashboard();
     if(window.refreshLiveStatus) window.refreshLiveStatus();
     const labelEl = document.getElementById("period-label");
     if(labelEl && window.rotuloPeriodo) labelEl.textContent = window.rotuloPeriodo(de, ate);

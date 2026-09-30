@@ -133,7 +133,7 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 | Linha do tempo | `v_apontamentos_ultimo_dia` | `apontamentos` | Indicadores Diário → Base Apontamento |
 | Selo "dados até" | `v_dados_status` | todas | — |
 | Lista de máquinas e grupos | — | `maquinas` | Machine Card → DIM_EQTOS & GRUPO EQTO |
-| WIP & Carteira | — | nenhuma | valores de referência, com aviso na tela |
+| WIP & Carteira | — | nenhuma | "sem dados" na tela: nenhuma base de WIP ligada ainda |
 
 TMR = horas produzindo ÷ (horas totais − horas planejadas: fim de turno,
 refeição, preventiva, falta de programação…). A classificação de cada código
@@ -181,20 +181,17 @@ Passo a passo e erros comuns: [docs/guias/carga-automatica-drive.md](./docs/guia
 
 ## Pendências e limitações conhecidas
 
-- **Definição do TMR a decidir.** O painel desconta as horas planejadas do
-  total. A planilha Graficos Tendência conta tudo no total, então o TMR do
-  painel sai maior. Falta escolher qual definição vale.
+- **TMR: vale a regra do BI** (decisão de 25/09): produzindo ÷ horas sem FIM
+  TURNO e INATIVIDADE, aplicada pelo hub. A conta acima (horas planejadas
+  descontadas) só vale para o fluxo antigo, sem o hub.
 - **Horas de 2025 fora da carga.** A aba Base Apontamento de 2025 tem 379.792
   linhas, acima do teto de 360.000 que a etapa 1 consegue ler. Setembro a
   dezembro de 2025 ficam sem horas. A aba de 2026 cresce cerca de mil linhas
   por dia e chega perto do teto no fim do ano.
-- **Minilinhas dos cards são sorteadas.** As 17 minilinhas de tendência nos
-  cards de indicador são geradas aleatoriamente. Ou ganham uma série real, ou
-  saem da tela; as duas opções pedem uma decisão, porque a segunda muda o
-  visual.
-- **Referência em caso de falha parcial.** Se só as consultas de refugo por
-  máquina ou de produção em kg falharem, esses dois gráficos mostram valores
-  de referência enquanto o selo continua dizendo "dado real".
+- **Falha ao carregar.** O painel tenta de novo uma vez; se falhar outra
+  vez, mostra "Não consegui carregar os dados" e nenhum número. Os valores
+  de referência só aparecem na pré-visualização local, sem Supabase. Com o
+  hub, erro numa consulta antiga que ele já cobre não derruba o painel.
 - **Produtividade usa horas de máquina.** O Power BI divide por horas
   trabalhadas da Folha de Ponto, que não está no Drive. O rótulo do card diz
   isso.
