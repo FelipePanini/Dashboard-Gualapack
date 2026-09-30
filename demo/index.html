@@ -1342,9 +1342,9 @@ function prettyCodigo(raw){
   return String(raw || "").replace(/^\d+_/, "").replace(/_/g, " ").trim() || "—";
 }
 
-/* Dados de referência — usados só se o backend não estiver configurado ou a
-   carga real falhar. Mesma estrutura dos BIs (ver docs/mapeamento/estrutura-bi.md).
-   Quando isso acontece, o selo do topo troca pra "valores de referência". */
+/* Dados de referência — usados só na pré-visualização local, sem Supabase
+   configurado (falha de carga mostra o aviso, nunca estes números). Mesma
+   estrutura dos BIs (ver docs/mapeamento/estrutura-bi.md). */
 const FALLBACK = {
   MAQUINAS: [
     { id:"COATING01", nome:"COATING 01", processo:"Coating",   rota:"—",     tmr:71, vel:186, velRef:210, aparas:4.1, horasProd:412, horasTot:580 },
@@ -1489,9 +1489,44 @@ async function loadRealData(periodoDe, periodoAte){
   const pDe  = periodoDe ? isoDate(periodoDe) : null;
   const pAte = periodoAte ? isoDate(periodoAte) : null;
   try{
-    const [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes, prodRes, statusRes, refugoProdRes, producaoKgRes,
-           hubMaqRes, hubParadasRes, hubGanttRes, hubMotivoRes, hubRefugoMaqRes, hubOpsRes, hubClasseRes, hubAparaRes,
-           hubFontesRes, hubAparaPeriodoRes, hubMensalRes, hubPerdaMaqMotivoRes] = await Promise.all([
+    // 1ª rodada: o que o data hub publica + a lista de máquinas (tabela
+    // pequena: id e grupo). Fora do throw de propósito: sem o hub publicado,
+    // essas funções não existem e o painel segue com as consultas antigas.
+    const [hubMaqRes, hubParadasRes, hubGanttRes, hubMotivoRes, hubRefugoMaqRes, hubOpsRes, hubClasseRes, hubAparaRes,
+           hubFontesRes, hubAparaPeriodoRes, hubMensalRes, hubPerdaMaqMotivoRes, listaRes] = await Promise.all([
+      // Horas por máquina/código publicadas pelo hub (Machine Card) e o resto
+      // dos cartões (002_cartoes.sql).
+      client.rpc("rpc_hub_maquinas", { p_de: pDe, p_ate: pAte }),
+      client.rpc("rpc_hub_paradas", { p_de: pDe, p_ate: pAte }),
+      client.from("v_hub_ultimo_dia").select("*"),
+      client.rpc("rpc_hub_perda_motivo", { p_de: pDe, p_ate: pAte }),
+      client.rpc("rpc_hub_refugo_maquina", { p_de: pDe, p_ate: pAte }),
+      client.rpc("rpc_hub_ops_refugo", { p_de: pDe, p_ate: pAte }),
+      client.rpc("rpc_hub_classificacao", { p_de: pDe, p_ate: pAte }),
+      client.from("v_hub_apara_mensal").select("*"),
+      client.from("v_hub_fontes").select("fonte,dado_ate"),
+      // 003_conferencia.sql: apara do período, série mensal real das linhas
+      // de tendência e perda por máquina e motivo.
+      client.rpc("rpc_hub_apara_periodo", { p_de: pDe, p_ate: pAte }),
+      client.rpc("rpc_hub_mensal", { p_meses: 13 }),
+      client.rpc("rpc_hub_perda_maquina_motivo", { p_de: pDe, p_ate: pAte }),
+      // o grupo físico filtra lá embaixo (GRUPO_PROCESSO), igual ao rpc_maquinas_resumo
+      client.from("maquinas").select("id,grupo"),
+    ]);
+    // Com o hub publicado (002), nenhuma consulta antiga é usada: todas têm
+    // equivalente no hub. Elas somam centenas de milhares de linhas e, em
+    // 30/09, estouraram o tempo do banco (statement timeout) e derrubaram o
+    // painel em fev–abr, e antes um 401 nelas jogou tudo nos valores de
+    // referência. Com o hub, nem são pedidas.
+    // Só "função não existe" (PGRST202: SQL do hub ainda não aplicado) leva
+    // ao caminho antigo. Outro erro no hub é falha de carga (tenta de novo),
+    // pra não trocar em silêncio pelas contas antigas, que não batem com o BI.
+    if(hubMaqRes.error && hubMaqRes.error.code !== "PGRST202") throw hubMaqRes.error;
+    // período sem nenhum apontamento também é hub (vazio), não caminho antigo
+    const HUB_ATIVO = !hubMaqRes.error && ((hubMaqRes.data||[]).length === 0 || "metros" in hubMaqRes.data[0]);
+    const naoPedida = { data: null, error: null };
+    const [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes, prodRes, statusRes, refugoProdRes, producaoKgRes] =
+      HUB_ATIVO ? [listaRes, ...Array(11).fill(naoPedida)] : await Promise.all([
       // Resumo por máquina, perdas, downtime, ops e produtividade agora são
       // FUNÇÕES parametrizadas por período (p_de/p_ate) — é o que o
       // seletor de datas do topo filtra de verdade. As séries mensais
@@ -1516,34 +1551,12 @@ async function loadRealData(periodoDe, periodoAte){
       // antes eram uma segunda rodada que só começava depois desta.
       client.from("v_refugo_producao_maquina").select("*"),
       client.from("v_producao_kg_mensal").select("*"),
-      // Horas por máquina/código publicadas pelo data hub (apontamentos do
-      // BI). Fora do throw de propósito: enquanto o hub não publica, essas
-      // funções não existem e o painel segue com as fontes de antes.
-      client.rpc("rpc_hub_maquinas", { p_de: pDe, p_ate: pAte }),
-      client.rpc("rpc_hub_paradas", { p_de: pDe, p_ate: pAte }),
-      client.from("v_hub_ultimo_dia").select("*"),
-      // Resto dos cartões pelo hub (002_cartoes.sql). Mesma regra: sem erro
-      // derrubando o painel se ainda não existirem.
-      client.rpc("rpc_hub_perda_motivo", { p_de: pDe, p_ate: pAte }),
-      client.rpc("rpc_hub_refugo_maquina", { p_de: pDe, p_ate: pAte }),
-      client.rpc("rpc_hub_ops_refugo", { p_de: pDe, p_ate: pAte }),
-      client.rpc("rpc_hub_classificacao", { p_de: pDe, p_ate: pAte }),
-      client.from("v_hub_apara_mensal").select("*"),
-      client.from("v_hub_fontes").select("fonte,dado_ate"),
-      // 003_conferencia.sql: apara do período, série mensal real das linhas
-      // de tendência e perda por máquina e motivo.
-      client.rpc("rpc_hub_apara_periodo", { p_de: pDe, p_ate: pAte }),
-      client.rpc("rpc_hub_mensal", { p_meses: 13 }),
-      client.rpc("rpc_hub_perda_maquina_motivo", { p_de: pDe, p_ate: pAte }),
     ]);
-    // Com o hub publicado (002), das consultas antigas só a lista de máquinas
-    // ainda é necessária: as outras têm equivalente no hub. Em 30/09 um 401
-    // e um 500 nelas derrubaram o painel inteiro pros valores de referência.
-    const HUB_ATIVO = !hubMaqRes.error && (hubMaqRes.data||[]).length > 0 && "metros" in hubMaqRes.data[0];
+    // Com o hub, a lista de máquinas é a única coisa indispensável.
     const essenciais = HUB_ATIVO ? [maqRes] : [maqRes, motivoRes, classeRes, downtimeRes, fardosRes, scrapBiRes, opsRes, ganttRes];
     const erro = essenciais.find(r=>r.error);
     if(erro) throw erro.error;
-    if(!maqRes.data || maqRes.data.length === 0) throw new Error("v_maquinas_resumo veio vazia");
+    if(!maqRes.data || maqRes.data.length === 0) throw new Error("a lista de máquinas veio vazia");
 
     // Produtividade/velocidade vêm de producao_metros (Machine Card), base
     // separada de apontamentos — por isso view à parte, casada por cod_recurso.
@@ -1736,7 +1749,7 @@ async function loadRealData(periodoDe, periodoAte){
     //   apontado = refugo ÷ (refugo + peso bruto das REBs); confirmado = scrap ÷ (peso bruto REBs + scrap)
     //   aderência = produzido ÷ planejado
     // Sem o 002, a rpc_hub_maquinas do 001 não traz "metros": fica tudo como acima.
-    const HUB2 = HUB_HORAS && "metros" in hubMaqRes.data[0];
+    const HUB2 = HUB_ATIVO;
     window.HUB_TOTAIS = null;
     window.PERDA_POR_MAQ = null;
     window.APARA_PERIODO = null;
@@ -1767,7 +1780,10 @@ async function loadRealData(periodoDe, periodoAte){
       // (média de percentuais não é o número do BI).
       const soma = c => hubMaqRes.data.reduce((a,r)=>a+n(r[c]),0);
       window.HUB_TOTAIS = {
-        tmr: soma("horas_totais")>0 ? soma("horas_produzindo")/soma("horas_totais")*100 : 0,
+        tmr: soma("horas_totais")>0 ? soma("horas_produzindo")/soma("horas_totais")*100 : null,
+        // horas do período de TODAS as máquinas do hub, como o BI (somar só
+        // as máquinas da lista deixava de fora quem não está nela)
+        horasProd: soma("horas_produzindo"), horasTot: soma("horas_totais"),
         vel: soma("horas_produzindo")>0 ? soma("metros")/soma("horas_produzindo")/60 : null,
         planKm: soma("planejado")/1000, realKm: soma("produzido")/1000,
         aderencia: soma("planejado")>0 ? soma("produzido")/soma("planejado")*100 : null,
@@ -2444,8 +2460,9 @@ hBarChart(document.getElementById("refugo-producao-chart"), REFUGO_PRODUCAO_MAQU
 
 /* ============ VIEW: PRODUTIVIDADE & TMR ============ */
 (function(){
-  const horasProd = MAQUINAS.reduce((a,m)=>a+m.horasProd,0);
-  const horasTot  = MAQUINAS.reduce((a,m)=>a+m.horasTot,0);
+  // Com o hub, as horas do período de todas as máquinas (o mesmo total do TMR).
+  const horasProd = window.HUB_TOTAIS ? window.HUB_TOTAIS.horasProd : MAQUINAS.reduce((a,m)=>a+m.horasProd,0);
+  const horasTot  = window.HUB_TOTAIS ? window.HUB_TOTAIS.horasTot  : MAQUINAS.reduce((a,m)=>a+m.horasTot,0);
   // Nenhuma base carregada até agora traz velocidade de máquina — quando
   // isso mudar, essas duas linhas passam a achar dado de verdade sozinhas.
   // Com o hub, máquina sem hora produzindo no período fica sem velocidade
@@ -2465,7 +2482,8 @@ hBarChart(document.getElementById("refugo-producao-chart"), REFUGO_PRODUCAO_MAQU
   if(velDisponivel){
     kpisProd.push({ label:"Velocidade média", value:velMedia, suffix:" m/min", decimals:0, delta:"média ponderada das máquinas", dir:"flat", spark: serieMensal("vel") });
   }
-  kpisProd.push({ label:"Horas produzindo", value:horasProd, suffix:" h", decimals:0, delta:`de ${fmt(horasTot)} h totais`, dir:"up", spark: serieMensal("horasProd") });
+  kpisProd.push({ label:"Horas produzindo", value: horasTot>0 ? horasProd : null, suffix:" h", decimals:0,
+    delta: horasTot>0 ? `de ${fmt(horasTot)} h totais` : "sem horas apontadas no período", dir:"up", spark: serieMensal("horasProd") });
   renderKpis(document.getElementById("prod-kpis"), kpisProd);
 
   hBarChart(document.getElementById("tmr-chart"), MAQUINAS.slice().sort((a,b)=>b.tmr-a.tmr).map(m=>({
