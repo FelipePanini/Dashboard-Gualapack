@@ -206,6 +206,10 @@ vale daqui pra frente em `demo/index.html`:
   aparece; trocar de aba de novo não repete.
 - **Celular** (até 768 px): abas embaixo, detalhe da máquina como folha que
   sobe de baixo (arrasta pra fechar), nenhuma rolagem lateral.
+- **Avatar abre o cartão da conta** (barra lateral no computador, topo no
+  celular): nome, e-mail, perfil, área, desde quando tem acesso e último
+  login, só com o que `profiles` e o login guardam. No celular o "Sair" fica
+  dentro desse cartão.
 
 ---
 
