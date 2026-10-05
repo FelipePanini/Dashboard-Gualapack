@@ -50,7 +50,7 @@ def _excel_falso(linhas_por_mes):
 
 
 def test_extrair_so_substitui_o_mes_quando_o_dado_muda(tmp_path, monkeypatch):
-    cfg = {"banco": {"ativo": True, "servidor": "s", "desde": "2026-08", "reextrair_meses": 2, "pasta": str(tmp_path)}}
+    cfg = {"banco": {"ativo": True, "conector": "excel", "servidor": "s", "desde": "2026-08", "reextrair_meses": 2, "pasta": str(tmp_path)}}
     dados = {"m2026_08": [["2", "44000", "20", "2026-08-03 00:00:00", "1.0"], ["1", "44000", "01", "2026-08-03 00:00:00", "0.5"]],
              "m2026_09": [["3", "45000", "40", "2026-09-01 00:00:00", "0.2"]]}
     monkeypatch.setattr(banco, "_rodar_excel", _excel_falso(dados))
@@ -67,7 +67,7 @@ def test_extrair_so_substitui_o_mes_quando_o_dado_muda(tmp_path, monkeypatch):
 
 
 def test_mes_passado_vazio_nao_apaga_o_arquivo_anterior(tmp_path, monkeypatch):
-    cfg = {"banco": {"ativo": True, "servidor": "s", "desde": "2026-08", "reextrair_meses": 2, "pasta": str(tmp_path)}}
+    cfg = {"banco": {"ativo": True, "conector": "excel", "servidor": "s", "desde": "2026-08", "reextrair_meses": 2, "pasta": str(tmp_path)}}
     monkeypatch.setattr(banco, "_rodar_excel", _excel_falso({"m2026_08": [["1", "1", "20", "2026-08-03 00:00:00", "1.0"]]}))
     banco.extrair(cfg, hoje=date(2026, 9, 15))
     monkeypatch.setattr(banco, "_rodar_excel", _excel_falso({}))
@@ -77,7 +77,7 @@ def test_mes_passado_vazio_nao_apaga_o_arquivo_anterior(tmp_path, monkeypatch):
 
 
 def test_sem_excel_vira_aviso_e_mantem_o_que_ja_tinha(tmp_path, monkeypatch):
-    cfg = {"banco": {"ativo": True, "servidor": "s", "desde": "2026-09", "reextrair_meses": 1, "pasta": str(tmp_path)}}
+    cfg = {"banco": {"ativo": True, "conector": "excel", "servidor": "s", "desde": "2026-09", "reextrair_meses": 1, "pasta": str(tmp_path)}}
 
     def quebra(spec, saida):
         raise RuntimeError("Excel não abriu")
@@ -94,3 +94,44 @@ def test_coleta_empilha_os_parquets_mensais(tmp_path):
     arquivos = localizar(fonte)
     df, motor = coleta.ler_isolado(fonte, arquivos)
     assert motor == "parquet" and sorted(df["qtd_horas"].to_list()) == [1.0, 2.0]
+
+
+def test_quadro_sql_reproduz_o_que_o_excel_gravava():
+    from datetime import datetime
+    from decimal import Decimal
+    nomes = ["IdApontamento", "CodApont", "Turno", "DtProducao", "QtdHoras", "usr_Bobina", "QtdProduzida"]
+    linhas = [(8265257349126.0, "40", 2, datetime(2026, 8, 1), 0.5, "1300           ", 17417),
+              (8265257349125.0, "01", 1, datetime(2026, 8, 1), Decimal("1.250"), None, 0)]
+    df = banco.quadro_sql(nomes, linhas)
+    assert df["id_apontamento"].to_list() == ["8265257349125", "8265257349126"]   # inteiro sem ".0", ordem numérica
+    assert df["cod_apont"].to_list() == ["01", "40"] and df["turno"].to_list() == ["1", "2"]
+    assert df["usr_bobina"].to_list() == [None, "1300           "]              # espaços do campo fixo mantidos
+    assert df["qtd_horas"].to_list() == [1.25, 0.5] and df["qtd_produzida"].to_list() == [0.0, 17417.0]
+    assert df.schema["dt_producao"] == pl.Datetime("us")
+
+
+def test_leitura_direta_e_o_padrao_e_o_excel_so_reserva(tmp_path, monkeypatch):
+    cfg = {"banco": {"ativo": True, "servidor": "s", "desde": "2026-09", "reextrair_meses": 1, "pasta": str(tmp_path)}}
+    quadro = banco.quadro_sql(["IdApontamento", "DtProducao"], [(1.0, __import__("datetime").datetime(2026, 9, 2))])
+
+    def excel_nao(spec, saida):
+        raise AssertionError("com a conexão direta funcionando, o Excel não deve ser aberto")
+    monkeypatch.setattr(banco, "_ler_sql", lambda meses: {m: quadro for m in meses})
+    monkeypatch.setattr(banco, "_rodar_excel", excel_nao)
+    mudaram, avisos = banco.extrair(cfg, hoje=date(2026, 9, 15))
+    assert mudaram == ["09/2026 (1 linhas)"] and avisos == []
+
+    def sem_conexao(meses):
+        raise RuntimeError("Login failed for user 'x' (18456)")
+    monkeypatch.setattr(banco, "_ler_sql", sem_conexao)
+    monkeypatch.setattr(banco, "_rodar_excel", _excel_falso({"m2026_09": [["1", "1", "20", "2026-09-02 00:00:00", "1.0"]]}))
+    mudaram, avisos = banco.extrair(cfg, hoje=date(2026, 9, 15))
+    assert any("usei o Excel como reserva" in a for a in avisos)
+    assert not any("'x'" in a for a in avisos)                    # o aviso não repete o usuário
+
+
+def test_mes_com_erro_na_leitura_direta_vira_aviso_e_nao_apaga(tmp_path, monkeypatch):
+    cfg = {"banco": {"ativo": True, "servidor": "s", "desde": "2026-09", "reextrair_meses": 1, "pasta": str(tmp_path)}}
+    monkeypatch.setattr(banco, "_ler_sql", lambda meses: {m: "tempo esgotado" for m in meses})
+    mudaram, avisos = banco.extrair(cfg, hoje=date(2026, 9, 15))
+    assert mudaram == [] and avisos == ["09/2026: o banco não respondeu (tempo esgotado)"]

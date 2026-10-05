@@ -95,12 +95,19 @@ As planilhas e os dois BIs leem a mesma view do banco (Metrics,
 passou a ler a view direto (`hub/banco.py`), e as planilhas e os BIs viraram
 conferência:
 
-- **Conector:** o próprio Excel, via `scripts/extrair_excel.ps1`. Ele usa o
-  login de banco já salvo nele (ninguém precisa saber a senha) e puxa um mês por
-  vez, filtrado no banco, só nas colunas que as planilhas usam (nunca nome de
-  operador nem observação). A conta do Windows ainda é recusada pelo servidor
-  (18456): quando o TI liberar leitura, `sqlserver.py` faz a leitura direta
-  (`scripts/testar_sqlserver.py` testa).
+- **Conector:** leitura direta (`sqlserver.py`, só SELECT, `ApplicationIntent=ReadOnly`)
+  com o usuário de leitura que o TI liberou. Usuário e senha ficam só no
+  Cofre de Credenciais do Windows: quem guarda é você, rodando
+  `scripts/guardar_acesso_banco.py` (a senha não aparece, não vai pra arquivo
+  nem pro git). Um mês leva cerca de 1 s. Puxa um mês por vez, filtrado no
+  banco, só nas colunas que as planilhas usam (nunca nome de operador nem
+  observação). Antes da troca, os 22 meses de jan/2025 a out/2026 saíram
+  idênticos, linha a linha, ao que o Excel extraía.
+- **Reserva:** se a conexão direta falhar, o hub avisa e usa o Excel
+  (`scripts/extrair_excel.ps1`, com o login salvo nele). `banco.conector: excel`
+  no `fontes.local.yaml` força esse caminho.
+- **Mapa do banco:** `scripts/mapear_banco.py` lista tabelas, views e colunas
+  que o acesso enxerga (só catálogo, nenhum dado) em `data/mapa_banco/`.
 - **Arquivos:** um parquet por mês em `data/extracao/banco`, desde jan/2025.
   Cada execução relê os 2 meses mais recentes e os que faltam, e só regrava um
   mês quando o dado mudou. A fonte `banco.apontamentos` empilha os meses.
