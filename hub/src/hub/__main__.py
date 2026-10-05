@@ -15,7 +15,7 @@ import sys
 import time
 from datetime import date
 
-from hub import coleta, config, db, espelho, execucao, medicao, publicacao, relatorio, transformacao, validacao
+from hub import banco, coleta, config, db, espelho, execucao, medicao, publicacao, relatorio, transformacao, validacao
 from hub.caminhos import CONFIG, DADOS, LOGS, SQL
 from hub.origens import Origens, localizar
 
@@ -74,6 +74,11 @@ def executar(gatilho: str = "manual", so_se_mudou: bool = False) -> int:
         log.info("copiado da pasta compartilhada: %s", ", ".join(copiados))
     for aviso in avisos_espelho:
         log.warning("espelho: %s", aviso)
+    # Depois puxa do banco os meses recentes: mês que mudou grava parquet novo,
+    # e isso também faz o "algo mudou" disparar.
+    _, avisos_banco = banco.extrair(cfg)
+    for aviso in avisos_banco:
+        log.warning("banco: %s", aviso)
     if so_se_mudou:
         motivo = algo_mudou(cfg)
         if motivo is None:
@@ -87,6 +92,8 @@ def executar(gatilho: str = "manual", so_se_mudou: bool = False) -> int:
     log.info("execução %s iniciada (%s)", run, gatilho)
     for aviso in avisos_espelho:  # entram no relatório e na página Qualidade dos dados
         execucao.registrar_erro(con, run, None, aviso, codigo="espelho", gravidade="aviso")
+    for aviso in avisos_banco:
+        execucao.registrar_erro(con, run, "banco.apontamentos", aviso, codigo="banco", gravidade="aviso")
 
     coleta.sincronizar_fontes(con, cfg["fontes"])
     coleta.inventariar_pasta(con, run, cfg["pasta_entrada"], cfg["fontes"])

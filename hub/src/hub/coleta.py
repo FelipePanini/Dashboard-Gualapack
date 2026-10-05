@@ -196,6 +196,8 @@ def ler_fonte(fonte: dict, caminho, motor: str = "calamine") -> pl.DataFrame:
         df = pl.concat(partes, how="diagonal")  # Laminação/Corte não têm "Inicialização"
     elif fonte["tipo"] == "excel_bloco":
         df = ler_bloco(caminho, fonte["aba"], fonte["ancora"], fonte.get("titulo"), motor)
+    elif fonte["tipo"] == "parquet":  # extração do banco (hub/banco.py), já com nomes e tipos padronizados
+        df = pl.read_parquet(caminho)
     else:
         raise ValueError(f"tipo de fonte desconhecido: {fonte['tipo']!r}")
 
@@ -233,7 +235,7 @@ def _filho_ler(fonte: dict, caminhos: list[str], saida: str, motor: str) -> None
 
 def ler_isolado(fonte: dict, caminhos: list[Path]) -> tuple[pl.DataFrame, str]:
     """Lê a fonte num processo filho; devolve (dados, leitor usado)."""
-    motores = ["pbix"] if fonte["tipo"] == "pbix" else ["calamine", "openpyxl"]
+    motores = {"pbix": ["pbix"], "parquet": ["parquet"]}.get(fonte["tipo"], ["calamine", "openpyxl"])
     codigo = None
     for motor in motores:
         with tempfile.TemporaryDirectory() as tmp:

@@ -40,4 +40,6 @@ def carregar(nome_fontes: str = "fontes.local.yaml") -> dict:
         "indicadores": _ler("indicadores.yaml")["indicadores"],
         "recortes": _ler("recortes.yaml")["recortes"],
         "publicacao": fontes.get("publicacao") or {},
+        # Extração do banco da fábrica (hub/banco.py): servidor, desde quando, pasta dos parquets.
+        "banco": fontes.get("banco") or {},
     }

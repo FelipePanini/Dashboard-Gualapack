@@ -972,7 +972,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
           <div class="panel-head">
             <div>
               <h2 class="panel-title">Máquinas</h2>
-              <div class="panel-sub">TMR, velocidade e apara por recurso &middot; clique para ver o detalhe</div>
+              <div class="panel-sub">TMR, velocidade e refugo por recurso &middot; clique para ver o detalhe</div>
             </div>
             <div class="filter-chips" id="maq-filters"></div>
           </div>
@@ -1258,7 +1258,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
       </div>
       <div>
         <div class="assistant-title">Assistente de Produção</div>
-        <div class="assistant-status"><span class="live-dot"></span>Consultando base fictícia</div>
+        <div class="assistant-status"><span class="live-dot"></span>IA (Claude) · números do painel</div>
       </div>
       <button class="assistant-close" id="assistant-close" aria-label="Fechar">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -1266,7 +1266,7 @@ footer{ color:var(--text-muted); font-size:12px; padding: 10px 4px 40px; }
     </div>
     <div class="assistant-body" id="assistant-body"></div>
     <div class="assistant-input">
-      <input id="assistant-input" type="text" placeholder="Pergunte sobre linhas, aparas, facas..." autocomplete="off" />
+      <input id="assistant-input" type="text" placeholder="Pergunte sobre máquinas, apara, paradas, aderência..." autocomplete="off" maxlength="1000" />
       <button id="assistant-send" aria-label="Enviar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20l16-8L4 4v6l10 2-10 2v6z"/></svg>
       </button>
@@ -1475,7 +1475,7 @@ function isoDate(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(
 
 // Devolve o erro quando não consegue carregar (quem chama tenta de novo e,
 // se falhar outra vez, mostra o aviso de falha), ou nada quando carregou.
-async function loadRealData(periodoDe, periodoAte){
+async function loadRealData(periodoDe, periodoAte, tentativa = 1){
   const cfg = window.SUPABASE_CONFIG;
   // Valores de referência só na pré-visualização local, sem Supabase
   // configurado. Com o Supabase, falha vira aviso, nunca número de exemplo.
@@ -1522,6 +1522,15 @@ async function loadRealData(periodoDe, periodoAte){
     // ao caminho antigo. Outro erro no hub é falha de carga (tenta de novo),
     // pra não trocar em silêncio pelas contas antigas, que não batem com o BI.
     if(hubMaqRes.error && hubMaqRes.error.code !== "PGRST202") throw hubMaqRes.error;
+    // Na 1ª tentativa, erro em qualquer consulta do hub também vira nova
+    // tentativa: em 30/09 um 401 passageiro (sessão recém-criada) nas paradas
+    // deixou o gráfico "sem paradas" com parada no banco. Na 2ª, o que ainda
+    // falhar fica sem dados só naquele gráfico. Função/view inexistente
+    // (PGRST202/205: SQL ainda não aplicado) não é erro passageiro.
+    const passageiro = [hubParadasRes, hubGanttRes, hubMotivoRes, hubRefugoMaqRes, hubOpsRes, hubClasseRes, hubAparaRes,
+                        hubFontesRes, hubAparaPeriodoRes, hubMensalRes, hubPerdaMaqMotivoRes]
+      .map(r=>r.error).find(e=>e && e.code !== "PGRST202" && e.code !== "PGRST205");
+    if(passageiro && tentativa === 1) throw passageiro;
     // período sem nenhum apontamento também é hub (vazio), não caminho antigo
     const HUB_ATIVO = !hubMaqRes.error && ((hubMaqRes.data||[]).length === 0 || "metros" in hubMaqRes.data[0]);
     const naoPedida = { data: null, error: null };
@@ -1605,7 +1614,8 @@ async function loadRealData(periodoDe, periodoAte){
         // própria máquina na janela de 12 meses (ver v_produtividade_maquina).
         vel:    prod && prod.velocidade_m_min     != null ? Math.round(Number(prod.velocidade_m_min))     : null,
         velRef: prod && prod.velocidade_ref_m_min != null ? Math.round(Number(prod.velocidade_ref_m_min)) : null,
-        aparas: pesoBruto>0 ? kgPerda/pesoBruto*100 : 0,
+        // mesma base (Produção kg) e o mesmo problema da apara por máquina do hub: sem valor
+        aparas: null,
         horasProd: Math.round(horasProd), horasTot: Math.round(horasTot),
         planKm: Math.round(planKm), realKm: Math.round(realKm),
         aderencia: planKm>0 ? realKm/planKm*100 : null,
@@ -1767,9 +1777,11 @@ async function loadRealData(periodoDe, periodoAte){
         m.horasTot = Math.round(tot);
         m.vel = prod>0 ? Math.round(n(h.metros)/prod/60) : null;
         m.velRef = h.velocidade_ref_m_min != null ? Math.round(n(h.velocidade_ref_m_min)) : null;
-        // mesma guarda de antes: perda maior que o peso de onde saiu é dado insuficiente
-        const pb = n(h.peso_bruto), rf = n(h.refugo);
-        m.aparas = pb>0 && rf<=pb ? rf/pb*100 : 0;
+        // Apara por máquina não existe no BI: lá ela aparece por mês, produto,
+        // cliente e OP; por máquina, só o refugo em kg. A conta que ficava aqui
+        // (refugo ÷ peso bruto da Produção kg, com peso bruto quase vazio fora
+        // das rebobinadeiras) dava 0% na R18 com 2,6 t de refugo em ago/2026.
+        m.aparas = null;
         // quantidades da Aderência em metros (o BI divide por 1000 pra mostrar km)
         m.planKm = Math.round(n(h.planejado)/1000);
         m.realKm = Math.round(n(h.produzido)/1000);
@@ -1882,7 +1894,8 @@ async function loadRealData(periodoDe, periodoAte){
         window.PERDA_MAQ_MOTIVO = porMaqMotivo;
       }
       if(!hubFontesRes.error){
-        const usadas = new Set(["machine_card.horas", "base_aparas.prod", "base_aparas.generico", "aderencia.diaria",
+        // banco.apontamentos: a view do banco, extraída pelo hub (TMR, velocidade, paradas, perda)
+        const usadas = new Set(["banco.apontamentos", "machine_card.horas", "base_aparas.prod", "base_aparas.generico", "aderencia.diaria",
                                 "refugo.aparas", "indicadores.producao_kg", "machine_card.producao_metros"]);
         const status = (hubFontesRes.data||[]).filter(r=>usadas.has(r.fonte) && r.dado_ate)
           .map(r=>({ base: r.fonte, ate: String(r.dado_ate).slice(0,10) }))
@@ -2392,19 +2405,18 @@ hBarChart(document.getElementById("perda-tipo-chart"), TIPOS_PERDA.map(t=>({
 
 (function(){
   // Com o hub: os kg de perda apontados em cada máquina no período (os do
-  // BI). Sem ele, a divisão antiga do total pela apara de cada máquina.
+  // BI). Sem ele não há kg por máquina (a divisão antiga do total pela apara
+  // era inventada): sem dados. A cor seguia a apara da máquina, que o BI não
+  // tem; agora é a mesma dos outros gráficos em kg.
   const kgReal = window.PERDA_POR_MAQ;
-  const porMaq = MAQUINAS.map(m=>({
-    nome:m.nome,
-    kg: kgReal ? Math.round(kgReal.get(String(m.id).trim().toUpperCase()) || 0)
-               : Math.round(perdaTotalKg * (m.aparas/MAQUINAS.reduce((a,x)=>a+x.aparas,0))),
-    pct:m.aparas
+  const porMaq = !kgReal ? [] : MAQUINAS.map(m=>({
+    nome:m.nome, kg: Math.round(kgReal.get(String(m.id).trim().toUpperCase()) || 0),
   })).sort((a,b)=>b.kg-a.kg);
+  const totalMaq = porMaq.reduce((a,m)=>a+m.kg,0);
   hBarChart(document.getElementById("perda-maquina-chart"), porMaq.map(m=>({
     label:m.nome, value:m.kg, display: fmt(m.kg)+" kg",
-    color: m.pct>META_APARAS+2 ? "var(--critical)" : m.pct>META_APARAS ? "var(--warning)" : "var(--good)",
-    color2: m.pct>META_APARAS+2 ? "var(--serious)" : m.pct>META_APARAS ? "var(--warning)" : "var(--series-3)",
-    tip:`<b>${esc(m.nome)}</b><br>${fmt(m.kg)} kg · ${fmt1(m.pct)}% de apara`
+    color:"var(--series-2)", color2:"var(--series-4)",
+    tip:`<b>${esc(m.nome)}</b><br>${fmt(m.kg)} kg` + (totalMaq>0 ? ` · ${fmt1(m.kg/totalMaq*100)}% do refugo das máquinas` : "")
   })), { idPrefix:"pm", labelW:92, valueW:76, rowH:26, aria:"Perda por máquina" });
 })();
 
@@ -2825,7 +2837,8 @@ window.renderGanttForTheme = renderGantt;
       <div class="drawer-metrics">
         <div class="drawer-metric"><div class="v mono">${m.tmr}%</div><div class="l">TMR</div></div>
         <div class="drawer-metric"><div class="v mono">${m.vel!=null ? m.vel : "—"}</div><div class="l">m/min</div></div>
-        <div class="drawer-metric"><div class="v mono">${fmt1(m.aparas)}%</div><div class="l">Apara</div></div>
+        <div class="drawer-metric" title="O BI não calcula apara por máquina; por máquina ele mostra o refugo em kg.">
+          <div class="v mono">${perdaMaq != null ? fmt(perdaMaq) : "—"}</div><div class="l">kg de refugo</div></div>
       </div>
 
       <div class="drawer-section-title">TMR — últimos 12 meses</div>
@@ -2845,8 +2858,6 @@ window.renderGanttForTheme = renderGantt;
            ...(m.vel!=null && m.velRef!=null
              ? [["Velocidade", Math.round(m.vel/m.velRef*100), "var(--series-3)", `${m.vel} m/min`]]
              : []),
-           // Apara numa escala de 0 a 10%, para a barra crescer com o problema
-           ["Apara", Math.min(100, Math.round(m.aparas/10*100)), statusCor[aparasStatus(m.aparas)], fmt1(m.aparas)+"%"]
           ].map(([label,val,c,txt])=>`
           <div class="drawer-bar-row">
             <div class="drawer-bar-label">${label}</div>
@@ -2884,7 +2895,11 @@ window.renderGanttForTheme = renderGantt;
   window.openMaquinaDrawer = open;
 })();
 
-/* ============ assistente sobre os indicadores ============ */
+/* ============ assistente (chat com IA) ============
+   As respostas vêm da Edge Function "assistente" (backend/functions/assistente):
+   o Claude consulta os mesmos números do painel, com o login de quem pergunta.
+   Daqui só vão a pergunta, o período selecionado e as últimas mensagens.
+   Antes eram respostas fixas por palavra-chave, algumas com conselho pronto. */
 (function(){
   const fab = document.getElementById("assistant-fab");
   const panel = document.getElementById("assistant-panel");
@@ -2892,6 +2907,8 @@ window.renderGanttForTheme = renderGantt;
   const body = document.getElementById("assistant-body");
   const input = document.getElementById("assistant-input");
   const sendBtn = document.getElementById("assistant-send");
+  const historico = [];   // { papel: "usuario" | "assistente", texto }
+  let esperando = false;
 
   function addMsg(role, html){
     const el = document.createElement("div");
@@ -2914,59 +2931,52 @@ window.renderGanttForTheme = renderGantt;
     body.scrollTop = body.scrollHeight;
   }
 
-  const piorTMR   = MAQUINAS.slice().sort((a,b)=>a.tmr-b.tmr)[0];
-  const piorApara = MAQUINAS.slice().sort((a,b)=>b.aparas-a.aparas)[0];
-  const maiorMotivo = TIPOS_PERDA[0];
-  const piorClasse = CLASSIFICACOES.slice().sort((a,b)=>b.aparas-a.aparas)[0];
-  const piorProc  = ADERENCIA_PROCESSO.filter(p=>p.pct != null).sort((a,b)=>a.pct-b.pct)[0];
-
-  function answerFor(qRaw){
-    const q = qRaw.toLowerCase();
-    if(q.includes("apara") || q.includes("refugo") || q.includes("perda")){
-      const dif = diferencaMesmoMes();
-      return `No período, a apara apontada está em <b>${fmtPct(aparasMedia)}</b> e a confirmada na balança em <b>${fmtPct(confirmMedia)}</b>`
-        + (dif != null ? ` — ${fmt1(dif)} p.p. de diferença.` : ".")
-        + `<br><br>O maior ofensor é <b>${esc(maiorMotivo.nome)}</b> (${fmt(maiorMotivo.kg)} kg, ${fmt1(maiorMotivo.kg/perdaTotalKg*100)}% do refugo), e a máquina com maior apara é a <b>${esc(piorApara.nome)}</b> com ${fmt1(piorApara.aparas)}%.`;
+  // Texto do modelo -> HTML seguro: escapa tudo antes e só então aplica
+  // **negrito**, listas com "- " e quebras de linha.
+  function formatar(t){
+    return esc(t)
+      .replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
+      .replace(/^[ \t]*[-•][ \t]+/gm, "• ")
+      .replace(/\n/g, "<br>");
+  }
+  // Erro HTTP da função traz a explicação no corpo (ex.: falta a chave).
+  async function mensagemDeErro(err){
+    const resp = err && err.context;
+    if(resp && typeof resp.status === "number"){
+      if(resp.status === 404) return `O assistente com IA ainda não está ligado: falta publicar a função <b>assistente</b> no Supabase.`;
+      try{ const j = await resp.clone().json(); if(j && j.mensagem) return esc(j.mensagem); }catch(e){}
     }
-    if(q.includes("tmr") || q.includes("parada") || q.includes("disponib")){
-      // as duas maiores paradas vêm do dado do período (antes o texto era fixo)
-      const topParadas = DOWNTIME.slice(0,2).map(d=>`<b>${esc(d.nome)}</b> (${fmt(d.horas)} h)`);
-      return `O TMR das ${MAQUINAS.length} máquinas está em <b>${fmt1(tmrMedio)}%</b>. A <b>${esc(piorTMR.nome)}</b> (${esc(piorTMR.processo)}) é a mais crítica, com ${piorTMR.tmr}% — são ${fmt(piorTMR.horasTot-piorTMR.horasProd)} h de parada no período.`
-        + (topParadas.length ? `<br><br>No período, as maiores paradas são ${topParadas.join(" e ")}.` : "");
-    }
-    if(q.includes("aderên") || q.includes("aderen") || q.includes("plano") || q.includes("planejad")){
-      if(aderMedia == null || !piorProc)
-        return "Não há programação no período escolhido, então não tenho como calcular a aderência ao plano.";
-      return `A aderência ao planejado está em <b>${fmt1(aderMedia)}%</b>. O gargalo é <b>${esc(piorProc.nome)}</b>, com ${fmt1(piorProc.pct)}% (${fmt(piorProc.realizado)} de ${fmt(piorProc.planejado)} km lineares).<br><br>Como corte fica no fim da rota, atraso em impressão e laminação se acumula ali — vale checar o WIP intermediário antes de replanejar.`;
-    }
-    if(q.includes("velocidad") || q.includes("produtiv") || q.includes("vazão") || q.includes("vazao")){
-      const semVelocidade = MAQUINAS.some(m=>m.vel==null || m.velRef==null);
-      const partProdutividade = produtividade != null
-        ? `A produtividade está em <b>${fmt1(produtividade)} m²/h</b>. `
-        : `Ainda não tenho produtividade (m²/h) — nenhuma base carregada traz essa métrica. `;
-      const partVelocidade = semVelocidade
-        ? `Também não tenho velocidade (m/min) por máquina ainda.`
-        : `Nas velocidades, a maior queda contra o próprio melhor mês aparece na <b>${esc(MAQUINAS.slice().sort((a,b)=>(a.vel/a.velRef)-(b.vel/b.velRef))[0].nome)}</b>, rodando bem abaixo do que ela já entregou — normalmente é sintoma de material ou acerto, não da máquina em si.`;
-      return partProdutividade + partVelocidade;
-    }
-    if(q.includes("classific") || q.includes("produto") || q.includes("estrutura")){
-      const melhorClasse = CLASSIFICACOES.slice().sort((a,b)=>a.aparas-b.aparas)[0];
-      return `Por classificação, a <b>${esc(piorClasse.nome)}</b> tem a maior apara: <b>${fmt1(piorClasse.aparas)}%</b> (meta ${fmt1(META_APARAS)}%). A menor é a <b>${esc(melhorClasse.nome)}</b>, com ${fmt1(melhorClasse.aparas)}%.`;
-    }
-    if(q.includes("wip") || q.includes("carteira") || q.includes("estoque")){
-      return `Ainda não tenho WIP nem carteira: nenhuma base desse tipo está ligada ao painel.`;
-    }
-    if(q.includes("máquina") || q.includes("maquina") || q.includes("pior") || q.includes("problema") || q.includes("crític")){
-      return `Os dois pontos que mais pesam agora:<br><br>1. <b>${esc(piorTMR.nome)}</b> — TMR de apenas ${piorTMR.tmr}%, puxando a disponibilidade geral para baixo.<br>2. <b>${esc(piorApara.nome)}</b> — ${fmt1(piorApara.aparas)}% de apara, bem acima da meta de ${fmt1(META_APARAS)}%.<br><br>Se for para priorizar um, comece pela ${esc(piorApara.nome)}: refugo vira perda de material, não só de tempo.`;
-    }
-    return `Posso comentar os indicadores que vieram dos BIs de Produção: <b>aparas</b> (apontado x confirmado, por motivo, máquina e classificação), <b>TMR</b> e paradas, <b>aderência ao planejado</b>, <b>velocidade/produtividade</b> e <b>WIP/carteira</b>. Sobre qual deles você quer olhar?`;
+    return "Não consegui falar com o assistente agora. Tente de novo em instantes.";
   }
 
-  function ask(text){
+  async function ask(text){
+    if(esperando) return;
+    esperando = true;
+    sendBtn.disabled = true;
     addMsg("user", esc(text));
     input.value = "";
     const typing = addMsg("bot", `<div class="typing"><span></span><span></span><span></span></div>`);
-    setTimeout(()=>{ typing.remove(); addMsg("bot", answerFor(text)); }, 650 + Math.random()*400);
+    const { de, ate } = periodoDaUrl();
+    try{
+      if(!window.gualapackAuth) throw new Error("sem cliente do Supabase");
+      const { data, error } = await window.gualapackAuth.functions.invoke("assistente", {
+        body: { pergunta: text, historico: historico.slice(-10), periodo: { de: isoDate(de), ate: isoDate(ate) } },
+      });
+      if(error) throw error;
+      const resposta = data && typeof data.resposta === "string" ? data.resposta.trim() : "";
+      if(!resposta) throw new Error("resposta vazia");
+      historico.push({ papel:"usuario", texto:text }, { papel:"assistente", texto:resposta });
+      typing.remove();
+      addMsg("bot", formatar(resposta));
+    }catch(err){
+      console.error("assistente:", err);
+      typing.remove();
+      addMsg("bot", await mensagemDeErro(err));
+    }finally{
+      esperando = false;
+      sendBtn.disabled = false;
+      input.focus();
+    }
   }
 
   fab.addEventListener("click", ()=>{
@@ -2974,8 +2984,10 @@ window.renderGanttForTheme = renderGantt;
     requestAnimationFrame(()=> requestAnimationFrame(()=> panel.classList.add("open")));
     if(!body.dataset.inited){
       body.dataset.inited = "1";
-      addMsg("bot", `Olá! Comento os indicadores do painel — a estrutura vem dos BIs de Produção (aparas, TMR, aderência, velocidade, WIP).`);
-      addSuggestions(["Como está a apara este mês?", "Qual máquina está pior?", "Onde estamos perdendo aderência?"]);
+      const { de, ate } = periodoDaUrl();
+      const rotulo = window.rotuloPeriodo ? window.rotuloPeriodo(de, ate) : "o período selecionado";
+      addMsg("bot", `Olá! Respondo com os números do painel, os mesmos do BI Indicadores de Produção. Se a pergunta não disser o período, uso o selecionado no topo (<b>${esc(rotulo)}</b>).`);
+      addSuggestions(["Como está a apara neste período?", "Qual máquina teve o pior TMR?", "Compare com o mês anterior"]);
     }
     input.focus();
   });
@@ -3395,11 +3407,11 @@ function mostrarFalhaCarga(err){
 async function boot(){
   const { de, ate } = periodoDaUrl();
   try{
-    let falha = await loadRealData(de, ate);
+    let falha = await loadRealData(de, ate, 1);
     if(falha){
       // Falha passageira (sessão recém-renovada, banco demorando): mais uma tentativa.
       await new Promise(r=>setTimeout(r, 1500));
-      falha = await loadRealData(de, ate);
+      falha = await loadRealData(de, ate, 2);
     }
     if(falha) mostrarFalhaCarga(falha);
     else renderDashboard();

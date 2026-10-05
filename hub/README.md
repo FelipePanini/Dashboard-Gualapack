@@ -88,6 +88,39 @@ funcionam.
 - **Arquivo que derruba o leitor rápido de Excel** (hoje: Refugo Aparas) é
   lido pelo leitor alternativo, mais lento, e vira aviso no relatório.
 
+## Banco da fábrica (desde 05/10)
+
+As planilhas e os dois BIs leem a mesma view do banco (Metrics,
+`View_usr_apontamentos_999999`); cada um só aplica filtros diferentes. O hub
+passou a ler a view direto (`hub/banco.py`), e as planilhas e os BIs viraram
+conferência:
+
+- **Conector:** o próprio Excel, via `scripts/extrair_excel.ps1`. Ele usa o
+  login de banco já salvo nele (ninguém precisa saber a senha) e puxa um mês por
+  vez, filtrado no banco, só nas colunas que as planilhas usam (nunca nome de
+  operador nem observação). A conta do Windows ainda é recusada pelo servidor
+  (18456): quando o TI liberar leitura, `sqlserver.py` faz a leitura direta
+  (`scripts/testar_sqlserver.py` testa).
+- **Arquivos:** um parquet por mês em `data/extracao/banco`, desde jan/2025.
+  Cada execução relê os 2 meses mais recentes e os que faltam, e só regrava um
+  mês quando o dado mudou. A fonte `banco.apontamentos` empilha os meses.
+- **Regras:** nos meses que o banco cobre, a tabela Horas do Machine Card (TMR,
+  velocidade, paradas) e a perda código 40 são montadas da view, como os Power
+  Query das planilhas (classificação pela tabela-padrão
+  `Classificação_Apontamentos.xlsx`). Nos outros meses, as planilhas.
+- **Conferido em 05/10:**
+  - **Igual linha a linha:** a tabela Horas do banco é igual à da planilha em 18
+    dos 22 meses, mesmo número de linhas, horas e metros.
+  - **Agosto/2026:** TMR por máquina e perda (1.148 linhas, 45.116,10 kg) iguais
+    à planilha, à tabela Apontamentos e ao BI.
+  - **Setembro/2026:** a planilha foi atualizada antes de 30/09 ser todo
+    apontado. Faltam nela 1.108 apontamentos (455,6 h), e o BI, que lê a
+    planilha, também.
+  - **Fevereiro a abril/2025:** o banco tem 4.053 linhas incluídas em lote em
+    03/04/2025, quase todas de 0 h, que a planilha de 2025 não tem.
+- **Ainda das planilhas:** apara apontada (BASE_PROD), aderência (programação),
+  apara confirmada (balança, digitada) e m² (produtividade).
+
 ## Execução automática
 
 Tarefa "Gualapack Data Hub" no Agendador de Tarefas do Windows. Ela roda a
@@ -220,7 +253,7 @@ o motivo vira aviso no relatório e a próxima tenta de novo.
 | Arquivo | Vai pro git? | O quê |
 |---|---|---|
 | `config/fontes.local.yaml` | **Não** | Pasta de entrada, planilhas, abas, colunas obrigatórias, frescor. Modelo em `fontes.exemplo.yaml` |
-| `config/sqlserver.local.yaml` | **Não** | Servidor do SQL Server (fase futura) |
+| `config/sqlserver.local.yaml` | **Não** | Servidor do SQL Server, para a leitura direta (quando o TI liberar) |
 | `config/indicadores.yaml` | Sim | Catálogo: definição, dono, fonte oficial, tolerância, regras |
 | `config/recortes.yaml` | Sim | Quais máquinas formam cada recorte (Flexo, Corte...) |
 
@@ -298,6 +331,6 @@ aguardando, divergente, validado.
    Disponibilidade em fev/2026) e da planilha de horas de pessoas.
 3. Desligar o fluxo antigo (Google Drive + GitHub Actions) quando o dono
    confirmar que o painel pelo hub está certo.
-4. Opcional: ler as consultas do SQL Server direto (só leitura), como o BI
-   já faz com a Perda Sistêmica. O dia corrente ficaria igual ao BI sem
-   depender de a planilha ser salva.
+4. Banco: montar também a BASE_PROD (apara apontada) e a produção em m²
+   direto da view, com os filtros dos Power Query; trocar o Excel pela leitura
+   direta quando o TI liberar a conta.
