@@ -177,10 +177,46 @@ Passo a passo e erros comuns: [docs/guias/carga-automatica-drive.md](./docs/guia
 - **Divergência entre fontes** é mostrada com as duas versões e a causa
   provável. Nenhum valor é escolhido em silêncio.
 
+### Interface do painel (revisão de 05/10)
+
+Revisada pelas diretrizes de design da Apple (skill `apple-design`). O que
+vale daqui pra frente em `demo/index.html`:
+
+- **Contraste mínimo 4,5:1** nos textos, nos dois temas. As cores são tokens
+  no topo do CSS (`--text-muted`, `--good`, `--warning`...): mudar uma cor é
+  mudar o token, conferindo o contraste.
+- **Uma cor, um significado.** Verde/âmbar/vermelho são status (vermelho só
+  pra alerta). Paradas usam a cor da classificação oficial do código
+  (`--cls-*`), igual no Gantt, nas horas de parada e no Pareto.
+- **Vidro (blur) só na camada funcional**: barra do topo, barra de abas do
+  celular, gaveta de detalhe, chat e seletor de período. Painéis e cartões
+  são opacos. Com "Reduzir transparência" ou "Aumentar contraste" no sistema,
+  o vidro vira superfície opaca.
+- **Gráficos desenhados na largura real do painel** (`montarGrafico`): 1
+  unidade = 1 px, texto de 11 px pra cima, redesenho ao mudar de largura.
+  Rótulo que não cabe ganha reticências, com o nome inteiro no `<title>`.
+- **Seta e cor no cartão só com comparação de verdade**: contra a meta
+  (apara) ou contra o mês anterior da série real do hub. O resto é texto
+  neutro.
+- **Máquina sem apontamento no período** fica neutra ("Sem apontamento",
+  "—"), não "Crítico 0%". As faixas do TMR (75% e 62%) continuam as mesmas
+  até a meta ser definida.
+- **Movimento**: curto (até ~0,6 s), com curva de mola, nunca bloqueia o uso
+  e some com "Reduzir movimento". Cada tela anima só na primeira vez que
+  aparece; trocar de aba de novo não repete.
+- **Celular** (até 768 px): abas embaixo, detalhe da máquina como folha que
+  sobe de baixo (arrasta pra fechar), nenhuma rolagem lateral.
+
 ---
 
 ## Pendências e limitações conhecidas
 
+- **Cores das paradas por classificação** dependem de
+  `hub/sql/supabase/004_classes.sql` (uma view de leitura). Sem ela, o painel
+  funciona igual, com as paradas numa cor só e as horas de parada por código.
+- **Faixas do TMR** (Dentro da meta ≥ 75%, Atenção ≥ 62%, Crítico abaixo)
+  são as de antes e deixam quase toda máquina em "Crítico". Aguardando a
+  meta de TMR por máquina ou por etapa.
 - **TMR: vale a regra do BI** (decisão de 25/09): produzindo ÷ horas sem FIM
   TURNO e INATIVIDADE, aplicada pelo hub. A conta acima (horas planejadas
   descontadas) só vale para o fluxo antigo, sem o hub.

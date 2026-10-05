@@ -199,7 +199,11 @@ Uma vez só, nesta ordem:
    período, séries mensais reais e refugo por máquina e motivo). Tem de
    mostrar `funcoes_ok = true`. Não precisa publicar de novo.
 
-Feitos: 1 a 3 em 25/09, 4 a 6 em 30/09.
+7. No **SQL Editor** → rodar `sql/supabase/004_classes.sql` (a classe
+   oficial de cada código de apontamento, pra cor das paradas no painel).
+   Só cria uma view de leitura. Não precisa publicar de novo.
+
+Feitos: 1 a 3 em 25/09, 4 a 6 em 30/09. O 7 aguarda (05/10).
 
 ### Conferência com o motor do BI (30/09)
 
