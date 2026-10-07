@@ -102,7 +102,7 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 | [`demo/`](./demo/) | O site: `index.html` (painel), `login.html`, `admin.html` (convites), `qualidade.html` (validação publicada pelo hub), `upload.html` (upload manual, legado). O nome `demo` ficou porque é o endereço já publicado. |
 | [`backend/sql/`](./backend/sql/) | Estrutura do banco: login e convites, tabelas dos dados, funções e views (as do fluxo anterior). |
 | [`backend/sync-drive/`](./backend/sync-drive/) | Fluxo anterior: a carga diária das planilhas do Drive (etapas 1 e 2). |
-| [`backend/functions/`](./backend/functions/) | Funções do Supabase: cadastro com convite e upload manual. |
+| [`backend/functions/`](./backend/functions/) | Funções do Supabase: cadastro com convite e upload manual. A `assistente` (chat com o Claude, API paga) está sem uso desde 07/10/2026. |
 | [`.github/workflows/`](./.github/workflows/) | Fluxo anterior: `build-database-central.yml` (etapa 1) e `sync-drive.yml` (etapa 2). |
 | [`docs/guias/`](./docs/guias/) | Passo a passo: configurar o Supabase, a carga automática, o upload manual. |
 | [`docs/mapeamento/`](./docs/mapeamento/) | Levantamentos: inventário das 220 abas, redundâncias, origem de cada número, validação contra as planilhas. |
@@ -215,6 +215,12 @@ vale daqui pra frente em `demo/index.html`:
   carteira exportam CSV (";" e vírgula decimal: abre direto no Excel).
 - **Leitura em páginas:** fila, WIP e carteira vêm inteiras mesmo acima do
   limite de 1.000 linhas por pedido do Supabase.
+- **Assistente sem IA** (botão redondo): responde na hora com os números que o
+  painel já carregou (apara, TMR, uma máquina, o que está parado agora,
+  entregas, fila, setup, WIP, carteira, laudos e um mês da série). Entende a
+  pergunta por palavras-chave; quando não entende, sugere o que sabe
+  responder. Nada sai da página e nada é cobrado (decisão de 07/10/2026: sem
+  API paga de IA).
 
 ---
 

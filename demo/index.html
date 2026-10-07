@@ -1534,7 +1534,7 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
       </div>
       <div>
         <div class="assistant-title">Assistente de Produção</div>
-        <div class="assistant-status"><span class="live-dot"></span>IA (Claude) · números do painel</div>
+        <div class="assistant-status"><span class="live-dot"></span>Responde na hora · números do painel</div>
       </div>
       <button class="assistant-close" id="assistant-close" aria-label="Fechar">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -1542,7 +1542,7 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
     </div>
     <div class="assistant-body" id="assistant-body"></div>
     <div class="assistant-input">
-      <input id="assistant-input" type="text" placeholder="Pergunte sobre máquinas, apara, paradas, aderência..." autocomplete="off" maxlength="1000" />
+      <input id="assistant-input" type="text" placeholder="Pergunte sobre apara, TMR, uma máquina, o que está parado agora..." autocomplete="off" maxlength="1000" />
       <button id="assistant-send" aria-label="Enviar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20l16-8L4 4v6l10 2-10 2v6z"/></svg>
       </button>
@@ -4271,11 +4271,14 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   window.openMaquinaDrawer = open;
 })();
 
-/* ============ assistente (chat com IA) ============
-   As respostas vêm da Edge Function "assistente" (backend/functions/assistente):
-   o Claude consulta os mesmos números do painel, com o login de quem pergunta.
-   Daqui só vão a pergunta, o período selecionado e as últimas mensagens.
-   O botão abre e fecha (o ícone vira um X), e o painel cresce a partir dele. */
+/* ============ assistente (sem IA) ============
+   Responde na hora as perguntas comuns com os MESMOS números que o painel já
+   carregou: nada sai da página, nada é cobrado e nada é inventado. Entende a
+   pergunta por palavras-chave (apara, TMR, uma máquina, agora, entregas,
+   fila, setup, WIP, carteira, laudos, um mês) e, quando não entende, sugere o
+   que sabe responder. Decisão do dono em 07/10/2026: nada de API paga de IA
+   (a Edge Function "assistente", com o Claude, ficou sem uso). O botão abre e
+   fecha (o ícone vira um X), e o painel cresce a partir dele. */
 (function(){
   const fab = document.getElementById("assistant-fab");
   const panel = document.getElementById("assistant-panel");
@@ -4283,7 +4286,6 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   const body = document.getElementById("assistant-body");
   const input = document.getElementById("assistant-input");
   const sendBtn = document.getElementById("assistant-send");
-  const historico = [];   // { papel: "usuario" | "assistente", texto }
   let esperando = false, timerFecha = 0;
 
   function addMsg(role, html){
@@ -4295,6 +4297,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     return el;
   }
   function addSuggestions(list){
+    if(!list || !list.length) return;
     const wrap = document.createElement("div");
     wrap.className = "msg-suggestions";
     list.forEach(q=>{
@@ -4307,52 +4310,378 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     body.scrollTop = body.scrollHeight;
   }
 
-  // Texto do modelo -> HTML seguro: escapa tudo antes e só então aplica
-  // **negrito**, listas com "- " e quebras de linha.
-  function formatar(t){
-    return esc(t)
-      .replace(/\*\*([^*\n]+)\*\*/g, "<b>$1</b>")
-      .replace(/^[ \t]*[-•][ \t]+/gm, "• ")
-      .replace(/\n/g, "<br>");
-  }
-  // Erro HTTP da função traz a explicação no corpo (ex.: falta a chave).
-  async function mensagemDeErro(err){
-    const resp = err && err.context;
-    if(resp && typeof resp.status === "number"){
-      if(resp.status === 404) return `O assistente com IA ainda não está ligado: falta publicar a função <b>assistente</b> no Supabase.`;
-      try{ const j = await resp.clone().json(); if(j && j.mensagem) return esc(j.mensagem); }catch(e){}
+  // ---------- entender a pergunta
+  const norm = s => String(s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+  // palavra (ou começo de palavra) em qualquer lugar da pergunta
+  const tem = (q, ...pal) => pal.some(p => new RegExp("\\b" + p).test(q));
+  const MESES_LONGOS = ["janeiro","fevereiro","marco","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+  const MESES_NOME = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+  // mês pelo nome inteiro ("agosto", "agosto de 2026") ou abreviado com o ano
+  // ("ago/26"); "dez" sozinho é número, não mês
+  function mesPedido(q){
+    for(let i = 0; i < 12; i++){
+      const m = q.match(new RegExp(`\\b(?:${MESES_LONGOS[i]}|${MESES_CURTOS[i]}(?=\\s*/\\s*\\d))(?:\\s*(?:de|/)\\s*(\\d{2,4}))?`));
+      if(m) return { mes: i, ano: m[1] ? Number(m[1].length === 2 ? "20" + m[1] : m[1]) : null };
     }
-    return "Não consegui falar com o assistente agora. Tente de novo em instantes.";
+    return null;
+  }
+  const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  // máquina citada: "R18", "reb 5", "REB05", "coating", "hot melt"...
+  function acharMaquina(q){
+    const ids = new Set(MAQUINAS.map(m=>m.id));
+    bancoLinhas("agora").forEach(r=> ids.add(limpaTexto(r.maquina)));
+    const lista = [...ids].sort((a,b)=> b.length - a.length);
+    for(const id of lista){
+      const n = norm(id).trim();
+      const p = n.match(/^([a-z]+)\s*0*(\d+)([a-z]?)$/);
+      const re = p ? new RegExp(`\\b${p[1]}\\s*0*${p[2]}${p[3]}\\b`) : new RegExp(`\\b${escRe(n)}\\b`);
+      if(re.test(q)) return id;
+    }
+    const apelidos = [[/\bcoating\b/, "COATING"], [/\bhot\s*melt\b|\bhmc\b/, "HMC"], [/\brevisora\b/, "REVISORA"]];
+    for(const [re, prefixo] of apelidos){
+      if(re.test(q)){ const id = lista.find(i=> chaveMaq(i).startsWith(prefixo)); if(id) return id; }
+    }
+    return null;
   }
 
-  async function ask(text){
+  // ---------- montar a resposta (só números que a página já tem)
+  const b = v => `<b>${v}</b>`;
+  const pct1 = v => fmt1(v) + "%";
+  // no cartão a seta diz se subiu ou caiu; no texto, a palavra
+  const comparado = c => !c ? "" : ` (${c.seta === "sobe" ? "subiu " : c.seta === "desce" ? "caiu " : ""}${c.texto})`;
+  const ok = v => v != null && Number.isFinite(v);
+  function periodo(){
+    const { de, ate } = periodoDaUrl();
+    const rot = window.rotuloPeriodo ? window.rotuloPeriodo(de, ate) : "";
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const andamento = de <= hoje && ate > hoje;
+    return (rot.includes("–") ? `de ${rot.replace(" – ", " a ")}` : `em ${rot}`) + (andamento ? " (em andamento)" : "");
+  }
+  // apara confirmada do mês anterior ao período, da série do gráfico
+  function aparaMesAnterior(){
+    const mes = mesAnteriorDoPeriodo();
+    if(!mes) return null;
+    const rotulo = MESES_CURTOS[Number(mes.slice(5, 7)) - 1];
+    const i = MESES.indexOf(rotulo);
+    const v = i >= 0 ? APARAS_MENSAL.confirmado[i] : null;
+    return v == null ? null : { rotulo: `${rotulo}/${mes.slice(2, 4)}`, valor: v };
+  }
+
+  function rApara(){
+    const per = periodo();
+    if(!ok(confirmMedia) && !ok(aparasMedia)) return `Não tenho apara ${per}.`;
+    let s = "";
+    if(ok(confirmMedia)){
+      s += `Apara confirmada ${per}: ${b(pct1(confirmMedia))}, ${confirmMedia <= META_APARAS ? "dentro" : "acima"} da meta de ${fmtMeta()}.`;
+      const ant = aparaMesAnterior();
+      if(ant) s += ` No mês anterior (${ant.rotulo}) foi ${pct1(ant.valor)}.`;
+    }else{
+      s += `A apara confirmada só existe por mês: escolha um mês no topo pra ver.`;
+    }
+    if(ok(aparasMedia)){
+      const dif = ok(confirmMedia) ? confirmMedia - aparasMedia : null;
+      s += ` A apontada foi ${b(pct1(aparasMedia))}` + (dif != null ? `, ${fmt1(Math.abs(dif))} p.p. ${dif >= 0 ? "abaixo" : "acima"} da confirmada` : "") + ".";
+    }
+    return s + " Mais na tela Aparas.";
+  }
+  function rTmr(){
+    const per = periodo();
+    if(!ok(tmrMedio)) return `Não tenho TMR ${per}.`;
+    const comp = comparaMesAnterior(tmrMedio, "tmr");
+    const ativas = MAQUINAS.filter(m=>m.horasTot > 0).sort((a,b)=>a.tmr - b.tmr);
+    let s = `TMR ${per}: ${b(pct1(tmrMedio))}${comparado(comp)}.`;
+    if(ativas.length >= 2) s += ` Menor: ${b(esc(ativas[0].nome))} com ${ativas[0].tmr}%. Maior: ${b(esc(ativas.at(-1).nome))} com ${ativas.at(-1).tmr}%.`;
+    return s + " Mais na tela TMR.";
+  }
+  function rRanking(q){
+    const per = periodo();
+    const melhor = tem(q, "melhor", "maior tmr", "mais rapida");
+    if(tem(q, "refugo", "perda", "apara")){
+      const mapa = window.PERDA_POR_MAQ;
+      if(!mapa) return `Não tenho refugo por máquina ${per}.`;
+      const l = [...mapa].filter(([,kg])=>kg > 0).sort((a,b)=>b[1] - a[1]);
+      if(!l.length) return `Sem refugo apontado ${per}.`;
+      return `Mais refugo ${per}: ` + l.slice(0, 3).map(([id, kg])=>`${b(esc(id))} ${fmt(kg)} kg`).join(", ") + ". Mais na tela Aparas.";
+    }
+    if(tem(q, "velocidad", "rapid", "lent")){
+      const l = MAQUINAS.filter(m=>m.vel != null && m.velRef > 0).map(m=>({ m, r: m.vel / m.velRef }))
+        .sort((a,b)=> melhor ? b.r - a.r : a.r - b.r);
+      if(!l.length) return `Não tenho velocidade por máquina ${per}.`;
+      return `${melhor ? "Mais perto" : "Mais longe"} do próprio melhor mês ${per}: ` +
+        l.slice(0, 3).map(x=>`${b(esc(x.m.nome))} ${fmt(x.m.vel)} de ${fmt(x.m.velRef)} m/min`).join(", ") + ". Mais na tela TMR.";
+    }
+    const l = MAQUINAS.filter(m=>m.horasTot > 0).sort((a,b)=> melhor ? b.tmr - a.tmr : a.tmr - b.tmr);
+    if(!l.length) return `Nenhuma máquina com horas apontadas ${per}.`;
+    return `${melhor ? "Maior" : "Menor"} TMR ${per}: ` + l.slice(0, 3).map(m=>`${b(esc(m.nome))} ${m.tmr}%`).join(", ") + ". Mais na tela TMR.";
+  }
+  function rMaquina(id){
+    const per = periodo();
+    const m = MAQUINAS.find(x=>x.id === id);
+    const partes = [];
+    if(m){
+      if(m.horasTot > 0){
+        partes.push(`${b(esc(m.nome))} ${per}: TMR ${b(m.tmr + "%")} (${fmt(m.horasProd)} h produzindo de ${fmt(m.horasTot)} h)` +
+          (m.vel != null ? `, velocidade ${fmt(m.vel)} m/min${m.velRef ? ` (melhor mês ${fmt(m.velRef)})` : ""}` : "") + ".");
+      }else{
+        partes.push(`${b(esc(m.nome))} não tem horas apontadas ${per}.`);
+      }
+      const kg = window.PERDA_POR_MAQ ? window.PERDA_POR_MAQ.get(chaveMaq(id)) : null;
+      if(kg){
+        const mot = window.PERDA_MAQ_MOTIVO ? (window.PERDA_MAQ_MOTIVO.get(chaveMaq(id)) || [])[0] : null;
+        partes.push(`Refugo: ${fmt(kg)} kg${mot ? `, mais por ${esc(mot.nome)} (${fmt(mot.kg)} kg)` : ""}.`);
+      }
+    }
+    const ag = bancoLinhas("agora").find(r=>chaveMaq(r.maquina) === chaveMaq(id));
+    if(ag){
+      const e = estadoAgora(ag);
+      const desde = dataLocal(ag.terminou_em || ag.desde);
+      const ativ = limpaTexto(ag.cod_desc).replace(/^\d+\s*-\s*/, "");
+      partes.push(`Agora: ${b(esc(e.nome))}` + (ativ && norm(ativ) !== norm(e.nome) ? ` (${esc(ativ)})` : "") +
+        (desde ? ` desde ${fmtDMHM(desde)}` : "") + (ag.num_ordem ? `, OP ${esc(ag.num_ordem)}` : "") + ".");
+    }
+    const fila = bancoLinhas("programacao").filter(r=>chaveMaq(r.maquina) === chaveMaq(id)).sort((a,b)=>Number(a.posicao) - Number(b.posicao));
+    if(fila.length){
+      partes.push(`Fila: ${fmt(fila.length)} ${fila.length === 1 ? "OP" : "OPs"}; a próxima é a OP ${esc(fila[0].num_ordem || "—")}` +
+        (fila[0].cliente ? ` (${esc(limpaTexto(fila[0].cliente))})` : "") + ".");
+    }
+    return partes.length ? partes.join(" ") : `Não tenho dados de ${esc(id)}.`;
+  }
+  function rAgora(){
+    const linhas = bancoLinhas("agora");
+    if(!linhas.length) return esc(bancoVazio("agora", "Sem apontamento em andamento agora."));
+    const ate = linhas.map(r=>dataLocal(r.dados_ate)).filter(Boolean).sort((a,b)=>b - a)[0] || null;
+    const ref = ate && (Date.now() - ate) < 30 * 60000 ? new Date() : (ate || new Date());
+    const com = linhas.map(r=>({ r, e: estadoAgora(r) }));
+    const em = (x, g) => !x.r.terminou_em && AGORA_GRUPOS[g].includes(x.e.chave);
+    const prod = com.filter(x=>em(x, "produzindo")).length, setup = com.filter(x=>em(x, "setup")).length, fora = com.filter(x=>em(x, "fora")).length;
+    const paradas = com.filter(x=>!em(x, "produzindo") && !em(x, "setup") && !em(x, "fora"));
+    const lista = paradas.map(x=>({ x, desde: dataLocal(x.r.terminou_em || x.r.desde) }))
+      .sort((a,b)=>(a.desde || ref) - (b.desde || ref)).slice(0, 5)
+      .map(({ x, desde })=>`${b(esc(limpaTexto(x.r.maquina)))} ${esc(limpaTexto(x.r.cod_desc).replace(/^\d+\s*-\s*/, "") || x.e.nome)}` +
+        (desde ? ` há ${fmtDuracao((ref - desde) / 60000)}` : ""));
+    let s = `Agora${ate ? ` (dados até ${fmtHM(ate)})` : ""}: ${b(prod)} produzindo, ${b(setup)} em setup, ${b(paradas.length)} paradas` +
+      (fora ? ` e ${fora} fora de turno ou inativas` : "") + ".";
+    if(lista.length) s += `<br>Paradas há mais tempo: ${lista.join("; ")}.`;
+    return s + " Mais na tela Agora.";
+  }
+  function rPerda(){
+    const per = periodo();
+    if(!TIPOS_PERDA.length || !(perdaTotalKg > 0)) return `Sem refugo apontado ${per}.`;
+    const top = TIPOS_PERDA.slice(0, 3).map(t=>`${esc(t.nome)} ${fmt(t.kg)} kg (${fmt1(t.kg / perdaTotalKg * 100)}%)`);
+    let s = `Refugo ${per}: ${b(fmt1(perdaTotalKg / 1000) + " t")}. Maiores motivos: ${top.join(", ")}.`;
+    if(window.PERDA_POR_MAQ){
+      const l = [...window.PERDA_POR_MAQ].sort((a,b)=>b[1] - a[1]);
+      if(l.length && l[0][1] > 0) s += ` Máquina com mais refugo: ${b(esc(l[0][0]))} (${fmt(l[0][1])} kg).`;
+    }
+    return s + " Mais na tela Aparas.";
+  }
+  function rParadas(){
+    const per = periodo();
+    if(!PARADAS_TODAS || !PARADAS_TODAS.length) return `Sem paradas apontadas ${per}.`;
+    const porClasse = new Map();
+    PARADAS_TODAS.forEach(x=> porClasse.set(x.classeNome, (porClasse.get(x.classeNome) || 0) + x.horas));
+    const classes = [...porClasse].sort((a,b)=>b[1] - a[1]).slice(0, 3).map(([n, h])=>`${esc(n)} ${fmt(h)} h`);
+    const codigos = PARADAS_TODAS.slice(0, 3).map(x=>`${esc(x.nome)} ${fmt(x.horas)} h`);
+    return `Horas sem produzir ${per}, por classe: ${classes.join(", ")}. Maiores motivos: ${codigos.join(", ")}. Mais nas telas TMR e Tempo.`;
+  }
+  function rAderencia(){
+    const per = periodo();
+    if(!ok(aderMedia)) return `Sem programação ${per}.`;
+    const comp = comparaMesAnterior(aderMedia, "ader");
+    const tot = window.HUB_TOTAIS;
+    const l = MAQUINAS.filter(m=>m.aderencia != null && m.planKm > 0).sort((a,b)=>a.aderencia - b.aderencia);
+    let s = `Aderência ao plano ${per}: ${b(pct1(aderMedia))}${comparado(comp)}` +
+      (tot ? `, ${fmt(tot.realKm)} de ${fmt(tot.planKm)} km planejados` : "") + ".";
+    if(l.length) s += ` Menor: ${b(esc(l[0].nome))} com ${fmt(l[0].aderencia)}%.`;
+    return s + " Mais na tela Aderência.";
+  }
+  function rEntregas(){
+    const per = periodo();
+    const linhas = bancoLinhas("entregas");
+    const porClasse = CLASSES_ENTREGA.map(c=>({ ...c,
+      itens: linhas.filter(r=>String(r.status || "").trim().startsWith(c.k)).reduce((a,r)=>a + (Number(r.itens) || 0), 0) }));
+    const total = porClasse.reduce((a,c)=>a + c.itens, 0);
+    if(!total) return esc(bancoVazio("entregas", `Sem itens faturados ${per}.`));
+    const prazo = (porClasse[0].itens + porClasse[1].itens) / total * 100;
+    return `Entregas ${per}: ${b(pct1(prazo))} no prazo (Ótimo + Bom), de ${fmt(total)} itens faturados. ` +
+      porClasse.map(c=>`${c.nome} ${fmt(c.itens)}`).join(", ") + ". Mais na tela Aderência.";
+  }
+  function rFila(){
+    const linhas = bancoLinhas("programacao");
+    if(!linhas.length) return esc(bancoVazio("programacao", "Nenhuma OP na fila agora."));
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const porMaq = new Map();
+    linhas.forEach(r=>{ const k = limpaTexto(r.maquina); porMaq.set(k, (porMaq.get(k) || 0) + 1); });
+    const maiores = [...porMaq].filter(([k])=>!/PENDENCIA/i.test(k)).sort((a,b)=>b[1] - a[1]).slice(0, 3).map(([k, n])=>`${b(esc(k))} ${fmt(n)}`);
+    const vencidas = linhas.filter(r=>{ const e = dataLocal(r.entrega); return e && e < hoje; }).length;
+    return `Fila de programação agora: ${b(fmt(linhas.length))} OPs. Maiores filas: ${maiores.join(", ")}.` +
+      (vencidas ? ` ${b(fmt(vencidas))} OPs com a entrega já vencida.` : "") + ` Pergunte por uma máquina ("fila da L04") ou veja a tela Aderência.`;
+  }
+  function rSetup(){
+    const per = periodo();
+    const d = bancoLinhas("setup").map(r=>({ nome: limpaTexto(r.maquina), prog: Number(r.min_programado) || 0, real: Number(r.min_real) || 0 }))
+      .filter(x=>x.prog > 0 || x.real > 0);
+    if(!d.length) return esc(bancoVazio("setup", `Sem setup apontado ${per}.`));
+    const P = d.reduce((a,x)=>a + x.prog, 0), R = d.reduce((a,x)=>a + x.real, 0);
+    const piores = d.filter(x=>x.real > x.prog).sort((a,b)=>(b.real - b.prog) - (a.real - a.prog)).slice(0, 3)
+      .map(x=>`${b(esc(x.nome))} +${fmt((x.real - x.prog) / 60)} h`);
+    return `Setup ${per}: ${b(P > 0 ? fmt(R / P * 100) + "%" : "—")} do tempo programado (${fmt(R / 60)} h reais de ${fmt(P / 60)} h).` +
+      (piores.length ? ` Mais acima do programado: ${piores.join(", ")}.` : "") + " Mais na tela TMR.";
+  }
+  function rWip(){
+    const w = bancoLinhas("wip");
+    if(!w.length) return esc(bancoVazio("wip", "Sem WIP agora."));
+    const kg = w.reduce((a,r)=>a + (Number(r.kg) || 0), 0), pal = w.reduce((a,r)=>a + (Number(r.pallets) || 0), 0);
+    const velho = w.filter(r=>/mais de 90/.test(r.idade || "")).reduce((a,r)=>a + (Number(r.kg) || 0), 0);
+    const et = new Map();
+    w.forEach(r=>{ const k = limpaTexto(r.etapa) || "Sem etapa"; et.set(k, (et.get(k) || 0) + (Number(r.kg) || 0)); });
+    const [etapa, kgEt] = [...et].sort((a,b)=>b[1] - a[1])[0];
+    return `WIP agora: ${b(fmtT(kg))} em ${fmt(pal)} pallets; ${b(fmtT(velho))}${kg > 0 ? ` (${fmt1(velho / kg * 100)}%)` : ""} com mais de 90 dias. ` +
+      `Etapa com mais WIP: ${esc(etapa)} (${fmtT(kgEt)}). Mais na tela WIP.`;
+  }
+  function rCarteira(){
+    const c = bancoLinhas("carteira");
+    if(!c.length) return esc(bancoVazio("carteira", "Sem carteira em aberto."));
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    const vence = r => dataLocal(r.entrega_negociada) || dataLocal(r.entrega_cliente);
+    const kg = c.reduce((a,r)=>a + (Number(r.kg_saldo) || 0), 0);
+    const venc = c.filter(r=>{ const d = vence(r); return d && d < hoje; }).reduce((a,r)=>a + (Number(r.kg_saldo) || 0), 0);
+    const cli = new Map();
+    c.forEach(r=>{ const k = limpaTexto(r.cliente) || "Sem cliente"; cli.set(k, (cli.get(k) || 0) + (Number(r.kg_saldo) || 0)); });
+    const top = [...cli].sort((a,b)=>b[1] - a[1]).slice(0, 3).map(([k, v])=>`${esc(k)} ${fmtT(v)}`);
+    const semPeso = c.filter(r=>r.kg_saldo == null).length;
+    return `Carteira em aberto: ${b(fmtT(kg))} em ${fmt(c.length)} itens; ${b(fmtT(venc))} com a entrega pedida já vencida. Maiores clientes: ${top.join(", ")}.` +
+      (semPeso ? ` ${fmt(semPeso)} itens sem peso conhecido ficam fora das toneladas.` : "") + " Mais na tela WIP.";
+  }
+  function rLaudos(){
+    const per = periodo();
+    const l = bancoLinhas("laudos").map(r=>({ s: limpaTexto(r.status) || "Sem resultado", n: Number(r.laudos) || 0 })).filter(r=>r.n > 0);
+    const tot = l.reduce((a,r)=>a + r.n, 0);
+    if(!tot) return esc(bancoVazio("laudos", `Sem laudos emitidos ${per}.`));
+    const aprov = l.filter(r=>/^aprovado/i.test(r.s)).reduce((a,r)=>a + r.n, 0);
+    return `Laudos do CQ ${per}: ${b(pct1(aprov / tot * 100))} aprovados, de ${fmt(tot)} laudos. ` +
+      l.sort((a,b)=>b.n - a.n).map(r=>`${esc(r.s)} ${fmt(r.n)}`).join(", ") + ". Mais na tela Aparas.";
+  }
+  function rProdutividade(){
+    const per = periodo();
+    const tot = window.HUB_TOTAIS;
+    if(produtividade == null && !(tot && ok(tot.vel))) return `Não tenho produtividade ${per}.`;
+    let s = "";
+    if(produtividade != null){
+      const comp = comparaMesAnterior(produtividade, "prodt", { unidade:"m²/h", casas:0 });
+      s += `Produtividade ${per}: ${b(fmt(produtividade) + " m²/h")}${comparado(comp)}, m² ÷ horas de máquina produzindo.`;
+    }
+    if(tot && ok(tot.vel)) s += ` Velocidade média: ${b(fmt(tot.vel) + " m/min")}.`;
+    return s + " Mais na tela TMR.";
+  }
+  function rComparar(){
+    if(!mesAnteriorDoPeriodo()) return "A comparação é com o mês anterior quando o período escolhido é um mês. Escolha um mês no topo e pergunte de novo.";
+    const itens = [];
+    const add = (nome, atual, chave, op, texto) => { if(!ok(atual)) return; const c = comparaMesAnterior(atual, chave, op); if(c) itens.push(`${nome} ${texto}${comparado(c)}`); };
+    if(ok(tmrMedio)) add("TMR", tmrMedio, "tmr", undefined, pct1(tmrMedio));
+    if(ok(aderMedia)) add("aderência", aderMedia, "ader", undefined, pct1(aderMedia));
+    if(produtividade != null) add("produtividade", produtividade, "prodt", { unidade:"m²/h", casas:0 }, fmt(produtividade) + " m²/h");
+    add("refugo", perdaTotalKg / 1000, "perdaT", { unidade:"t", maiorMelhor:false }, fmt1(perdaTotalKg / 1000) + " t");
+    const ant = aparaMesAnterior();
+    if(ok(confirmMedia) && ant){
+      const dif = confirmMedia - ant.valor;
+      itens.push(`apara confirmada ${pct1(confirmMedia)} (${fmt1(Math.abs(dif))} p.p. ${dif > 0 ? "acima" : "abaixo"} de ${ant.rotulo})`);
+    }
+    if(!itens.length) return "Não tenho o mês anterior na série pra comparar.";
+    return `Contra o mês anterior: ${itens.join("; ")}.`;
+  }
+  // um mês da série (os 12 últimos fechados; a apara inclui o mês aberto)
+  function rMes(q, pedido){
+    const s = window.SERIE_MENSAL;
+    const mm = String(pedido.mes + 1).padStart(2, "0");
+    const iso = (s ? s.meses : []).filter(m=>m.endsWith("-" + mm) && (!pedido.ano || m.startsWith(String(pedido.ano)))).at(-1) || null;
+    const iA = MESES.indexOf(MESES_CURTOS[pedido.mes]);
+    const conf = iA >= 0 ? APARAS_MENSAL.confirmado[iA] : null, apon = iA >= 0 ? APARAS_MENSAL.apontado[iA] : null;
+    if(!iso && conf == null && apon == null) return `Não tenho ${MESES_NOME[pedido.mes]} na série dos últimos 12 meses. Escolha o mês no topo do painel.`;
+    const i = iso ? s.meses.indexOf(iso) : -1;
+    const v = k => i >= 0 && s[k] ? s[k][i] : null;
+    const hoje = new Date();
+    const aberto = !iso && pedido.mes === hoje.getMonth();
+    const nome = MESES_NOME[pedido.mes] + (iso ? "/" + iso.slice(0, 4) : "") + (aberto ? " (em andamento)" : "");
+    const algum = tem(q, "tmr", "apara", "scrap", "aderencia", "plano", "refugo", "perda", "produtividade", "m2", "velocidad");
+    const quer = (...k) => !algum || tem(q, ...k);
+    const partes = [];
+    if(quer("apara", "scrap")){
+      if(conf != null) partes.push(`apara confirmada ${b(pct1(conf))} (${conf <= META_APARAS ? "dentro" : "acima"} da meta de ${fmtMeta()})`);
+      if(apon != null) partes.push(`apontada ${pct1(apon)}`);
+    }
+    if(quer("tmr") && ok(v("tmr"))) partes.push(`TMR ${b(pct1(v("tmr")))}`);
+    if(quer("aderencia", "plano") && ok(v("ader"))) partes.push(`aderência ${b(pct1(v("ader")))}`);
+    if(quer("refugo", "perda") && ok(v("perdaT"))) partes.push(`refugo ${b(fmt1(v("perdaT")) + " t")}`);
+    if(quer("produtividade", "m2") && ok(v("prodt"))) partes.push(`produtividade ${b(fmt(v("prodt")) + " m²/h")}`);
+    if(quer("velocidad") && ok(v("vel"))) partes.push(`velocidade ${b(fmt(v("vel")) + " m/min")}`);
+    if(!partes.length) return `Não tenho esse indicador para ${nome}.`;
+    return `Em ${nome}: ${partes.join(", ")}.`;
+  }
+  function rResumo(){
+    const per = periodo();
+    const partes = [];
+    if(ok(confirmMedia)) partes.push(`apara confirmada ${b(pct1(confirmMedia))} (meta ${fmtMeta()})`);
+    else if(ok(aparasMedia)) partes.push(`apara apontada ${b(pct1(aparasMedia))}`);
+    if(ok(tmrMedio)) partes.push(`TMR ${b(pct1(tmrMedio))}`);
+    if(ok(aderMedia)) partes.push(`aderência ${b(pct1(aderMedia))}`);
+    if(perdaTotalKg > 0) partes.push(`refugo ${b(fmt1(perdaTotalKg / 1000) + " t")}`);
+    let s = partes.length ? `Resumo ${per}: ${partes.join(", ")}.` : `Sem dados ${per}.`;
+    const ag = bancoLinhas("agora");
+    if(ag.length){
+      const n = ag.filter(r=>!r.terminou_em && estadoAgora(r).chave === "PRODUZINDO").length;
+      s += ` Agora, ${b(n)} de ${ag.length} máquinas produzindo.`;
+    }
+    return s;
+  }
+
+  const SUGESTOES = ["Como está a apara?", "Qual máquina teve o pior TMR?", "O que está parado agora?", "Compare com o mês anterior", "Entregas no prazo", "Como está a carteira?"];
+  function responder(texto){
+    if(window.FALHA_CARGA || USANDO_DADOS_REAIS !== true) return { html: "Sem dados carregados no painel agora." };
+    const q = norm(texto);
+    const maq = acharMaquina(q);
+    if(maq && !tem(q, "pior", "melhor", "ranking")) return { html: rMaquina(maq), sug: ["O que está parado agora?", "Qual máquina teve o pior TMR?"] };
+    if(tem(q, "agora", "neste momento", "nesse momento", "esta parad", "estao parad", "chao de fabrica")) return { html: rAgora(), sug: ["Qual máquina teve o pior TMR?", "Fila de programação"] };
+    if(tem(q, "compar", "mes anterior", "mes passado")) return { html: rComparar(), sug: ["Como está a apara?", "Resumo"] };
+    const mes = mesPedido(q);
+    if(mes) return { html: rMes(q, mes), sug: ["Compare com o mês anterior"] };
+    if(tem(q, "pior", "melhor", "ranking") || (tem(q, "mais", "maior", "menor") && tem(q, "maquina"))) return { html: rRanking(q), sug: ["Como está a R18?", "O que está parado agora?"] };
+    if(tem(q, "apara", "scrap")) return { html: rApara(), sug: ["Refugo por motivo", "Compare com o mês anterior"] };
+    if(tem(q, "tmr", "eficien", "tempo de maquina")) return { html: rTmr(), sug: ["Horas paradas por motivo", "Qual máquina teve o pior TMR?"] };
+    if(tem(q, "fila", "programacao", "proxima", "proximas")) return { html: rFila(), sug: ["Fila da L04", "Entregas no prazo"] };
+    if(tem(q, "entrega", "prazo", "otimo", "pessimo")) return { html: rEntregas(), sug: ["Como está a carteira?", "Fila de programação"] };
+    if(tem(q, "setup")) return { html: rSetup(), sug: ["Como está o TMR?"] };
+    if(tem(q, "wip", "pallet", "em processo")) return { html: rWip(), sug: ["Como está a carteira?"] };
+    if(tem(q, "carteira", "pedido", "vencid", "faturad")) return { html: rCarteira(), sug: ["Entregas no prazo", "Como está o WIP?"] };
+    if(tem(q, "laudo", "cq", "qualidade", "aprovad", "reprovad")) return { html: rLaudos(), sug: ["Como está a apara?"] };
+    if(tem(q, "refugo", "perda", "motivo")) return { html: rPerda(), sug: ["Qual máquina tem mais refugo?", "Como está a apara?"] };
+    if(tem(q, "parad", "parou", "downtime")) return { html: rParadas(), sug: ["O que está parado agora?", "Como está o TMR?"] };
+    if(tem(q, "aderencia", "plano", "planejado", "realizado")) return { html: rAderencia(), sug: ["Fila de programação", "Entregas no prazo"] };
+    if(tem(q, "produtividade", "m2", "velocidad")) return { html: rProdutividade(), sug: ["Qual máquina está mais lenta?"] };
+    if(tem(q, "resumo", "como esta", "como estamos", "visao geral", "geral", "bom dia", "boa tarde", "boa noite", "ola", "oi\\b")) return { html: rResumo(), sug: SUGESTOES.slice(0, 3) };
+    return { html: "Ainda não sei responder isso. Pergunte sobre apara, TMR, uma máquina (ex.: R18), o que está parado agora, entregas, fila, setup, WIP, carteira, laudos ou um mês (ex.: agosto).", sug: SUGESTOES };
+  }
+
+  function ask(text){
     if(esperando) return;
     esperando = true;
     sendBtn.disabled = true;
     addMsg("user", esc(text));
     input.value = "";
-    const typing = addMsg("bot", `<div class="typing" aria-label="Respondendo"><span></span><span></span><span></span></div>`);
-    const { de, ate } = periodoDaUrl();
-    try{
-      if(!window.gualapackAuth) throw new Error("sem cliente do Supabase");
-      const { data, error } = await window.gualapackAuth.functions.invoke("assistente", {
-        body: { pergunta: text, historico: historico.slice(-10), periodo: { de: isoDate(de), ate: isoDate(ate) } },
-      });
-      if(error) throw error;
-      const resposta = data && typeof data.resposta === "string" ? data.resposta.trim() : "";
-      if(!resposta) throw new Error("resposta vazia");
-      historico.push({ papel:"usuario", texto:text }, { papel:"assistente", texto:resposta });
-      typing.remove();
-      addMsg("bot", formatar(resposta));
-    }catch(err){
-      console.error("assistente:", err);
-      typing.remove();
-      addMsg("bot", await mensagemDeErro(err));
-    }finally{
+    // a resposta sai na hora; o "digitando" curto só marca a vez de responder
+    const typing = reduzMovimento() ? null : addMsg("bot", `<div class="typing" aria-label="Respondendo"><span></span><span></span><span></span></div>`);
+    const entregar = ()=>{
+      if(typing) typing.remove();
+      let r;
+      try{ r = responder(text); }
+      catch(err){ console.error("assistente:", err); r = { html: "Não consegui montar essa resposta. Tente perguntar de outro jeito.", sug: SUGESTOES.slice(0, 3) }; }
+      addMsg("bot", r.html);
+      addSuggestions(r.sug);
       esperando = false;
       sendBtn.disabled = false;
-      input.focus();
-    }
+      input.focus({ preventScroll:true });
+    };
+    if(typing) setTimeout(entregar, 280); else entregar();
   }
 
   const aberto = () => panel.classList.contains("open");
@@ -4367,8 +4696,9 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       body.dataset.inited = "1";
       const { de, ate } = periodoDaUrl();
       const rotulo = window.rotuloPeriodo ? window.rotuloPeriodo(de, ate) : "o período selecionado";
-      addMsg("bot", `Olá! Respondo com os números do painel, os mesmos do BI Indicadores de Produção. Se a pergunta não disser o período, uso o selecionado no topo (<b>${esc(rotulo)}</b>).`);
-      addSuggestions(["Como está a apara neste período?", "Qual máquina teve o pior TMR?", "Compare com o mês anterior"]);
+      addMsg("bot", `Olá! Respondo na hora com os números do painel, do período escolhido no topo (<b>${esc(rotulo)}</b>). ` +
+        `Pergunte sobre apara, TMR, uma máquina, o que está parado agora, entregas, fila, setup, WIP, carteira, laudos ou um mês.`);
+      addSuggestions(SUGESTOES.slice(0, 4));
     }
     input.focus({ preventScroll:true });
   }
@@ -4386,6 +4716,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   document.addEventListener("keydown", e=>{ if(e.key==="Escape" && aberto()) fechar(); });
   sendBtn.addEventListener("click", ()=>{ if(input.value.trim()) ask(input.value.trim()); });
   input.addEventListener("keydown", e=>{ if(e.key==="Enter" && input.value.trim()) ask(input.value.trim()); });
+  window.perguntarAoAssistente = texto => responder(texto).html;   // usado nos testes
 })();
 
 const footerNote = document.getElementById("footer-note");
