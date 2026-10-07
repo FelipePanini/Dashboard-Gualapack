@@ -17,6 +17,7 @@ Regras que existem por causa de falhas reais:
 from __future__ import annotations
 
 import calendar
+import fnmatch
 import hashlib
 import json
 import multiprocessing
@@ -323,9 +324,13 @@ def sincronizar_fontes(con: duckdb.DuckDBPyConnection, fontes: list[dict]) -> No
         )
 
 
-def inventariar_pasta(con: duckdb.DuckDBPyConnection, run_id: int, pasta: Path | None, fontes: list[dict]) -> None:
+def inventariar_pasta(con: duckdb.DuckDBPyConnection, run_id: int, pasta: Path | None, fontes: list[dict],
+                      ignorar: list[str] | tuple[str, ...] = ()) -> None:
     """Arquivo deixado na pasta de entrada (ou subpasta) que nenhuma fonte usa
-    vira aviso no relatório: é assim que uma planilha nova aparece pra ser catalogada."""
+    vira aviso no relatório: é assim que uma planilha nova aparece pra ser catalogada.
+    `ignorar` (ignorar_na_pasta do fontes.local.yaml): nomes, com * e ?, de
+    arquivos que estão lá de propósito e não são fonte (as planilhas que o
+    banco substituiu em 05/10/2026 continuam na pasta pro time)."""
     if pasta is None:
         return
     if not pasta.exists():
@@ -340,7 +345,8 @@ def inventariar_pasta(con: duckdb.DuckDBPyConnection, run_id: int, pasta: Path |
             pass  # a coleta já registra arquivo ausente
     for arq in sorted(pasta.rglob("*")):
         if (not arq.is_file() or arq.name.startswith("~$")
-                or arq.suffix.lower() not in EXTENSOES_DE_DADOS or arq.resolve() in usados):
+                or arq.suffix.lower() not in EXTENSOES_DE_DADOS or arq.resolve() in usados
+                or any(fnmatch.fnmatch(arq.name.lower(), padrao.lower()) for padrao in ignorar)):
             continue
         onde = arq.relative_to(pasta)
         if arq.suffix.lower() == ".pbix":

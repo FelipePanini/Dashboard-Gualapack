@@ -1,10 +1,13 @@
 """Publicação no Supabase: o que o hub validou vai para a camada trusted.
-O painel web usa de dois jeitos: a página "Qualidade dos dados" mostra a
-validação, e os cartões leem séries por dia (CONJUNTOS: horas do Machine
-Card, apara da BASE_PROD, perda, aderência, kg e m² por máquina) que o
-Supabase soma no período, com as regras do BI Indicadores Produção
-(sql/supabase/002_cartoes.sql). A linha do tempo usa os apontamentos do BI
-Dados de Produção.
+O painel web usa de três jeitos: a página "Qualidade dos dados" mostra a
+validação; os cartões leem séries por dia (CONJUNTOS: horas do Machine Card,
+apara da BASE_PROD, perda, aderência, m² por máquina, entregas, setup, laudos
+e faturamento) que o Supabase soma no período, com as regras do BI
+Indicadores Produção (sql/supabase/002_cartoes.sql e 005_banco.sql); e as
+fotos do estado atual (FOTOS: máquinas agora, fila de programação, WIP,
+carteira) vão inteiras a cada publicação. Tudo sai do banco da fábrica, menos
+os lançamentos manuais (aderência diária, fardos e apara confirmada). A linha
+do tempo usa os apontamentos do banco.
 
 Quem publica é um usuário técnico do painel (scripts/criar_usuario_hub.py),
 não a chave mestra do Supabase: a senha fica no Cofre de Credenciais do
@@ -27,6 +30,7 @@ from pathlib import Path
 
 import duckdb
 import keyring
+import polars as pl
 import requests
 
 from hub.caminhos import RAIZ
@@ -138,40 +142,64 @@ def montar_pacote(con: duckdb.DuckDBPyConnection, run_id: int, cfg: dict) -> dic
                      "terminada_em": _iso(execucao[2]), "status": execucao[3]},
         "fontes": fontes, "indicadores": indicadores, "validacao": validacao, "avisos": avisos,
     }
-    if tabela_existe(con, "clean.pbi_apontamento"):
+    if tabela_existe(con, "raw.banco__apontamentos"):
         pacote["codigos"] = codigos(con)
         pacote["ultimo_dia"] = ultimo_dia(con)
     if tabela_existe(con, "clean.base_prod") and tabela_existe(con, "clean.apara_confirmada_mes"):
         pacote["apara_mes"] = apara_mes(con)
+    for chave, (tabela, consulta) in FOTOS.items():
+        if tabela_existe(con, tabela):
+            pacote[chave] = _linhas(con, consulta)
     return pacote
 
 
-# -- horas do BI pros cartões do painel -------------------------------------------
+def _linhas(con: duckdb.DuckDBPyConnection, consulta: str) -> list[dict]:
+    """Linhas de uma consulta prontas pro JSON: data "2026-10-05", data e hora
+    "2026-10-05T12:40:00" (hora da fábrica, sem fuso), NaN vira null."""
+    df = con.execute(consulta).pl()
+    df = df.with_columns(
+        [pl.col(c).dt.strftime("%Y-%m-%d") for c, tipo in df.schema.items() if tipo == pl.Date]
+        + [pl.col(c).dt.strftime("%Y-%m-%dT%H:%M:%S") for c, tipo in df.schema.items() if isinstance(tipo, pl.Datetime)]
+        + [pl.col(c).fill_nan(None) for c, tipo in df.schema.items() if tipo in (pl.Float32, pl.Float64)])
+    return df.to_dicts()
+
+
+# -- códigos e linha do tempo, do banco ----------------------------------------------
+_COD = """case when length(cast(try_cast(cod_apont as integer) as varchar)) = 1
+                then '0' || cast(try_cast(cod_apont as integer) as varchar)
+                else cast(try_cast(cod_apont as integer) as varchar) end"""
+
+
 def codigos(con: duckdb.DuckDBPyConnection) -> list[dict]:
-    """Cada código de apontamento do BI com a descrição do BI e a classe do
-    cadastro oficial. Código sem cadastro vai como SEM CLASSIFICACAO."""
+    """Cada código de apontamento do banco com a descrição do banco e a classe
+    da tabela-padrão. Código sem cadastro vai como SEM CLASSIFICACAO."""
     return [{"cod": c[0], "descricao": c[1], "classe": c[2]} for c in con.execute(
-        """with bi as (   -- mesmo zero à esquerda do clean (lpad do DuckDB corta texto)
-             select case when length(cast(cod_apont as varchar)) = 1 then '0' || cast(cod_apont as varchar)
-                         else cast(cod_apont as varchar) end as cod,
-                    any_value(cast(cod_desc as varchar)) as descricao
-             from raw.pbi__apontamentos where cod_apont is not null group by 1)
-           select bi.cod, bi.descricao, coalesce(c.classe, 'SEM CLASSIFICACAO')
-           from bi left join clean.classificacao c on c.cod = bi.cod
-           order by bi.cod""").fetchall()]
+        f"""with b as (   -- mesmo zero à esquerda do clean (lpad do DuckDB corta texto)
+             select {_COD} as cod, any_value(trim(cod_desc)) as descricao
+             from raw.banco__apontamentos where try_cast(cod_apont as integer) is not null group by 1)
+           select b.cod, b.descricao, coalesce(c.classe, 'SEM CLASSIFICACAO')
+           from b left join clean.classificacao c on c.cod = b.cod
+           order by b.cod""").fetchall()]
 
 
 def ultimo_dia(con: duckdb.DuckDBPyConnection) -> list[dict]:
-    """Eventos do último dia do BI, pra linha do tempo das máquinas."""
+    """Eventos do último dia de produção do banco, pra linha do tempo das
+    máquinas. O evento ainda em andamento (fim vazio, "data zero") vai até a
+    hora do dado mais novo; registro instantâneo (fim = início) fica de fora."""
     return [{"maquina": e[0], "cod_apont": e[1], "hora_inicio": _hora_fabrica(e[2]),
              "hora_fim": _hora_fabrica(e[3]), "num_ordem": e[4]} for e in con.execute(
-        """select upper(trim(cast(cod_recurso as varchar))),
-                  case when length(cast(cod_apont as varchar)) = 1 then '0' || cast(cod_apont as varchar)
-                       else cast(cod_apont as varchar) end,
-                  cast(hora_inicio as timestamp), cast(hora_fim as timestamp), cast(num_ordem as varchar)
-           from raw.pbi__apontamentos
-           where cast(dt_producao as date) = (select max(dia) from clean.pbi_apontamento)
-             and cod_recurso is not null and hora_inicio is not null and hora_fim is not null
+        f"""with a as (select * from raw.banco__apontamentos
+                        where cod_recurso is not null and hora_inicio > timestamp '2000-01-01'
+                          and hora_inicio < current_date + interval 2 day),   -- data errada no futuro não conta
+                ref as (select max(cast(dt_producao as date)) filter (where dt_producao < current_date + interval 2 day) as dia,
+                               max(dt_inclusao) filter (where dt_inclusao < current_date + interval 2 day) as agora from a)
+           select upper(trim(cod_recurso)), {_COD}, hora_inicio,
+                  case when hora_fim is null or hora_fim < timestamp '1901-01-01'
+                       then greatest(ref.agora, hora_inicio) else hora_fim end,
+                  nullif(trim(num_ordem), '')
+           from a, ref
+           where cast(a.dt_producao as date) = ref.dia
+             and (hora_fim is null or hora_fim < timestamp '1901-01-01' or hora_fim > hora_inicio)
            order by 1, 3""").fetchall()]
 
 
@@ -199,20 +227,43 @@ CONJUNTOS: dict[str, tuple[str, str]] = {
         select dia, maquina, coalesce(num_ordem, '') as num_ordem,
                round(sum(planejado), 3) as planejado, round(sum(produzido), 3) as produzido
         from clean.aderencia group by all"""),
-    # apara de cada máquina (detalhe): aba Base Apontamentos (kg) do Indicadores Diário
-    "kg_maquina_dia": ("raw.indicadores__producao_kg", """
-        select cast(dt_producao as date) as dia, upper(trim(cast(cod_recurso as varchar))) as maquina,
-               round(sum(coalesce(try_cast(peso_bruto as double), 0)), 3) as peso_bruto,
-               round(sum(coalesce(try_cast(refugo as double), 0)), 3) as refugo
-        from raw.indicadores__producao_kg
-        where dt_producao is not null and cod_recurso is not null group by all"""),
-    # produtividade (m² por hora de máquina): aba Produção (Metros) do Machine Card
-    "m2_maquina_dia": ("raw.machine_card__producao_metros", """
-        select cast(dt_producao as date) as dia, upper(trim(cast(cod_recurso as varchar))) as maquina,
-               round(sum(coalesce(try_cast(producao_m as double), 0)), 3) as m2,
-               round(sum(coalesce(try_cast(qtd_horas as double), 0)), 6) as horas
-        from raw.machine_card__producao_metros
-        where dt_producao is not null and cod_recurso is not null group by all"""),
+    # produtividade (m² por hora de máquina): a consulta "Produção" do Machine Card, refeita do banco
+    "m2_maquina_dia": ("clean.producao_metros", """
+        select dia, maquina_painel as maquina,
+               round(sum(coalesce(m2, 0)), 3) as m2, round(sum(coalesce(horas, 0)), 6) as horas
+        from clean.producao_metros group by all"""),
+    # --- 005_banco.sql: o que o painel ganhou com a leitura direta do banco ---
+    # entregas no prazo: a classificação do PCP por item faturado
+    "entrega_dia": ("clean.entrega_dia", """
+        select dia, status, cliente, itens, notas from clean.entrega_dia"""),
+    # setup programado x real por máquina
+    "setup_dia": ("clean.setup_dia", """
+        select dia, maquina, atividades, round(min_programado, 3) as min_programado,
+               round(min_real, 3) as min_real, acima_do_programado
+        from clean.setup_dia"""),
+    # laudos do CQ por status
+    "laudo_dia": ("clean.laudo_dia", """
+        select dia, status, laudos, analises from clean.laudo_dia"""),
+    # faturamento de produto acabado (kg = m² × gramatura ÷ 1000)
+    "faturamento_dia": ("clean.faturamento_dia", """
+        select dia, cliente, notas, itens, round(m2, 3) as m2, round(kg, 3) as kg from clean.faturamento_dia"""),
+}
+# Conjuntos que só existem a partir do 005_banco.sql: sem ele, o Supabase não
+# conhece o conjunto e eles ficam de fora, com um aviso (o resto publica normal).
+CONJUNTOS_005 = {"entrega_dia", "setup_dia", "laudo_dia", "faturamento_dia"}
+
+# Fotos do estado atual: vão inteiras no pacote, a cada publicação (005_banco.sql).
+FOTOS: dict[str, tuple[str, str]] = {
+    "agora": ("clean.maquina_agora", "select * from clean.maquina_agora order by maquina"),
+    "programacao": ("clean.programacao", """
+        select maquina, posicao, num_ordem, cliente, produto, atividade, situacao, ini_plan, fim_plan, entrega,
+               qtd_planejada, qtd_produzida, saldo
+        from clean.programacao order by maquina, posicao"""),
+    "wip": ("clean.wip", "select * from clean.wip order by etapa, local, cliente, idade"),
+    "carteira": ("clean.carteira_aberta", """
+        select * from clean.carteira_aberta
+        order by coalesce(entrega_pcp, entrega_cliente) nulls last, num_pedido, item"""),
+    "carteira_mes": ("clean.carteira_mes", "select * from clean.carteira_mes order by mes"),
 }
 
 
@@ -301,14 +352,20 @@ def publicar(con: duckdb.DuckDBPyConnection, run_id: int, cfg: dict, republicar:
     if republicar:
         con.execute("delete from publicacao_mes")
     ja_foi = {(c, m): a for c, m, a in con.execute("select conjunto, mes, assinatura from publicacao_mes").fetchall()}
-    enviados = {}
+    enviados, sem_005 = {}, []
     for conjunto in CONJUNTOS:
         for mes, assinatura in sorted(assinaturas(con, conjunto).items()):
             if ja_foi.get((conjunto, mes)) == assinatura:
                 continue
             linhas = linhas_do_mes(con, conjunto, mes)
-            resposta = enviar({"conjunto": conjunto, "de": mes.isoformat(), "ate": _fim_do_mes(mes).isoformat(),
-                               "linhas": linhas})
+            try:
+                resposta = enviar({"conjunto": conjunto, "de": mes.isoformat(), "ate": _fim_do_mes(mes).isoformat(),
+                                   "linhas": linhas})
+            except PublicacaoFalhou as e:
+                if conjunto in CONJUNTOS_005 and "conjunto desconhecido" in str(e):
+                    sem_005.append(conjunto)
+                    break  # o Supabase ainda não tem o 005: os outros meses deste conjunto também não entram
+                raise
             if resposta.get("linhas") != len(linhas):
                 raise PublicacaoFalhou(f"o Supabase não gravou '{conjunto}' ({resposta}): falta rodar "
                                        "hub/sql/supabase/002_cartoes.sql no SQL Editor e depois 'uv run hub publicar'")
@@ -318,5 +375,6 @@ def publicar(con: duckdb.DuckDBPyConnection, run_id: int, cfg: dict, republicar:
                         [conjunto, mes, assinatura])
             enviados[conjunto] = enviados.get(conjunto, 0) + 1
     series = ", ".join(f"{c} {n} mês(es)" for c, n in enviados.items()) or "nenhuma série mudou"
+    falta = (f"; sem o 005_banco.sql no Supabase, ficaram de fora: {', '.join(sem_005)}" if sem_005 else "")
     return (f"publicado: {len(pacote['validacao'])} validações, {len(pacote['fontes'])} fontes, "
-            f"{len(pacote['avisos'])} avisos, {len(pacote.get('ultimo_dia', []))} eventos do último dia; {series}")
+            f"{len(pacote['avisos'])} avisos, {len(pacote.get('ultimo_dia', []))} eventos do último dia; {series}{falta}")

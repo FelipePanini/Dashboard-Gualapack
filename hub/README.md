@@ -1,17 +1,19 @@
 # Data hub de produção
 
-Lê as planilhas de uma pasta na Área de Trabalho, padroniza, mede cada
-indicador em cada fonte e compara com a fonte oficial. Cada número sai com
-status e com a linhagem de onde veio. Roda no PC com Python e um banco local
-(DuckDB), sem API do Google e sem copiar planilha para lugar nenhum.
+Lê o banco da fábrica (Metrics, só leitura) e as planilhas de lançamento
+manual, padroniza, aplica as regras dos BIs de Produção, mede cada indicador
+em cada fonte e compara com a fonte oficial. Cada número sai com status e com
+a linhagem de onde veio. Roda num PC da rede da fábrica, com Python e um banco
+local (DuckDB).
 
 ```
-pasta compartilhada (originais)       ← você atualiza as planilhas aqui
-      │  a cada 30 min: copia o que mudou (espelho)
-      ▼
-Área de Trabalho\Dados do Painel\     cópias que o hub lê
-      │  mudou algo? (Agendador de Tarefas, --se-mudou)
-      ▼
+SQL Server da fábrica (Metrics)          pasta compartilhada (originais)
+      │  só leitura, a cada 10 min              │  a cada 10 min: copia o que mudou (espelho)
+      ▼                                         ▼
+data/extracao/banco/*.parquet            Área de Trabalho\Dados do Painel\
+      └─────────────────┬───────────────────────┘
+                        │  mudou algo? (Agendador de Tarefas, --se-mudou)
+                        ▼
 coleta: contrato de colunas, SHA-256, data máxima do dado
       ▼
 data/hub.duckdb
@@ -23,9 +25,9 @@ data/hub.duckdb
       ▼
 relatorios/qualidade.html + validacao.csv + correcoes.csv
       ▼
-Supabase, schema trusted (só agregados)  →  painel: todos os cartões, com as regras
-                                            do BI Indicadores Produção, e a página
-                                            "Qualidade dos dados"
+Supabase, schema trusted (agregados e      →  painel: os cartões, com as regras dos
+fotos pequenas do estado atual)                BIs, as telas do banco e a página
+                                               "Qualidade dos dados"
 ```
 
 Nenhuma etapa usa IA. A atualização é determinística e não gasta tokens.
@@ -90,31 +92,61 @@ funcionam.
 
 ## Banco da fábrica (desde 05/10)
 
-As planilhas e os dois BIs leem a mesma view do banco (Metrics,
-`View_usr_apontamentos_999999`); cada um só aplica filtros diferentes. O hub
-passou a ler a view direto (`hub/banco.py`), e as planilhas e os BIs viraram
-conferência:
+As planilhas e os BIs leem as mesmas views do banco (Metrics); cada um só
+aplica filtros diferentes. O hub lê as views direto, com os filtros dos Power
+Query, e as planilhas e os BIs viraram conferência.
 
-- **Conector:** leitura direta (`sqlserver.py`, só SELECT, `ApplicationIntent=ReadOnly`)
-  com o usuário de leitura que o TI liberou. Usuário e senha ficam só no
-  Cofre de Credenciais do Windows: quem guarda é você, rodando
+- **Só leitura:** usuário de leitura que o TI liberou, conexão com
+  `ApplicationIntent=ReadOnly` e uma trava no código (`sqlserver.so_leitura`)
+  que só deixa passar uma consulta (SELECT ou WITH). INSERT, UPDATE, DELETE,
+  MERGE, EXEC, CREATE, ALTER, DROP, TRUNCATE, SELECT INTO e afins são
+  recusados antes de chegar ao banco. Usuário e senha ficam só no Cofre de
+  Credenciais do Windows: quem guarda é você, rodando
   `scripts/guardar_acesso_banco.py` (a senha não aparece, não vai pra arquivo
-  nem pro git). Um mês leva cerca de 1 s. Puxa um mês por vez, filtrado no
-  banco, só nas colunas que as planilhas usam (nunca nome de operador nem
-  observação). Antes da troca, os 22 meses de jan/2025 a out/2026 saíram
-  idênticos, linha a linha, ao que o Excel extraía.
-- **Reserva:** se a conexão direta falhar, o hub avisa e usa o Excel
-  (`scripts/extrair_excel.ps1`, com o login salvo nele). `banco.conector: excel`
-  no `fontes.local.yaml` força esse caminho.
+  nem pro git). Servidor e banco ficam em `config/sqlserver.local.yaml`, fora
+  do git. Sem conexão, o hub avisa e segue com o que já tinha; não há mais
+  caminho pelo Excel.
 - **Mapa do banco:** `scripts/mapear_banco.py` lista tabelas, views e colunas
   que o acesso enxerga (só catálogo, nenhum dado) em `data/mapa_banco/`.
-- **Arquivos:** um parquet por mês em `data/extracao/banco`, desde jan/2025.
-  Cada execução relê os 2 meses mais recentes e os que faltam, e só regrava um
-  mês quando o dado mudou. A fonte `banco.apontamentos` empilha os meses.
-- **Regras:** nos meses que o banco cobre, a tabela Horas do Machine Card (TMR,
-  velocidade, paradas) e a perda código 40 são montadas da view, como os Power
-  Query das planilhas (classificação pela tabela-padrão
-  `Classificação_Apontamentos.xlsx`). Nos outros meses, as planilhas.
+- **Apontamentos** (`banco.py`): `View_usr_apontamentos_999999`, um parquet
+  por mês em `data/extracao/banco` desde jan/2025, só nas colunas usadas
+  (nunca nome de operador nem observação). Cada execução relê os 2 meses mais
+  recentes e os que faltam, e só regrava um mês quando o dado mudou; mês que
+  volta vazio não apaga o anterior. A fonte `banco.apontamentos` empilha os
+  meses.
+- **As outras leituras** (`extracoes.py`), cada uma no seu intervalo. Uma
+  leitura com erro não derruba as outras: vira aviso e o arquivo anterior
+  continua valendo.
+
+  | Fonte | No banco | Como |
+  |---|---|---|
+  | `banco.estrutura_largura` | `EstrProcessos` | foto a cada 6 h: largura de cada estrutura (m² da produção) |
+  | `banco.maquina_agora` | `CTREntradasMaquina`, status 1 | foto: a OP aberta em cada máquina |
+  | `banco.programacao` | `view_usr_ProgramacaoPlanner` | foto: a fila (alocado, não finalizado) |
+  | `banco.programacao_pcp` | `View_usr_programacao_teruel` | foto a cada 1 h, e a primeira de cada dia guardada em `historico/` |
+  | `banco.wip` | `view_usr_pallet_wip_disponiveis` | foto |
+  | `banco.gramatura_produto` | `EstrComponentes` + `EstruturasOp` | foto a cada 6 h: gramatura de cada produto |
+  | `banco.carteira` | `View_usr_ListaPedidosVenda` | foto a cada 10 min, sem preço nem vendedor |
+  | `banco.faturamento` | `view_usr_notas_saida_entrada_custo` | por mês: notas de produto acabado |
+  | `banco.entregas` | `View_usr_Entregas_Desempenho` | por mês: a consulta e a classificação da Aderência Semanal |
+  | `banco.setup` | `View_usr_Acompanhamento_Prod` | por mês, a cada 30 min |
+  | `banco.laudos` | `view_usr_LaudoAnalise` | por mês, desde jan/2026, sem o analista |
+
+- **Regras:** a tabela Horas do Machine Card (TMR, velocidade, paradas), a
+  perda código 40, a BASE_PROD (apara apontada e peso bruto) e a produção em
+  m² são montadas dos apontamentos, como os Power Query das planilhas. A
+  classe de cada código vem de `config/classificacao_apontamentos.csv`, cópia
+  da tabela-padrão `Classificação_Apontamentos.xlsx` (113 códigos). Código
+  novo aparece como "SEM CLASSIFICACAO" e na checagem 010 até entrar no CSV.
+- **Carteira:** a view repete o item do pedido uma vez por entrega (junta
+  `COMREntregas`), com a quantidade do item inteiro em cada repetição; o hub
+  conta um item por linha. E o `TotalKG` dela usa o `PesoEMKG` do cadastro,
+  que é 1,0 (ou 0) na maioria dos produtos vendidos em m². O hub pesa em KG
+  pela própria quantidade e em M2 por m² × gramatura da estrutura ÷ 1000 (a
+  mesma "Gramatura Total" das notas, igual em 1.648 de 1.648 produtos
+  faturados). Milheiro, metro e cm² ficam sem peso, e o painel diz quantos.
+  Em 05/10: carteira aberta 811 t, onde a view somava 2.190 t; em agosto, 306
+  t pedidas, 346 t produzidas e 346 t faturadas.
 - **Conferido em 05/10:**
   - **Igual linha a linha:** a tabela Horas do banco é igual à da planilha em 18
     dos 22 meses, mesmo número de linhas, horas e metros.
@@ -125,15 +157,23 @@ conferência:
     planilha, também.
   - **Fevereiro a abril/2025:** o banco tem 4.053 linhas incluídas em lote em
     03/04/2025, quase todas de 0 h, que a planilha de 2025 não tem.
-- **Ainda das planilhas:** apara apontada (BASE_PROD), aderência (programação),
-  apara confirmada (balança, digitada) e m² (produtividade).
+  - **Séries publicadas, tudo pelo banco:** horas e perda iguais às de antes
+    em 22 de 22 meses, aderência em 12 de 12, apara apontada de jun/2025 a
+    ago/2026 e m² de jan a set/2026 (outubro mais atual; 2025 passou a
+    existir).
+- **Ainda de planilha:** a apara confirmada (Sequenciamento dos fardos,
+  Acumulado e Refugo Aparas, lançados à mão) e a aderência (ADERÊNCIA DIÁRIA
+  do PCP: o banco só guarda a programação atual; com as fotos diárias de
+  `banco.programacao_pcp`, ela poderá vir do banco).
 
 ## Execução automática
 
 Tarefa "Gualapack Data Hub" no Agendador de Tarefas do Windows. Ela roda a
-cada 30 minutos com o usuário logado, sem abrir janela. Só processa se algo
-mudou na pasta ou na configuração, e ao menos uma vez por dia (o frescor
-depende da data de hoje). O registro fica em `logs/hub-AAAA-MM.log`.
+cada 10 minutos com o usuário logado, sem abrir janela. A cada rodada lê o
+banco (só regrava o mês ou a foto que mudou) e copia as planilhas manuais que
+mudaram; o resto só roda se algo mudou no banco, na pasta ou na configuração,
+e ao menos uma vez por dia (o frescor depende da data de hoje). O registro
+fica em `logs/hub-AAAA-MM.log`.
 
 ```powershell
 schtasks /Query /TN "Gualapack Data Hub"     # ver
@@ -148,18 +188,24 @@ jeitos:
 
 - **Todos os cartões** saem de séries por dia que o hub publica e o Supabase
   soma no período escolhido (`sql/supabase/002_cartoes.sql`), com as medidas
-  do **BI Indicadores Produção** aplicadas às mesmas planilhas que ele lê:
+  do **BI Indicadores Produção** aplicadas ao banco:
 
-  | Cartão | Regra (medida do BI) | Tabela |
+  | Cartão | Regra (medida do BI) | De onde |
   |---|---|---|
-  | TMR | produzindo ÷ horas sem FIM TURNO e sem INATIVIDADE | Machine Card, tabela Horas |
-  | Velocidade | metros ÷ horas produzindo ÷ 60 (VelMédia) | Machine Card, tabela Horas |
-  | Paradas | horas por código, fora PRODUZINDO | Machine Card, tabela Horas |
-  | Apara apontada | refugo ÷ (refugo + peso bruto das REBs) | Base Aparas, BASE_PROD |
-  | Apara confirmada | scrap ÷ (peso bruto das REBs + scrap) | Refugo Aparas + BASE_PROD |
-  | Aderência | produzido ÷ planejado (% Realizado Prog) | Aderência Semanal, ADERENCIA_BI |
-  | Perda por motivo / máquina, OPs | kg de perda apontada (código 40) | Base Aparas, BASE_DETALHE |
+  | TMR | produzindo ÷ horas sem FIM TURNO e sem INATIVIDADE | apontamentos (tabela Horas) |
+  | Velocidade | metros ÷ horas produzindo ÷ 60 (VelMédia) | apontamentos (tabela Horas) |
+  | Paradas | horas por código, fora PRODUZINDO | apontamentos (tabela Horas) |
+  | Apara apontada | refugo ÷ (refugo + peso bruto das REBs) | apontamentos (BASE_PROD) |
+  | Apara confirmada | scrap ÷ (peso bruto das REBs + scrap) | Refugo Aparas (planilha) + BASE_PROD |
+  | Aderência | produzido ÷ planejado (% Realizado Prog) | Aderência Semanal, ADERENCIA_BI (planilha) |
+  | Perda por motivo / máquina, OPs | kg de perda apontada (código 40) | apontamentos |
   | Apara por classificação | apontado por grupo de produto (Aparas_Geral v3) | BASE_PROD |
+  | Produtividade | m² ÷ horas produzindo | apontamentos + largura da estrutura |
+- **As telas que vêm direto do banco** (`sql/supabase/005_banco.sql`): fotos
+  do estado atual que o painel lê inteiras (máquinas agora, fila de
+  programação, WIP, carteira) e séries por dia somadas no período (entregas
+  por classificação, setup programado x real, laudos do CQ, faturamento), mais
+  a série mensal de carteira x produzido x faturado.
 
   Os cartões gerais (TMR, aderência, velocidade) são o total do período,
   como no BI, não a média das máquinas. A regra do TMR foi escolhida pelo
@@ -177,12 +223,17 @@ bruto e refugo por OP/dia (com a descrição do produto), perda por
 OP/dia/tipo, programado × produzido por OP/dia, kg e m² por máquina/dia, os
 eventos do último dia (máquina, código, início, fim, OP), valores por mês e
 recorte, o catálogo de indicadores, o estado de cada fonte (sem caminho de
-arquivo) e os avisos (com os caminhos apagados). Nada de operador,
-observação ou cliente. As séries vão um mês por vez e só o mês que mudou; o
-Supabase confirma quantas linhas gravou, senão o mês vai de novo.
+arquivo) e os avisos (com os caminhos apagados). Das telas do banco: a
+atividade e a OP de cada máquina agora, a fila por máquina, o WIP somado por
+etapa, local, cliente e idade, os itens da carteira em aberto, e entregas,
+setup, laudos e faturamento somados por dia. O cliente (nome da empresa)
+vai onde a tela pede (WIP, carteira, fila, entregas); operador, analista,
+vendedor, preço e observação nunca saem do banco. As séries vão um mês por
+vez e só o mês que mudou; o Supabase confirma quantas linhas gravou, senão o
+mês vai de novo.
 
-Os cartões ficam tão atuais quanto as planilhas da pasta compartilhada (a
-cópia automática traz o que mudou); o BI Indicadores Produção é a conferência.
+Os cartões ficam tão atuais quanto o banco (a cada 10 min) e as planilhas
+manuais da pasta compartilhada; os BIs são a conferência.
 
 A escrita é feita por um **usuário técnico** do painel, só dele: a função
 `public.hub_publicar` confere a tabela `trusted.escritores` e troca os dados
@@ -209,8 +260,13 @@ Uma vez só, nesta ordem:
 7. No **SQL Editor** → rodar `sql/supabase/004_classes.sql` (a classe
    oficial de cada código de apontamento, pra cor das paradas no painel).
    Só cria uma view de leitura. Não precisa publicar de novo.
+8. No **SQL Editor** → rodar `sql/supabase/005_banco.sql` (as tabelas e a
+   leitura das telas do banco: agora, fila, WIP, carteira, entregas, setup e
+   laudos; já inclui a view do 7). Tem de mostrar `funcoes_ok = true`. Depois,
+   aqui em `hub/`: `uv run hub publicar`. Sem o 005, o hub publica o resto
+   normalmente e avisa o que ficou de fora.
 
-Feitos: 1 a 3 em 25/09, 4 a 6 em 30/09. O 7 aguarda (05/10).
+Feitos: 1 a 3 em 25/09, 4 a 6 em 30/09. O 8 (que já faz o 7) aguarda.
 
 ### Conferência com o motor do BI (30/09)
 
@@ -264,7 +320,8 @@ o motivo vira aviso no relatório e a próxima tenta de novo.
 | Arquivo | Vai pro git? | O quê |
 |---|---|---|
 | `config/fontes.local.yaml` | **Não** | Pasta de entrada, planilhas, abas, colunas obrigatórias, frescor. Modelo em `fontes.exemplo.yaml` |
-| `config/sqlserver.local.yaml` | **Não** | Servidor do SQL Server, para a leitura direta (quando o TI liberar) |
+| `config/sqlserver.local.yaml` | **Não** | Servidor e banco da leitura direta (usuário e senha ficam no Cofre do Windows) |
+| `config/classificacao_apontamentos.csv` | Sim | Classe de cada código de apontamento (cópia da tabela-padrão) |
 | `config/indicadores.yaml` | Sim | Catálogo: definição, dono, fonte oficial, tolerância, regras |
 | `config/recortes.yaml` | Sim | Quais máquinas formam cada recorte (Flexo, Corte...) |
 
@@ -295,6 +352,20 @@ aguardando, divergente, validado.
 - **Uma checagem:** um SQL em `sql/checagens/` que devolve
   `source_id, gravidade, codigo, mensagem`.
 - **Mudou a regra de um indicador:** suba a `versao` no catálogo.
+
+## Situação em 05/10/2026
+
+- Tudo que o painel mostra sai do banco, menos a apara confirmada e a
+  aderência (planilhas manuais do PCP).
+- **26 fontes** catalogadas: as leituras do banco, as planilhas manuais e os
+  dois BIs (conferência).
+- **Validação:** 497 validados, 18 divergentes, 42 aguardando. As
+  divergências têm causa conhecida: em setembro o BI leu uma planilha
+  desatualizada (faltam nela 455,6 h); em fevereiro, o filtro Des_NumOrdem do
+  próprio BI.
+- **Telas novas:** agora no chão de fábrica, entregas no prazo, fila de
+  programação, setup programado x real, WIP, carteira x produzido x faturado
+  e laudos do CQ.
 
 ## Situação em 25/09/2026
 
@@ -335,13 +406,16 @@ aguardando, divergente, validado.
 
 ## Próximos passos
 
-1. Lista de máquinas e grupos: é o que ainda vem do fluxo antigo (Google
-   Drive); todos os números já saem do hub (002 e 003 aplicados em 30/09).
-2. Produtividade: o painel mostra m² ÷ hora de máquina. A do BI (m² ÷ hora
-   trabalhada) depende de duas planilhas paradas (Produção M² em jan/2026,
-   Disponibilidade em fev/2026) e da planilha de horas de pessoas.
-3. Desligar o fluxo antigo (Google Drive + GitHub Actions) quando o dono
+1. Aderência pelo banco: com algumas semanas de fotos diárias da
+   programação do PCP (`historico/programacao_pcp_*.parquet`), reproduzir a
+   ADERÊNCIA DIÁRIA sem a planilha.
+2. As três planilhas manuais da apara confirmada: trocar por API ou agente
+   (decisão pendente).
+3. Lista de máquinas e grupos: é o que ainda vem do fluxo antigo (Google
+   Drive).
+4. Produtividade: o painel mostra m² ÷ hora de máquina. A do BI (m² ÷ hora
+   trabalhada) depende da Folha de Ponto.
+5. Tirar o backend do Supabase para um servidor da fábrica (decisão do dono,
+   para depois).
+6. Desligar o fluxo antigo (Google Drive + GitHub Actions) quando o dono
    confirmar que o painel pelo hub está certo.
-4. Banco: montar também a BASE_PROD (apara apontada) e a produção em m²
-   direto da view, com os filtros dos Power Query; trocar o Excel pela leitura
-   direta quando o TI liberar a conta.

@@ -1,9 +1,9 @@
--- Apontamento com código que não existe no cadastro oficial: as horas dele
--- não caem em nenhuma classe, e o TMR fica errado sem ninguém perceber.
-select 'indicadores.base_apontamento', 'aviso', 'codigo_sem_classificacao',
-       printf('código %s sem classificação oficial: %.1f h em %d apontamentos',
+-- Código de apontamento sem classe na tabela-padrão (config/classificacao_apontamentos.csv):
+-- as horas dele entram no total do TMR sem ser FIM TURNO nem INATIVIDADE.
+select 'banco.apontamentos', 'aviso', 'codigo_sem_classificacao',
+       printf('código %s sem classificação oficial: %.1f h em %d apontamentos (acrescentar em config/classificacao_apontamentos.csv)',
               coalesce(a.cod_apont, '(vazio)'), sum(a.horas), count(*))
-from clean.apontamento a
-left join clean.classificacao c on c.cod = a.cod_apont
-where c.cod is null
+from clean.machine_card a
+cross join cfg.parametros p
+where a.classe is null and year(a.dia) = p.ano
 group by a.cod_apont;

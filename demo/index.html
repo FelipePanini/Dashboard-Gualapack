@@ -65,6 +65,12 @@ body.auth-pending::after{
   --cls-fim-turno: #7d8794;
   --cls-sem-classe: #977a5e;
   --cls-parada: #b85f17;
+  /* classificação de entrega da Aderência Semanal: Ótimo → Péssimo (verde → vermelho) */
+  --ent-1: #08703d;
+  --ent-2: #4a8f2a;
+  --ent-3: #9a6a00;
+  --ent-4: #b4561e;
+  --ent-5: #c22b3c;
   --shadow-card: 0 1px 2px rgba(10,21,36,0.05), 0 6px 18px -10px rgba(10,21,36,0.14);
   --shadow-hover: 0 2px 4px rgba(10,21,36,0.06), 0 14px 30px -14px rgba(10,47,87,0.28);
   --shadow-pop: 0 12px 40px -12px rgba(10,21,36,0.32), 0 2px 6px rgba(10,21,36,0.06);
@@ -122,6 +128,11 @@ body.auth-pending::after{
     --cls-fim-turno: #6b7684;
     --cls-sem-classe: #a08a72;
     --cls-parada: #df9255;
+    --ent-1: #2fbf2f;
+    --ent-2: #8fd16a;
+    --ent-3: #e0a834;
+    --ent-4: #f0966d;
+    --ent-5: #e66767;
     --shadow-card: 0 1px 2px rgba(0,0,0,0.4);
     --shadow-hover: 0 2px 4px rgba(0,0,0,0.4), 0 16px 32px -16px rgba(0,0,0,0.7);
     --shadow-pop: 0 16px 48px -12px rgba(0,0,0,0.75), 0 2px 6px rgba(0,0,0,0.4);
@@ -167,6 +178,11 @@ body.auth-pending::after{
   --cls-fim-turno: #6b7684;
   --cls-sem-classe: #a08a72;
   --cls-parada: #df9255;
+  --ent-1: #2fbf2f;
+  --ent-2: #8fd16a;
+  --ent-3: #e0a834;
+  --ent-4: #f0966d;
+  --ent-5: #e66767;
   --shadow-card: 0 1px 2px rgba(0,0,0,0.4);
   --shadow-hover: 0 2px 4px rgba(0,0,0,0.4), 0 16px 32px -16px rgba(0,0,0,0.7);
   --shadow-pop: 0 16px 48px -12px rgba(0,0,0,0.75), 0 2px 6px rgba(0,0,0,0.4);
@@ -676,6 +692,9 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
 .drawer-facas-item{ display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); font-size:13px; }
 .drawer-facas-item:last-child{ border-bottom:none; }
 .drawer-facas-item span:last-child{ font-weight:600; font-variant-numeric: tabular-nums; white-space:nowrap; }
+.drawer-facas-item span.quebra{ white-space:normal; text-align:right; min-width:0; }
+.drawer-facas-item span.quebra-esq{ min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.drawer-agora{ margin-bottom:4px; }
 
 /* ---------- seletor de período (popover) ---------- */
 .period-overlay{
@@ -726,6 +745,78 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
 .period-nota{ font-size:12px; line-height:1.5; color: var(--text-muted); margin:12px 2px 0; }
 .period-foot{ display:flex; justify-content:space-between; align-items:center; margin-top:14px; gap:10px; }
 .period-info{ font-size:12.5px; color: var(--text-secondary); }
+
+/* ---------- número de destaque no topo de um painel ---------- */
+.destaque{ display:flex; align-items:baseline; gap:4px 12px; flex-wrap:wrap; margin:-2px 0 14px; }
+.destaque-num{ font-size:28px; font-weight:700; letter-spacing:-0.02em; line-height:1; font-variant-numeric: tabular-nums; }
+.destaque-txt{ font-size:12.5px; color: var(--text-muted); line-height:1.4; }
+
+/* ---------- agora no chão de fábrica ---------- */
+.agora-grid{ display:grid; grid-template-columns: repeat(auto-fill, minmax(272px, 1fr)); gap:12px; }
+.agora-card{
+  position:relative; background: var(--surface-1); border:1px solid var(--border); border-radius:14px;
+  padding: 14px 16px 12px 18px; min-width:0; display:flex; flex-direction:column; gap:12px;
+  transition: transform .4s var(--spring), box-shadow .3s var(--ease-out), border-color .2s var(--ease-out);
+}
+.agora-card::before{
+  content:""; position:absolute; left:0; top:14px; bottom:14px; width:3px; border-radius:0 3px 3px 0;
+  background: var(--cor, var(--border-strong));
+}
+.agora-card.clicavel{ cursor:pointer; }
+.agora-card.clicavel:hover{ transform: translateY(-2px); box-shadow: var(--shadow-hover); border-color: var(--border-strong); }
+.agora-card.clicavel:active{ transform: scale(.98); transition-duration:.12s; }
+.machine-board.anima .agora-card{ animation: entra-leve .45s var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 28ms); }
+.classe-pill{
+  display:inline-flex; align-items:center; gap:6px; flex:none; max-width:100%;
+  font-size:12px; font-weight:600; color: var(--text-primary); background: var(--surface-sunken);
+  padding:3px 9px 3px 8px; border-radius:99px; white-space:nowrap;
+}
+.classe-pill .dot{ width:8px; height:8px; border-radius:50%; background: var(--cor, var(--text-muted)); flex:none; position:relative; }
+/* pulso só em quem está produzindo: diz "rodando agora", não enfeita */
+.agora-card.rodando .classe-pill .dot::after{
+  content:""; position:absolute; inset:-3px; border-radius:50%; border:2px solid var(--cor);
+  opacity:0; animation: pulso 2.6s var(--ease-out) infinite;
+}
+.agora-hero{ display:flex; flex-direction:column; gap:4px; }
+.agora-hero .v{ font-size:26px; font-weight:700; line-height:1; letter-spacing:-0.02em; font-variant-numeric: tabular-nums; }
+.agora-hero .l{ font-size:12.5px; color: var(--text-secondary); line-height:1.4; }
+.agora-card.sem-dado .agora-hero .v{ color: var(--text-muted); }
+.agora-op{ font-size:12.5px; color: var(--text-secondary); line-height:1.4; min-width:0; }
+.agora-op .produto{ display:block; color: var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.progresso{ display:flex; align-items:center; gap:10px; font-size:12px; }
+.progresso-trilho{ flex:1; height:6px; border-radius:99px; background: var(--surface-sunken); overflow:hidden; min-width:40px; }
+.progresso-barra{ height:100%; border-radius:99px; background: var(--series-3); transform-origin:left center; }
+.machine-board.anima .progresso-barra{ animation: cresce-x .7s var(--ease-out) backwards .15s; }
+.progresso-txt{ flex:none; font-variant-numeric: tabular-nums; color: var(--text-secondary); }
+.agora-fatos{ display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:8px; margin:0; padding-top:10px; border-top:1px solid var(--border); }
+.agora-fatos > div{ min-width:0; }
+.agora-fatos dt{ font-size:11.5px; color: var(--text-muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.agora-fatos dd{ margin:3px 0 0; font-size:13px; font-weight:650; font-variant-numeric: tabular-nums; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.agora-fatos dd.fato-sub{ margin-top:1px; font-size:11.5px; font-weight:500; color: var(--text-muted); }
+.agora-fatos .alerta, .agora-fatos dd.fato-sub.alerta{ color: var(--warning); }
+.panel-sub.alerta{ color: var(--warning); font-weight:600; }
+
+/* ---------- seletor (pop-up) e tabelas das listas ---------- */
+.select-wrap{ position:relative; display:inline-flex; align-items:center; flex:none; max-width:100%; }
+.select-wrap select{
+  appearance:none; -webkit-appearance:none; font-family:inherit; font-size:13px; font-weight:600; color: var(--text-primary);
+  background: var(--surface-1); border:1px solid var(--border); border-radius:999px; padding:8px 34px 8px 14px; min-height:36px;
+  cursor:pointer; max-width:100%; text-overflow:ellipsis; transition: border-color .2s var(--ease-out);
+}
+.select-wrap select:hover{ border-color: var(--border-strong); }
+.select-wrap select:disabled{ opacity:.5; cursor:default; }
+.select-wrap svg{ position:absolute; right:12px; width:12px; height:12px; pointer-events:none; color: var(--text-secondary); }
+.fila-resumo{ display:flex; flex-wrap:wrap; gap:6px 18px; font-size:12.5px; color: var(--text-secondary); margin:-2px 0 12px; }
+.fila-resumo b{ color: var(--text-primary); font-weight:650; font-variant-numeric: tabular-nums; }
+.celula-dupla{ display:block; min-width:0; }
+.celula-dupla .sub{ display:block; color: var(--text-muted); font-size:12px; max-width:320px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.mini-barra{ display:inline-block; width:54px; height:6px; border-radius:99px; background: var(--surface-sunken); vertical-align:middle; margin-right:8px; overflow:hidden; }
+.mini-barra > span{ display:block; height:100%; background: var(--series-3); border-radius:99px; }
+.mais-btn{ margin:12px auto 0; }
+.sit{ display:inline-flex; align-items:center; gap:6px; white-space:nowrap; }
+.sit .dot{ width:7px; height:7px; border-radius:50%; flex:none; }
+.valor-alerta{ color: var(--critical); font-weight:650; }
+.mais-btn[hidden]{ display:none; }
 
 /* Reduzir transparência (sistema): vidro vira superfície opaca */
 /* ---------- cartão da conta (abre pelo avatar) ---------- */
@@ -818,6 +909,9 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
   .panel{ padding:16px 14px 14px; border-radius:14px; }
   .proc-grid{ grid-template-columns: minmax(0,1fr); }
   .machine-grid{ grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap:10px; }
+  .agora-grid{ grid-template-columns: minmax(0,1fr); gap:10px; }
+  .agora-card{ padding:12px 14px 12px 16px; }
+  .destaque-num{ font-size:24px; }
   .machine-card{ padding:12px 12px 10px 15px; }
   .machine-spark{ width:72px; }
   .assistant{ right:16px; bottom: calc(80px + env(safe-area-inset-bottom)); }
@@ -894,7 +988,11 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
         <span class="rail-label" aria-hidden="true">Geral</span>
       </button>
-      <button class="rail-btn" data-view="aparas" title="Aparas e refugo" aria-label="Aparas e refugo">
+      <button class="rail-btn" data-view="agora" title="Agora no chão de fábrica" aria-label="Agora no chão de fábrica">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2.5-6 5 12 2.5-6H21"/></svg>
+        <span class="rail-label" aria-hidden="true">Agora</span>
+      </button>
+      <button class="rail-btn" data-view="aparas" title="Aparas e qualidade" aria-label="Aparas e qualidade">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3v7.5a3 3 0 0 0 6 0V3"/><path d="M9 13.5V21"/><path d="M15 21V9a3 3 0 0 1 3-3h3"/></svg>
         <span class="rail-label" aria-hidden="true">Aparas</span>
       </button>
@@ -1007,7 +1105,23 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
         </section>
       </div>
 
-      <!-- ============ APARAS & REFUGO ============ -->
+      <!-- ============ AGORA NO CHÃO DE FÁBRICA ============ -->
+      <div class="view" id="view-agora">
+        <section class="kpi-row" id="agora-kpis"></section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3 class="panel-title">Máquinas agora</h3>
+              <div class="panel-sub" id="agora-sub">O apontamento em andamento em cada máquina</div>
+            </div>
+            <div class="segmented" id="agora-filtros" role="group" aria-label="Filtrar por etapa"></div>
+          </div>
+          <div class="machine-board" id="agora-board"></div>
+        </section>
+      </div>
+
+      <!-- ============ APARAS & QUALIDADE ============ -->
       <div class="view" id="view-aparas">
         <section class="kpi-row" id="aparas-kpis"></section>
 
@@ -1070,6 +1184,28 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
             </table>
           </div>
         </section>
+
+        <section class="grid-2 uneven equal-cols">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3 class="panel-title">Laudos do CQ</h3>
+                <div class="panel-sub">Laudos emitidos no período, por resultado</div>
+              </div>
+            </div>
+            <div id="laudos-destaque"></div>
+            <div class="grafico" id="laudos-chart"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3 class="panel-title">Laudos aprovados por mês</h3>
+                <div class="panel-sub">% aprovados, com ou sem reanálise &middot; mês corrente parcial</div>
+              </div>
+            </div>
+            <div class="grafico" id="laudos-mes-chart"></div>
+          </div>
+        </section>
       </div>
 
       <!-- ============ PRODUTIVIDADE & TMR ============ -->
@@ -1106,6 +1242,17 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
           </div>
           <div class="grafico" id="velocidade-chart"></div>
         </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3 class="panel-title">Setup programado x real</h3>
+              <div class="panel-sub">Horas de setup no período por máquina &middot; barra = real, traço = programado</div>
+            </div>
+          </div>
+          <div id="setup-destaque"></div>
+          <div class="grafico" id="setup-chart"></div>
+        </section>
       </div>
 
       <!-- ============ ADERÊNCIA ============ -->
@@ -1130,6 +1277,53 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
             </div>
           </div>
           <div class="proc-grid" id="proc-grid"></div>
+        </section>
+
+        <section class="grid-2 uneven equal-cols">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3 class="panel-title">Entregas no prazo</h3>
+                <div class="panel-sub">Itens faturados no período, pela classificação da Aderência Semanal</div>
+              </div>
+            </div>
+            <div id="entregas-destaque"></div>
+            <div class="grafico" id="entregas-chart"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3 class="panel-title">Entregas no prazo por mês</h3>
+                <div class="panel-sub">% dos itens faturados &middot; mês corrente parcial</div>
+              </div>
+              <div class="legend" id="entregas-mes-legend"></div>
+            </div>
+            <div class="grafico" id="entregas-mes-chart"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3 class="panel-title">Fila de programação</h3>
+              <div class="panel-sub">OPs alocadas e não finalizadas, na ordem do PCP &middot; agora</div>
+            </div>
+            <label class="select-wrap">
+              <span class="sr-only">Máquina da fila</span>
+              <select id="fila-maquina"></select>
+              <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 4.5l3 3 3-3"/></svg>
+            </label>
+          </div>
+          <div class="fila-resumo" id="fila-resumo"></div>
+          <div class="table-wrap">
+            <table id="fila-table">
+              <thead>
+                <tr><th scope="col">#</th><th scope="col">OP</th><th scope="col">Cliente e produto</th><th scope="col">Atividade</th><th scope="col">Situação</th><th scope="col">Início → fim planejado</th><th scope="col">Entrega</th><th scope="col">Produzido</th><th scope="col">Saldo</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <button type="button" class="icon-btn mais-btn" id="fila-mais" hidden></button>
         </section>
       </div>
 
@@ -1159,57 +1353,99 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
 
       <!-- ============ WIP & CARTEIRA ============ -->
       <div class="view" id="view-wip">
-        <div class="view-notice">Esta visão ainda não está conectada a uma base real de WIP/Carteira &mdash; fica sem dados até uma planilha ou BI desse tipo entrar no hub.</div>
         <section class="kpi-row" id="wip-kpis"></section>
 
-        <section class="grid-2">
+        <section class="grid-2 uneven">
           <div class="panel">
             <div class="panel-head">
               <div>
                 <h3 class="panel-title">WIP por etapa</h3>
-                <div class="panel-sub">Metros lineares parados em cada estágio do processo</div>
+                <div class="panel-sub">Pallets disponíveis em processo, pela atividade da OP &middot; agora</div>
               </div>
+              <div class="segmented" id="wip-medida" role="group" aria-label="Medida do WIP"></div>
             </div>
             <div class="grafico" id="wip-chart"></div>
           </div>
           <div class="panel">
             <div class="panel-head">
               <div>
-                <h3 class="panel-title">Carteira x Produção</h3>
-                <div class="panel-sub">Carteira, produzido e faturado em kg &middot; mês corrente</div>
+                <h3 class="panel-title">Idade do WIP</h3>
+                <div class="panel-sub">kg em processo pelo tempo desde o início da OP</div>
               </div>
-              <div class="legend" id="carteira-legend"></div>
             </div>
-            <div class="grafico" id="carteira-chart"></div>
+            <div class="grafico" id="wip-idade-chart"></div>
           </div>
         </section>
 
         <section class="panel">
           <div class="panel-head">
             <div>
-              <h3 class="panel-title">WIP em aberto por cliente</h3>
-              <div class="panel-sub">Dentro (DC) e fora (FC) da carteira do mês</div>
+              <h3 class="panel-title">WIP por cliente</h3>
+              <div class="panel-sub">Pallets, metros e kg em processo de cada cliente</div>
             </div>
-            <button class="icon-btn" id="wip-export">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+            <button type="button" class="icon-btn" id="wip-export">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
               Exportar CSV
             </button>
           </div>
           <div class="table-wrap">
             <table id="wip-table">
               <thead>
-                <tr><th>Cliente</th><th>Classificação</th><th>Etapa</th><th>Carteira</th><th>Metros WIP</th><th>Situação</th></tr>
+                <tr><th scope="col">Cliente</th><th scope="col">Pallets</th><th scope="col">Metros</th><th scope="col">kg</th><th scope="col">Principais etapas</th><th scope="col">OP mais antiga</th></tr>
               </thead>
               <tbody></tbody>
             </table>
           </div>
+          <button type="button" class="icon-btn mais-btn" id="wip-mais" hidden></button>
+        </section>
+
+        <section class="grid-2 uneven equal-cols">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3 class="panel-title">Carteira x Produção x Faturamento</h3>
+                <div class="panel-sub">t por mês &middot; carteira pela data pedida pelo cliente &middot; meses fechados</div>
+              </div>
+              <div class="legend" id="carteira-legend"></div>
+            </div>
+            <div class="grafico" id="carteira-chart"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3 class="panel-title">Carteira em aberto por entrega</h3>
+                <div class="panel-sub">Saldo a faturar (t) pelo mês da entrega pedida &middot; agora</div>
+              </div>
+            </div>
+            <div class="grafico" id="carteira-prazo-chart"></div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3 class="panel-title">Carteira em aberto por cliente</h3>
+              <div class="panel-sub">Itens liberados, não liberados e revisados com saldo a faturar</div>
+            </div>
+            <button type="button" class="icon-btn" id="carteira-export">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+              Exportar CSV
+            </button>
+          </div>
+          <div class="table-wrap">
+            <table id="carteira-table">
+              <thead>
+                <tr><th scope="col">Cliente</th><th scope="col">Itens</th><th scope="col">Pedidos</th><th scope="col">Saldo</th><th scope="col">Vencido</th><th scope="col">Próxima entrega</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <button type="button" class="icon-btn mais-btn" id="carteira-mais" hidden></button>
         </section>
       </div>
 
       <footer id="footer-note">
-        Painel interno de Produção &middot; Gualapack Jaguariúna &middot;
-        indicadores, máquinas e motivos de perda espelhados dos BIs de Produção &mdash;
-        valores numéricos de referência até a conexão com a fonte de dados.
+        Painel interno de Produção &middot; Gualapack Jaguariúna.
       </footer>
     </main>
   </div>
@@ -1276,7 +1512,7 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
       <div class="period-mes-grid" id="period-mes-grid"></div>
     </div>
 
-    <p class="period-nota">O resumo por máquina, perdas e produtividade seguem este período. As séries mensais (Aparas, Scrap, Produção em kg) continuam mostrando os últimos 12 meses de contexto.</p>
+    <p class="period-nota">O resumo por máquina, perdas, produtividade, entregas, setup e laudos seguem este período. As séries mensais mostram os últimos 12 meses; Agora, WIP, carteira e fila mostram o estado atual.</p>
 
     <div class="period-foot">
       <span class="period-info" id="period-info"></span>
@@ -1497,6 +1733,7 @@ function applyFallback(){
   window.APARA_PERIODO = null;
   window.SERIE_MENSAL = null;
   window.PERDA_MAQ_MOTIVO = null;
+  window.BANCO = null;   // pré-visualização: as partes novas do banco ficam sem dados
   MAQUINAS = FALLBACK.MAQUINAS.map(m=>({...m}));
   const FATOR_KM = 8; // converte horas × m/min de referência em km lineares do período
   MAQUINAS.forEach(m=>{
@@ -1525,6 +1762,29 @@ function applyFallback(){
 // voltar um dia, dependendo da hora e do fuso do navegador).
 function isoDate(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
 
+/* Lê uma view inteira em páginas: o Supabase devolve no máximo 1.000 linhas
+   por pedido (ou menos, se o servidor estiver configurado assim), e a fila de
+   programação já passa de 850. O 1º pedido traz o total de linhas, e a leitura
+   segue até ter todas; sem o total, segue até uma página vir vazia (página
+   curta não prova que acabou: pode ser o limite do servidor). A ordem fixa
+   (chave única da view) garante que nenhuma linha se repita ou suma entre uma
+   página e outra. Devolve { data, error }, como o cliente do Supabase. */
+async function lerTudo(client, view, ordem){
+  const PAGINA = 1000, linhas = [];
+  let total = null;
+  for(let i = 0; i < 100; i++){
+    let q = client.from(view).select("*", i === 0 ? { count:"exact" } : undefined);
+    ordem.forEach(c=>{ q = q.order(c, { ascending:true, nullsFirst:false }); });
+    const { data, error, count } = await q.range(linhas.length, linhas.length + PAGINA - 1);
+    if(error) return { data:null, error };
+    if(i === 0 && Number.isFinite(count)) total = count;
+    if(!data || !data.length) break;
+    linhas.push(...data);
+    if(total != null && linhas.length >= total) break;
+  }
+  return { data:linhas, error:null };
+}
+
 // Devolve o erro quando não consegue carregar (quem chama tenta de novo e,
 // se falhar outra vez, mostra o aviso de falha), ou nada quando carregou.
 async function loadRealData(periodoDe, periodoAte, tentativa = 1){
@@ -1545,7 +1805,8 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
     // pequena: id e grupo). Fora do throw de propósito: sem o hub publicado,
     // essas funções não existem e o painel segue com as consultas antigas.
     const [hubMaqRes, hubParadasRes, hubGanttRes, hubMotivoRes, hubRefugoMaqRes, hubOpsRes, hubClasseRes, hubAparaRes,
-           hubFontesRes, hubAparaPeriodoRes, hubMensalRes, hubPerdaMaqMotivoRes, listaRes, hubCodigosRes] = await Promise.all([
+           hubFontesRes, hubAparaPeriodoRes, hubMensalRes, hubPerdaMaqMotivoRes, listaRes, hubCodigosRes,
+           bAgoraRes, bFilaRes, bWipRes, bCarteiraRes, bEntregasRes, bSetupRes, bLaudosRes, bMensalRes] = await Promise.all([
       // Horas por máquina/código publicadas pelo hub (Machine Card) e o resto
       // dos cartões (002_cartoes.sql).
       client.rpc("rpc_hub_maquinas", { p_de: pDe, p_ate: pAte }),
@@ -1567,6 +1828,17 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
       // classe oficial de cada código de apontamento (004_classes.sql): dá a
       // cor das paradas. Sem a view, as paradas ficam numa cor só.
       client.from("v_hub_codigos").select("cod,classe"),
+      // 005_banco.sql: o que o hub lê direto do banco da fábrica. Fotos do
+      // estado atual (máquinas agora, fila, WIP, carteira) e as séries novas
+      // (entregas, setup, laudos, carteira x produzido x faturado).
+      client.from("v_hub_agora").select("*"),
+      lerTudo(client, "v_hub_programacao", ["maquina", "posicao"]),
+      lerTudo(client, "v_hub_wip", ["etapa", "local", "cliente", "situacao", "idade"]),
+      lerTudo(client, "v_hub_carteira", ["num_pedido", "item", "entrega_cliente", "quantidade", "faturada", "dt_pedido", "produto"]),
+      client.rpc("rpc_hub_entregas", { p_de: pDe, p_ate: pAte }),
+      client.rpc("rpc_hub_setup", { p_de: pDe, p_ate: pAte }),
+      client.rpc("rpc_hub_laudos", { p_de: pDe, p_ate: pAte }),
+      client.rpc("rpc_hub_mensal_banco", { p_meses: 13 }),
     ]);
     // Com o hub publicado (002), nenhuma consulta antiga é usada: todas têm
     // equivalente no hub. Elas somam centenas de milhares de linhas e, em
@@ -1583,7 +1855,8 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
     // falhar fica sem dados só naquele gráfico. Função/view inexistente
     // (PGRST202/205: SQL ainda não aplicado) não é erro passageiro.
     const passageiro = [hubParadasRes, hubGanttRes, hubMotivoRes, hubRefugoMaqRes, hubOpsRes, hubClasseRes, hubAparaRes,
-                        hubFontesRes, hubAparaPeriodoRes, hubMensalRes, hubPerdaMaqMotivoRes, hubCodigosRes]
+                        hubFontesRes, hubAparaPeriodoRes, hubMensalRes, hubPerdaMaqMotivoRes, hubCodigosRes,
+                        bAgoraRes, bFilaRes, bWipRes, bCarteiraRes, bEntregasRes, bSetupRes, bLaudosRes, bMensalRes]
       .map(r=>r.error).find(e=>e && e.code !== "PGRST202" && e.code !== "PGRST205");
     if(passageiro && tentativa === 1) throw passageiro;
     // período sem nenhum apontamento também é hub (vazio), não caminho antigo
@@ -1965,6 +2238,19 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
       }
     }
 
+    // Partes novas do banco: cada uma com o seu estado. "faltando" = o
+    // 005_banco.sql ainda não foi aplicado (função ou view não existe); "erro"
+    // = falhou nas duas tentativas. Nos dois casos o painel daquela parte diz
+    // "Sem dados" — nunca zero, nunca número de exemplo.
+    window.BANCO = { estado:{} };
+    const faltaNoSupabase = e => e && (e.code === "PGRST202" || e.code === "PGRST205");
+    Object.entries({ agora:bAgoraRes, programacao:bFilaRes, wip:bWipRes, carteira:bCarteiraRes, entregas:bEntregasRes,
+                     setup:bSetupRes, laudos:bLaudosRes, mensal:bMensalRes }).forEach(([parte, r])=>{
+      window.BANCO.estado[parte] = !r.error ? "ok" : faltaNoSupabase(r.error) ? "faltando" : "erro";
+      window.BANCO[parte] = !r.error && Array.isArray(r.data) ? r.data : [];
+      if(r.error && !faltaNoSupabase(r.error)) console.error(`Falha ao carregar ${parte} do banco — essa parte fica sem dados:`, r.error);
+    });
+
     USANDO_DADOS_REAIS = true;
     return null;
   }catch(err){
@@ -1981,6 +2267,120 @@ const fmt1  = n => n.toLocaleString("pt-BR", { minimumFractionDigits:1, maximumF
 const fmtNum = (n, casas) => n.toLocaleString("pt-BR", { minimumFractionDigits:casas, maximumFractionDigits:casas });
 const esc   = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const reduzMovimento = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+/* ---- partes novas do banco (005_banco.sql): estado de cada uma ---- */
+const BANCO_MSG = {
+  faltando: "Sem dados: esta parte ainda não foi publicada no painel.",
+  erro: "Sem dados: não consegui carregar esta parte agora. Recarregue a página para tentar de novo.",
+};
+function bancoOk(parte){ return !!(window.BANCO && window.BANCO.estado[parte] === "ok"); }
+function bancoLinhas(parte){ return bancoOk(parte) ? window.BANCO[parte] || [] : []; }
+// Texto do estado vazio de uma parte: não publicada, falhou, ou sem dado no período.
+function bancoVazio(parte, semDado){
+  if(!window.BANCO) return USANDO_DADOS_REAIS ? BANCO_MSG.faltando : "Sem dados na pré-visualização.";
+  const st = window.BANCO.estado[parte];
+  return st === "faltando" ? BANCO_MSG.faltando : st === "erro" ? BANCO_MSG.erro : semDado;
+}
+function semDados(holder, texto){
+  if(!holder) return;
+  _graficos.get(holder)?.ro.disconnect();
+  holder.innerHTML = `<div class="empty-state">${esc(texto)}</div>`;
+}
+
+/* Data e hora da fábrica (o banco grava sem fuso): "2026-10-05T12:44:00" ou
+   "2026-10-30" viram Date local. Não usar new Date("2026-10-30") direto: só
+   com a data, o navegador entende meia-noite UTC e volta um dia no Brasil. */
+function dataLocal(v){
+  if(!v) return null;
+  const s = String(v);
+  const d = new Date(/^\d{4}-\d{2}-\d{2}$/.test(s) ? s + "T00:00:00" : s);
+  return isNaN(d) ? null : d;
+}
+const MESES_CURTOS = ["jan","fev","mar","abr","mai","jun","jul","ago","set","out","nov","dez"];
+const fmtDM   = d => d.toLocaleDateString("pt-BR", { day:"2-digit", month:"2-digit" });
+const fmtHM   = d => d.toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-digit" });
+const fmtDMHM = d => `${fmtDM(d)} ${fmtHM(d)}`;
+const fmtDMA  = d => `${fmtDM(d)}/${String(d.getFullYear()).slice(-2)}`;
+const rotuloMes = iso => { const d = dataLocal(String(iso).slice(0,10)); return d ? MESES_CURTOS[d.getMonth()] : String(iso); };
+const mesmoDiaQue = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+const fimDoDia = d => { const r = new Date(d); r.setHours(23,59,59,999); return r; };
+function fmtDuracao(min){
+  min = Math.max(0, Math.round(min));
+  if(min < 60) return `${min} min`;
+  const h = Math.floor(min / 60), m = min % 60;
+  if(h < 24) return m ? `${h} h ${m} min` : `${h} h`;
+  const d = Math.floor(h / 24), hr = h % 24;
+  return hr ? `${d} d ${hr} h` : `${d} d`;
+}
+// só a maior unidade, pra caber numa linha curta ("3 d", "11 h", "40 min")
+function fmtDuracaoCurta(min){
+  min = Math.max(0, Math.round(min));
+  if(min < 60) return `${min} min`;
+  const h = Math.floor(min / 60);
+  return h < 24 ? `${h} h` : `${Math.floor(h / 24)} d`;
+}
+const limpaTexto = s => String(s ?? "").replace(/\s+/g, " ").trim();
+const chaveMaq = s => String(s ?? "").trim().toUpperCase();
+// toneladas com 1 casa; abaixo de 50 kg, "< 0,1 t" (e não "0,0 t", que parece nada)
+const fmtT = kg => kg > 0 && kg < 50 ? "< 0,1 t" : fmt1(kg / 1000) + " t";
+
+/* CSV que o Excel em português abre direto: ";" separa, vírgula decimal, com BOM. */
+function baixarCsv(nome, colunas, linhas){
+  const cel = v=>{
+    if(v == null) return "";
+    if(typeof v === "number") return Number.isFinite(v) ? String(Math.round(v * 1000) / 1000).replace(".", ",") : "";
+    const s = limpaTexto(v);
+    return /[";]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const txt = "\ufeff" + [colunas.map(c=>c[1]).join(";"), ...linhas.map(l=>colunas.map(c=>cel(l[c[0]])).join(";"))].join("\r\n");
+  const url = URL.createObjectURL(new Blob([txt], { type:"text/csv;charset=utf-8" }));
+  const a = document.createElement("a");
+  a.href = url; a.download = nome;
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=> URL.revokeObjectURL(url), 2000);
+}
+
+/* Controle segmentado (a seleção desliza com mola), como o filtro das máquinas. */
+function segmentado(container, opcoes, ativo, aoMudar){
+  container.innerHTML = `<span class="segmented-thumb" aria-hidden="true"></span>` + opcoes.map(([v, txt])=>
+    `<button type="button" class="${v === ativo ? "active" : ""}" data-v="${esc(v)}" aria-pressed="${v === ativo}">${esc(txt)}</button>`).join("");
+  const thumb = container.querySelector(".segmented-thumb");
+  const mover = ()=>{
+    const b = container.querySelector("button.active");
+    if(!b || !b.offsetWidth) return;
+    thumb.style.width = b.offsetWidth + "px";
+    thumb.style.transform = `translateX(${b.offsetLeft}px)`;
+    if(!thumb.classList.contains("pronto")) requestAnimationFrame(()=> thumb.classList.add("pronto"));
+  };
+  container.querySelectorAll("button").forEach(b=> b.addEventListener("click", ()=>{
+    if(b.classList.contains("active")) return;
+    container.querySelectorAll("button").forEach(x=>{ x.classList.toggle("active", x === b); x.setAttribute("aria-pressed", String(x === b)); });
+    mover();
+    aoMudar(b.dataset.v);
+  }));
+  requestAnimationFrame(mover);
+  new ResizeObserver(mover).observe(container);
+}
+
+/* Tabela longa: as primeiras linhas e um botão para ver todas. */
+function tabelaComMais(tbody, botao, linhasHtml, { limite = 12, colunas, vazio }){
+  if(!tbody) return;
+  if(!linhasHtml.length){
+    tbody.innerHTML = `<tr><td colspan="${colunas}"><div class="empty-state">${esc(vazio)}</div></td></tr>`;
+    if(botao) botao.hidden = true;
+    return;
+  }
+  let todas = false;
+  const desenhar = ()=>{
+    tbody.innerHTML = (todas ? linhasHtml : linhasHtml.slice(0, limite)).join("");
+    if(!botao) return;
+    botao.hidden = linhasHtml.length <= limite;
+    botao.textContent = todas ? "Mostrar menos" : `Mostrar todas (${fmt(linhasHtml.length)})`;
+    botao.setAttribute("aria-expanded", String(todas));
+  };
+  if(botao) botao.onclick = ()=>{ todas = !todas; desenhar(); };
+  desenhar();
+}
 
 function isDark(){
   const t = document.documentElement.getAttribute("data-theme");
@@ -2241,6 +2641,7 @@ function multiLineChart(holder, labels, series, opts={}){
     defs += "</defs>";
 
     let areas="", lines="", dots="";
+    const rotulos = [];
     series.forEach((s,si)=>{
       // Ponto sem dado quebra a linha em vez de virar zero: recomeça o traço
       // ("M") no próximo ponto com valor.
@@ -2257,7 +2658,18 @@ function multiLineChart(holder, labels, series, opts={}){
       areas += `<path d="${d} L${x(iFim).toFixed(1)},${y(yMin).toFixed(1)} L${x(iIni).toFixed(1)},${y(yMin).toFixed(1)} Z" fill="url(#${id}-a${si})"/>`;
       lines += `<path d="${d}" fill="none" stroke="${s.color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"${s.dashed ? ` stroke-dasharray="5,4"` : ""}/>`;
       dots  += `<circle class="surge" style="--i:${si+8}" cx="${x(iFim)}" cy="${y(s.data[iFim])}" r="4" fill="${s.color}" stroke="var(--surface-1)" stroke-width="2"/>`;
-      if(padR > 20) dots += `<text class="surge" style="--i:${si+8}" x="${x(iFim)+9}" y="${y(s.data[iFim])+4}" font-size="11.5" font-weight="650" fill="${s.color}">${esc(s.short||"")}</text>`;
+      if(padR > 20 && s.short) rotulos.push({ si, x: x(iFim)+9, y: y(s.data[iFim])+4, cor: s.color, txt: s.short });
+    });
+    // rótulos do fim das linhas: afasta os que ficariam a menos de 13 px um do outro
+    rotulos.sort((a,b)=>a.y-b.y);
+    for(let k=1;k<rotulos.length;k++){
+      const ant = rotulos[k-1];
+      if(Math.abs(rotulos[k].x - ant.x) < 40 && rotulos[k].y - ant.y < 13) rotulos[k].y = ant.y + 13;
+    }
+    const sobra = rotulos.length ? rotulos[rotulos.length-1].y - (H - padB + 4) : 0;
+    if(sobra > 0) rotulos.forEach(r=>{ r.y -= sobra; });
+    rotulos.forEach(r=>{
+      dots += `<text class="surge" style="--i:${r.si+8}" x="${r.x}" y="${r.y.toFixed(1)}" font-size="11.5" font-weight="650" fill="${r.cor}">${esc(r.txt)}</text>`;
     });
 
     let metaLine = "";
@@ -2596,6 +3008,200 @@ const ORDEM_ETAPAS = ["Impressão", "Laminação", "Corte / Refile", "Coating"];
   new ResizeObserver(moverThumb).observe(filters);
 })();
 
+/* ============ VIEW: AGORA NO CHÃO DE FÁBRICA ============
+   O apontamento em andamento em cada máquina (o Metrics grava o evento quando
+   ele começa), a OP aberta nela, velocidade real x programada e o término
+   programado. O hub lê o banco a cada 10 min; esta tela busca de novo a cada
+   5 min, e o "há quanto tempo" anda sozinho a cada minuto. */
+const AGORA_GRUPOS = { produzindo:["PRODUZINDO"], setup:["SETUP", "INICIALIZACAO"], fora:["FIM TURNO", "INATIVIDADE"] };
+function estadoAgora(r){
+  if(!r) return { chave:"SEM", nome:"Sem apontamento recente", cor:"var(--border-strong)" };
+  if(r.terminou_em) return { chave:"ENCERRADO", nome:"Sem atividade aberta", cor:"var(--border-strong)" };
+  const k = String(r.classe || "").trim().toUpperCase();
+  return CLASSES_PARADA[k] ? { chave:k, ...CLASSES_PARADA[k] } : classeDoCodigo(r.cod_apont);
+}
+(function(){
+  const board = document.getElementById("agora-board");
+  const filtros = document.getElementById("agora-filtros");
+  const sub = document.getElementById("agora-sub");
+  const kpis = document.getElementById("agora-kpis");
+  if(!board) return;
+  const num = v => v == null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v);
+  const porId = new Map(MAQUINAS.map(m=>[chaveMaq(m.id), m]));
+  let filtro = "all", assinaturaKpis = "", filtrosProntos = false;
+
+  function itens(){
+    const linhas = bancoLinhas("agora");
+    const porMaq = new Map(linhas.map(r=>[chaveMaq(r.maquina), r]));
+    const lista = MAQUINAS.map(m=>({ id:m.id, nome:m.nome, processo:m.processo, rota:m.rota, m, r: porMaq.get(chaveMaq(m.id)) || null }));
+    linhas.forEach(r=>{
+      if(!porId.has(chaveMaq(r.maquina))) lista.push({ id:limpaTexto(r.maquina), nome:limpaTexto(r.maquina), processo:"Outros recursos", rota:"—", m:null, r });
+    });
+    return lista;
+  }
+  // Até quando vai o dado. Com dado em dia, os tempos contam até agora; com
+  // dado parado, só até o último apontamento lido (não inventa duração).
+  function referencia(){
+    const ate = bancoLinhas("agora").map(r=>dataLocal(r.dados_ate)).filter(Boolean).sort((a,b)=>b-a)[0] || null;
+    const agora = new Date();
+    const fresco = !!ate && (agora - ate) < 30 * 60000;
+    return { ate, fresco, ref: fresco || !ate ? agora : ate };
+  }
+
+  function cartao(it, i, ref){
+    const r = it.r, e = estadoAgora(r);
+    const desde = r && !r.terminou_em ? dataLocal(r.desde) : null;
+    const fim = r && r.terminou_em ? dataLocal(r.terminou_em) : null;
+    const ativ = r ? limpaTexto(r.cod_desc).replace(/^\d+\s*-\s*/, "") : "";
+    const marco = desde || fim;
+    const hero = marco ? fmtDuracao((ref - marco) / 60000) : "—";
+    const quando = d => mesmoDiaQue(d, ref) ? fmtHM(d) : fmtDMHM(d);
+    const rotulo = !r ? "Sem apontamento nos últimos 7 dias"
+                 : fim ? `Sem atividade aberta desde ${quando(fim)} · último: ${ativ}`
+                 : desde ? `${ativ} · desde ${quando(desde)}` : ativ;
+
+    const op = r && r.num_ordem ? `<div class="agora-op">OP <span class="mono">${esc(r.num_ordem)}</span>${r.cliente ? " · " + esc(limpaTexto(r.cliente)) : ""}${
+      r.produto ? `<span class="produto" title="${esc(limpaTexto(r.produto))}">${esc(limpaTexto(r.produto))}</span>` : ""}</div>` : "";
+    const plan = r ? num(r.qtd_planejada) : null, boa = r ? num(r.qtd_boa) : null;
+    const pct = plan > 0 && boa != null ? boa / plan * 100 : null;
+    const prog = pct == null ? "" : `<div class="progresso">
+        <div class="progresso-trilho" aria-hidden="true"><div class="progresso-barra" style="width:${Math.min(100, pct).toFixed(1)}%"></div></div>
+        <span class="progresso-txt">${fmt(pct)}% · ${fmt(boa)} de ${fmt(plan)}</span></div>`;
+
+    const vr = r ? num(r.vel_real_m_min) : null, vp = r ? num(r.vel_programada_m_min) : null;
+    const term = r ? dataLocal(r.termino_programado) : null;
+    const atrasado = !!term && !fim && term < ref;
+    const hp = r ? num(r.horas_prod_dia) : null, ht = r ? num(r.horas_tot_dia) : null;
+    const fatos = [];
+    if(r && r.num_ordem && ((vr != null && vr > 0) || vp != null)){
+      fatos.push(`<div><dt>Velocidade</dt><dd>${vr != null && vr > 0 ? fmt(vr) + " m/min" : "—"}</dd><dd class="fato-sub">${vp != null ? `prog. ${fmt(vp)}` : "sem prog."}</dd></div>`);
+    }
+    if(term && !fim){
+      fatos.push(`<div><dt title="Término previsto na programação">Término</dt><dd class="${atrasado ? "alerta" : ""}">${quando(term)}</dd>` +
+        `<dd class="fato-sub${atrasado ? " alerta" : ""}">${atrasado ? `atrasado ${fmtDuracaoCurta((ref - term) / 60000)}` : `em ${fmtDuracaoCurta((term - ref) / 60000)}`}</dd></div>`);
+    }
+    if(ht > 0) fatos.push(`<div><dt>TMR hoje</dt><dd>${fmt((hp || 0) / ht * 100)}%</dd><dd class="fato-sub">${fmt1(hp || 0)} de ${fmt1(ht)} h</dd></div>`);
+
+    const clicavel = !!it.m;
+    const aria = !clicavel ? "" : ` tabindex="0" role="button" aria-label="${esc(`${it.nome}: ${
+      !r ? "sem apontamento recente" : fim ? `sem atividade aberta desde ${quando(fim)}` : `${e.nome}${ativ && ativ.toLowerCase() !== e.nome.toLowerCase() ? ", " + ativ : ""}, há ${hero}`
+    }${r && r.num_ordem ? `, OP ${r.num_ordem}` : ""}. Ver detalhe`)}"`;
+    return `<div class="agora-card${clicavel ? " clicavel" : ""}${e.chave === "PRODUZINDO" ? " rodando" : ""}${!r ? " sem-dado" : ""}"
+        style="--i:${i}; --cor:${e.cor}" data-maq="${esc(it.id)}"${aria}>
+      <div class="machine-top">
+        <div style="min-width:0"><div class="machine-name">${esc(it.nome)}</div>
+          <div class="machine-line">${esc(it.processo)}${it.rota && it.rota !== "—" ? " · " + esc(it.rota) : ""}</div></div>
+        <span class="classe-pill"><span class="dot"></span>${esc(e.nome)}</span>
+      </div>
+      <div class="agora-hero"><span class="v"${marco ? ` data-marco="${marco.getTime()}"` : ""}>${esc(hero)}</span><span class="l">${esc(rotulo)}</span></div>
+      ${op}${prog}
+      ${fatos.length ? `<dl class="agora-fatos">${fatos.join("")}</dl>` : ""}
+    </div>`;
+  }
+
+  function contagem(lista){
+    const comDado = lista.filter(x=>x.r);
+    const conta = g => comDado.filter(x=>!x.r.terminou_em && AGORA_GRUPOS[g].includes(estadoAgora(x.r).chave)).length;
+    const produzindo = conta("produzindo"), setup = conta("setup"), fora = conta("fora");
+    return { total: comDado.length, produzindo, setup, fora, paradas: comDado.length - produzindo - setup - fora };
+  }
+
+  function desenharBoard(animar){
+    const lista = itens();
+    const { ref } = referencia();
+    const etapas = [...ORDEM_ETAPAS, "Outros recursos"].filter(p=> lista.some(x=>x.processo === p));
+    if(filtro !== "all" && !etapas.includes(filtro)) filtro = "all";
+    const grupos = (filtro === "all" ? etapas : [filtro]).map(p=>({ etapa:p, lista: lista.filter(x=>x.processo === p) }));
+    const foco = document.activeElement && board.contains(document.activeElement) ? document.activeElement.dataset.maq : null;
+    let i = 0;
+    board.classList.toggle("anima", !!animar && !reduzMovimento());
+    board.innerHTML = grupos.map(g=>{
+      const c = contagem(g.lista);
+      const partes = [c.produzindo && `${c.produzindo} produzindo`, c.setup && `${c.setup} em setup`, c.paradas && `${c.paradas} ${c.paradas === 1 ? "parada" : "paradas"}`,
+                      c.fora && `${c.fora} fora de turno`].filter(Boolean);
+      return `<section class="etapa" aria-label="${esc(g.etapa)}">
+        <div class="etapa-head"><h4 class="etapa-nome">${esc(g.etapa)}</h4><span class="etapa-info">${esc(partes.join(" · ") || "sem apontamento recente")}</span></div>
+        <div class="agora-grid">${g.lista.map(x=>cartao(x, i++, ref)).join("")}</div>
+      </section>`;
+    }).join("");
+    board.querySelectorAll(".agora-card.clicavel").forEach(card=>{
+      const abrir = ()=>{
+        const m = MAQUINAS.find(x=>x.id === card.dataset.maq);
+        if(m && window.openMaquinaDrawer) window.openMaquinaDrawer(m, card);
+      };
+      card.addEventListener("click", abrir);
+      card.addEventListener("keydown", e=>{ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); abrir(); } });
+    });
+    if(foco){
+      const el = [...board.querySelectorAll(".agora-card")].find(c=>c.dataset.maq === foco);
+      if(el && el.tabIndex >= 0) el.focus({ preventScroll:true });
+    }
+    if(!filtrosProntos){
+      filtrosProntos = true;
+      segmentado(filtros, [["all", "Todas"], ...etapas.map(p=>[p, p])], filtro, v=>{ filtro = v; desenharBoard(true); });
+    }
+  }
+
+  function render(animar){
+    const lista = itens();
+    if(!bancoLinhas("agora").length){
+      renderKpis(kpis, [
+        { label:"Produzindo", value:null, nota:"máquinas rodando agora" },
+        { label:"Em setup", value:null, nota:"setup e inicialização" },
+        { label:"Paradas", value:null, nota:"com ou sem motivo apontado" },
+        { label:"TMR hoje", value:null, suffix:"%", nota:"dia de produção atual" },
+      ]);
+      filtros.hidden = true;
+      sub.classList.remove("alerta");
+      board.innerHTML = `<div class="empty-state">${esc(bancoVazio("agora", "Sem dados: nenhuma máquina com apontamento recente."))}</div>`;
+      return;
+    }
+    filtros.hidden = false;
+    const c = contagem(lista);
+    // TMR do dia de produção mais recente, na regra do BI (horas sem FIM TURNO e INATIVIDADE)
+    const comDado = lista.filter(x=>x.r);
+    const dia = comDado.map(x=>x.r.dia).filter(Boolean).map(d=>String(d).slice(0,10)).sort().pop();
+    const doDia = comDado.filter(x=>x.r.dia && String(x.r.dia).slice(0,10) === dia);
+    const hp = doDia.reduce((a,x)=>a+(Number(x.r.horas_prod_dia)||0),0), ht = doDia.reduce((a,x)=>a+(Number(x.r.horas_tot_dia)||0),0);
+    const valores = [
+      { label:"Produzindo", value:c.produzindo, suffix:` de ${c.total}`, decimals:0, nota:"máquinas rodando agora" },
+      { label:"Em setup", value:c.setup, decimals:0, nota:"setup e inicialização" },
+      { label:"Paradas", value:c.paradas, decimals:0, nota: c.fora ? `e mais ${c.fora} fora de turno ou inativas` : "com ou sem motivo apontado" },
+      { label:"TMR hoje", value: ht > 0 ? hp / ht * 100 : null, suffix:"%", decimals:1,
+        nota: ht > 0 ? `${fmt1(hp)} de ${fmt1(ht)} h · dia ${fmtDM(dataLocal(dia))}` : "sem horas apontadas hoje" },
+    ];
+    // a busca a cada 5 min só redesenha os cartões de cima quando algo mudou
+    const assinatura = JSON.stringify(valores.map(v=>[v.value, v.suffix, v.nota]));
+    if(assinatura !== assinaturaKpis){ assinaturaKpis = assinatura; renderKpis(kpis, valores); }
+
+    const { ate, fresco } = referencia();
+    sub.classList.toggle("alerta", !!ate && !fresco);
+    sub.textContent = !ate ? "O apontamento em andamento em cada máquina"
+      : fresco ? `O apontamento em andamento em cada máquina · dados do banco até ${fmtHM(ate)} · atualiza sozinho`
+      : `Sem dado novo desde ${fmtDMHM(ate)} (há ${fmtDuracao((new Date() - ate) / 60000)}) · os tempos vão até esse horário`;
+    desenharBoard(animar);
+  }
+  render(true);
+  window.renderAgora = render;
+
+  async function buscarDeNovo(){
+    if(document.visibilityState !== "visible" || !window.gualapackAuth || !window.BANCO) return;
+    try{
+      const { data, error } = await window.gualapackAuth.from("v_hub_agora").select("*");
+      if(error || !Array.isArray(data)) return;          // mantém o que está na tela
+      window.BANCO.agora = data;
+      window.BANCO.estado.agora = "ok";
+      render(false);
+    }catch(e){ /* sem rede: tenta de novo na próxima */ }
+  }
+  setInterval(buscarDeNovo, 5 * 60000);
+  setInterval(()=>{
+    if(document.visibilityState !== "visible") return;
+    const { ref } = referencia();
+    board.querySelectorAll(".agora-hero .v[data-marco]").forEach(el=>{ el.textContent = fmtDuracao((ref - Number(el.dataset.marco)) / 60000); });
+  }, 60000);
+})();
+
 /* ============ VIEW: APARAS & REFUGO ============ */
 // Diferença do MESMO mês: o último com apontado e confirmado. O apontado do
 // mês aberto contra o confirmado do mês anterior comparava meses diferentes.
@@ -2685,6 +3291,42 @@ hBarChart(document.getElementById("classe-chart"), CLASSIFICACOES.map(c=>({
       <td class="quebra">${esc(o.motivo)}</td>
     </tr>`;
   }).join("") : `<tr><td colspan="7"><div class="empty-state">Sem OPs com refugo no período.</div></td></tr>`;
+})();
+
+/* Laudos do CQ (view_usr_LaudoAnalise): cada laudo pelo resultado. */
+const STATUS_LAUDO = [
+  { nome:"Aprovado",                cor:"var(--good)" },
+  { nome:"Aprovado com Reanálise",  cor:"var(--ent-2)" },
+  { nome:"Reprovado com Reanálise", cor:"var(--warning)" },
+  { nome:"Reprovado",               cor:"var(--critical)" },
+];
+(function(){
+  const holder = document.getElementById("laudos-chart");
+  const dest = document.getElementById("laudos-destaque");
+  if(!holder) return;
+  const linhas = bancoLinhas("laudos").map(r=>({ status: limpaTexto(r.status) || "Sem resultado", laudos: Number(r.laudos)||0, analises: Number(r.analises)||0 }))
+    .filter(r=>r.laudos > 0);
+  const total = linhas.reduce((a,r)=>a+r.laudos,0);
+  const def = s => STATUS_LAUDO.find(x=>x.nome.toLowerCase() === s.toLowerCase());
+  const ordem = s => { const i = STATUS_LAUDO.findIndex(x=>x.nome.toLowerCase() === s.toLowerCase()); return i < 0 ? 99 : i; };
+  if(!total){
+    dest.innerHTML = "";
+    semDados(holder, bancoVazio("laudos", "Sem laudos emitidos no período."));
+  }else{
+    const aprovados = linhas.filter(r=>/^aprovado/i.test(r.status)).reduce((a,r)=>a+r.laudos,0);
+    dest.innerHTML = `<div class="destaque"><span class="destaque-num">${fmt1(aprovados / total * 100)}%</span>
+      <span class="destaque-txt">aprovados, com ou sem reanálise · ${fmt(total)} laudos no período</span></div>`;
+    hBarChart(holder, linhas.sort((a,b)=>ordem(a.status) - ordem(b.status) || b.laudos - a.laudos).map(r=>({
+      label:r.status, value:r.laudos, display:`${fmt(r.laudos)} · ${fmt(r.laudos / total * 100)}%`, color: def(r.status) ? def(r.status).cor : "var(--series-3)",
+      tip:`<b>${esc(r.status)}</b><br>${fmt(r.laudos)} laudos · ${fmt1(r.laudos / total * 100)}%<br>${fmt(r.analises)} análises`,
+    })), { labelW:170, valueW:84, rowH:30, aria:"Laudos do CQ por resultado" });
+  }
+  const mens = bancoLinhas("mensal").slice(-12);
+  const pct = mens.map(r=>{ const tot = Number(r.laudos_total)||0; return tot > 0 ? (Number(r.laudos_aprovados)||0) / tot * 100 : null; });
+  const holderMes = document.getElementById("laudos-mes-chart");
+  if(pct.every(v=>v == null)) semDados(holderMes, bancoVazio("mensal", "Sem laudos nos últimos meses."));
+  else multiLineChart(holderMes, mens.map(r=>rotuloMes(r.mes)), [{ name:"Aprovados", short:"Aprov.", color:"var(--series-2)", data:pct }],
+    { idPrefix:"la", fmtY: v=>fmt(v)+"%", fmtTip: v=>fmt1(v)+"%", aria:"Laudos aprovados por mês" });
 })();
 
 /* ============ VIEW: PRODUTIVIDADE & TMR ============ */
@@ -2790,6 +3432,58 @@ hBarChart(document.getElementById("classe-chart"), CLASSIFICACOES.map(c=>({
   });
 })();
 
+/* Setup programado x real por máquina (View_usr_Acompanhamento_Prod: minutos
+   de setup programados e reais de cada OP que saiu da máquina no período). */
+(function(){
+  const holder = document.getElementById("setup-chart");
+  const dest = document.getElementById("setup-destaque");
+  if(!holder) return;
+  const n = v => Number(v)||0;
+  const dados = bancoLinhas("setup").map(r=>({ nome: limpaTexto(r.maquina), ativ: n(r.atividades), prog: n(r.min_programado) / 60,
+      real: n(r.min_real) / 60, acima: n(r.acima_do_programado) }))
+    .filter(d=>d.prog > 0 || d.real > 0).sort((a,b)=>b.real - a.real);
+  if(!dados.length){
+    dest.innerHTML = "";
+    semDados(holder, bancoVazio("setup", "Sem setup apontado no período."));
+    return;
+  }
+  const soma = k => dados.reduce((a,d)=>a+d[k],0);
+  const tProg = soma("prog"), tReal = soma("real"), tAtiv = soma("ativ"), tAcima = soma("acima");
+  const fmtH = v => v < 10 ? fmt1(v) : fmt(v);
+  dest.innerHTML = `<div class="destaque"><span class="destaque-num">${tProg > 0 ? fmt(tReal / tProg * 100) + "%" : "—"}</span>
+    <span class="destaque-txt">do tempo programado · ${fmtH(tReal)} h reais de ${fmtH(tProg)} h programadas · ${fmt(tAcima)} de ${fmt(tAtiv)} setups acima do programado</span></div>`;
+  const resumo = dados.slice(0,5).map(d=>`${d.nome} ${fmtH(d.real)} de ${fmtH(d.prog)} h`).join("; ");
+  const tip = d => `<b>${esc(d.nome)}</b><br>Real ${fmtH(d.real)} h · programado ${fmtH(d.prog)} h${d.prog > 0 ? ` (${fmt(d.real / d.prog * 100)}%)` : ""}` +
+    `<br>${fmt(d.ativ)} setups · ${fmt(d.acima)} acima do programado` +
+    (d.ativ > 0 ? `<br>Média ${fmt(d.real * 60 / d.ativ)} min por setup (programado ${fmt(d.prog * 60 / d.ativ)})` : "");
+  montarGrafico(holder, (W, animar)=>{
+    const rowH = 30, gap = 6, H = dados.length * (rowH + gap) - gap;
+    const labelW = Math.min(110, Math.round(W * 0.28)), valW = W < 420 ? 92 : 120;
+    const barX = labelW + 10, barMax = Math.max(10, W - barX - valW - 8), bh = 14;
+    const max = Math.max(...dados.map(d=>Math.max(d.prog, d.real))) || 1;
+    holder.innerHTML = `<svg class="${animar ? "anima" : ""}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc("Horas de setup reais contra programadas por máquina: " + resumo)}">
+      ${dados.map((d,i)=>{
+        const y = i * (rowH + gap), yb = y + (rowH - bh) / 2;
+        const wReal = d.real / max * barMax, xProg = barX + d.prog / max * barMax;
+        const cor = d.real > d.prog ? "var(--critical)" : "var(--good)";
+        return `<g class="linha-barra" data-i="${i}">
+          <rect class="fundo-hover" x="-6" y="${y-2}" width="${W+12}" height="${rowH+4}" rx="8"/>
+          <text x="0" y="${y + rowH/2 + 4}" font-size="12" fill="var(--text-secondary)">${esc(cortarTexto(d.nome, labelW, 12))}</text>
+          <rect x="${barX}" y="${yb}" width="${barMax}" height="${bh}" rx="${bh/2}" fill="var(--surface-sunken)"/>
+          ${wReal > 0 ? `<rect class="barra-h" style="--i:${i}" x="${barX}" y="${yb}" width="${wReal.toFixed(1)}" height="${bh}" rx="${Math.min(bh/2, wReal/2).toFixed(1)}" fill="${cor}"/>` : ""}
+          ${d.prog > 0 ? `<line x1="${xProg.toFixed(1)}" y1="${y + 3}" x2="${xProg.toFixed(1)}" y2="${y + rowH - 3}" stroke="var(--text-primary)" stroke-width="2" stroke-linecap="round"/>` : ""}
+          <text x="${W}" y="${y + rowH/2 + 4}" font-size="12" text-anchor="end" class="num" fill="var(--text-primary)" font-weight="600">${fmtH(d.real)} h <tspan fill="var(--text-muted)" font-weight="400">/ ${fmtH(d.prog)} h</tspan></text>
+        </g>`;
+      }).join("")}
+    </svg>`;
+    holder.querySelectorAll(".linha-barra").forEach(g=>{
+      const d = dados[+g.dataset.i];
+      g.addEventListener("mousemove", e=> attachTip(holder, tip(d), e));
+      g.addEventListener("mouseleave", ()=> clearTip(holder));
+    });
+  });
+})();
+
 /* ============ VIEW: ADERÊNCIA ============ */
 (function(){
   // Consolidado inclui todas as máquinas (Coating incluído); com o hub, todas
@@ -2883,6 +3577,142 @@ hBarChart(document.getElementById("classe-chart"), CLASSIFICACOES.map(c=>({
       <div class="proc-sub num">${semValor ? "sem programação no período" : `${fmt(p.realizado)} de ${fmt(p.planejado)} km`}</div>
     </div>`;
   }).join("");
+})();
+
+/* Entregas no prazo (View_usr_Entregas_Desempenho, a consulta da Aderência
+   Semanal do PCP): cada item faturado classificado pela data pedida pelo
+   cliente e pela data do PCP. No prazo = Ótimo + Bom. */
+const CLASSES_ENTREGA = [
+  { k:"1", nome:"Ótimo",   desc:"faturado até a data pedida pelo cliente",       cor:"var(--ent-1)" },
+  { k:"2", nome:"Bom",     desc:"depois da data do cliente, até a data do PCP", cor:"var(--ent-2)" },
+  { k:"3", nome:"Regular", desc:"1 a 5 dias depois da data do PCP",             cor:"var(--ent-3)" },
+  { k:"4", nome:"Ruim",    desc:"6 a 10 dias depois da data do PCP",            cor:"var(--ent-4)" },
+  { k:"5", nome:"Péssimo", desc:"mais de 10 dias depois da data do PCP",        cor:"var(--ent-5)" },
+];
+(function(){
+  const holder = document.getElementById("entregas-chart");
+  const dest = document.getElementById("entregas-destaque");
+  if(!holder) return;
+  const linhas = bancoLinhas("entregas");
+  const porClasse = CLASSES_ENTREGA.map(c=>({ ...c,
+    itens: linhas.filter(r=>String(r.status || "").trim().startsWith(c.k)).reduce((a,r)=>a+(Number(r.itens)||0),0) }));
+  const total = porClasse.reduce((a,c)=>a+c.itens,0);
+  if(!total){
+    dest.innerHTML = "";
+    semDados(holder, bancoVazio("entregas", "Sem itens faturados no período."));
+  }else{
+    const noPrazo = (porClasse[0].itens + porClasse[1].itens) / total * 100;
+    dest.innerHTML = `<div class="destaque"><span class="destaque-num">${fmt1(noPrazo)}%</span>
+      <span class="destaque-txt">no prazo (Ótimo + Bom) · ${fmt(total)} itens faturados no período</span></div>`;
+    hBarChart(holder, porClasse.map(c=>({ label:c.nome, value:c.itens, display:`${fmt(c.itens)} · ${fmt(c.itens / total * 100)}%`, color:c.cor,
+      tip:`<b>${c.nome}</b> — ${esc(c.desc)}<br>${fmt(c.itens)} itens · ${fmt1(c.itens / total * 100)}%` })),
+      { labelW:80, valueW:84, rowH:30, aria:"Itens faturados por classificação de entrega" });
+  }
+
+  const mens = bancoLinhas("mensal").slice(-12);
+  const CHAVES = ["entregas_otimo", "entregas_bom", "entregas_regular", "entregas_ruim", "entregas_pessimo"];
+  const tot = r => CHAVES.reduce((a,k)=>a+(Number(r[k])||0),0);
+  const prazo = mens.map(r=>{ const t = tot(r); return t > 0 ? ((Number(r.entregas_otimo)||0) + (Number(r.entregas_bom)||0)) / t * 100 : null; });
+  const otimo = mens.map(r=>{ const t = tot(r); return t > 0 ? (Number(r.entregas_otimo)||0) / t * 100 : null; });
+  const holderMes = document.getElementById("entregas-mes-chart");
+  const legenda = document.getElementById("entregas-mes-legend");
+  if(prazo.every(v=>v == null)){
+    legenda.innerHTML = "";
+    semDados(holderMes, bancoVazio("mensal", "Sem entregas nos últimos meses."));
+  }else{
+    const defs = [
+      { name:"No prazo (Ótimo + Bom)", short:"Prazo", color:"var(--series-2)", data:prazo },
+      { name:"Ótimo (data do cliente)", short:"Ótimo", color:"var(--series-4)", dashed:true, data:otimo },
+    ];
+    legenda.innerHTML = defs.map(d=>`<span class="legend-item" style="cursor:default"><span class="legend-dot" style="background:${d.color}"></span>${esc(d.name)}</span>`).join("");
+    multiLineChart(holderMes, mens.map(r=>rotuloMes(r.mes)), defs,
+      { idPrefix:"en", yMin:0, yMax:100, fmtY: v=>fmt(v)+"%", fmtTip: v=>fmt1(v)+"%", aria:"Entregas no prazo por mês" });
+  }
+})();
+
+/* Fila de programação por máquina (view_usr_ProgramacaoPlanner: OPs alocadas
+   e não finalizadas): o que vem depois, com início e fim planejados,
+   planejado x produzido e o saldo. Quantidades na unidade da OP. */
+(function(){
+  const sel = document.getElementById("fila-maquina");
+  const tbody = document.querySelector("#fila-table tbody");
+  const resumo = document.getElementById("fila-resumo");
+  const mais = document.getElementById("fila-mais");
+  if(!sel) return;
+  const linhas = bancoLinhas("programacao");
+  if(!linhas.length){
+    sel.innerHTML = `<option>Sem fila</option>`;
+    sel.disabled = true;
+    resumo.innerHTML = "";
+    tabelaComMais(tbody, mais, [], { colunas:9, vazio: bancoVazio("programacao", "Sem dados: nenhuma OP alocada na programação agora.") });
+    return;
+  }
+  const porMaq = new Map();
+  linhas.forEach(r=>{
+    const k = chaveMaq(r.maquina);
+    if(!porMaq.has(k)) porMaq.set(k, { nome: limpaTexto(r.maquina), ops: [] });
+    porMaq.get(k).ops.push(r);
+  });
+  porMaq.forEach(g=> g.ops.sort((a,b)=>Number(a.posicao) - Number(b.posicao)));
+  // na ordem da rota, como o quadro de máquinas; depois os outros recursos e as filas de pendência
+  const ordem = k=>{
+    const m = MAQUINAS.find(x=>chaveMaq(x.id) === k);
+    return [/PENDENCIA/.test(k) ? 2 : m ? 0 : 1, m ? ORDEM_ETAPAS.indexOf(m.processo) : 0];
+  };
+  const chaves = [...porMaq.keys()].sort((a,b)=>{
+    const x = ordem(a), y = ordem(b);
+    return x[0] - y[0] || x[1] - y[1] || a.localeCompare(b, "pt-BR", { numeric:true });
+  });
+  const nomeFila = g => { const m = g.nome.match(/^(\d+)\s*-\s*PENDENCIA$/i); return m ? `Pendência ${m[1]}` : g.nome; };
+  sel.innerHTML = chaves.map(k=>{
+    const g = porMaq.get(k);
+    return `<option value="${esc(k)}">${esc(nomeFila(g))} · ${fmt(g.ops.length)} ${g.ops.length === 1 ? "OP" : "OPs"}</option>`;
+  }).join("");
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  const pill = (classe, txt, titulo) => `<span class="status-pill status-${classe}"${titulo ? ` title="${esc(titulo)}"` : ""}><span class="dot" style="background:currentColor"></span>${esc(txt)}</span>`;
+
+  function render(){
+    const g = porMaq.get(sel.value);
+    if(!g) return;
+    const ops = g.ops;
+    const liberadas = ops.filter(r=>/^liberad/i.test(limpaTexto(r.situacao))).length;
+    const fimCarga = ops.map(r=>dataLocal(r.fim_plan)).filter(Boolean).sort((a,b)=>b - a)[0];
+    const horas = ops.reduce((a,r)=>{ const i = dataLocal(r.ini_plan), f = dataLocal(r.fim_plan); return a + (i && f && f > i ? (f - i) / 3600000 : 0); }, 0);
+    const vencidas = ops.filter(r=>{ const e = dataLocal(r.entrega); return e && e < hoje; }).length;
+    const depois = ops.filter(r=>{ const e = dataLocal(r.entrega), f = dataLocal(r.fim_plan); return e && f && e >= hoje && f > fimDoDia(e); }).length;
+    resumo.innerHTML = [
+      `<span><b>${fmt(ops.length)}</b> ${ops.length === 1 ? "OP" : "OPs"} na fila</span>`,
+      `<span><b>${fmt(liberadas)}</b> ${liberadas === 1 ? "liberada" : "liberadas"} · <b>${fmt(ops.length - liberadas)}</b> com pendência ou em análise</span>`,
+      horas > 0 ? `<span><b>${fmt(horas)} h</b> programadas${fimCarga ? ` · até ${fmtDMHM(fimCarga)}` : ""}</span>` : "",
+      vencidas ? `<span><b>${fmt(vencidas)}</b> com entrega vencida</span>` : "",
+      depois ? `<span><b>${fmt(depois)}</b> terminam depois da entrega</span>` : "",
+    ].filter(Boolean).join("");
+    tabelaComMais(tbody, mais, ops.map(r=>{
+      const ini = dataLocal(r.ini_plan), fim = dataLocal(r.fim_plan), ent = dataLocal(r.entrega);
+      const plan = Number(r.qtd_planejada)||0, prod = Number(r.qtd_produzida)||0;
+      const pct = plan > 0 ? prod / plan * 100 : null;
+      const sit = limpaTexto(r.situacao) || "—";
+      const entTxt = ent ? (ent.getFullYear() === hoje.getFullYear() ? fmtDM(ent) : fmtDMA(ent)) : "—";
+      const entrega = !ent ? "—"
+        : ent < hoje ? pill("critical", `${entTxt} · vencida`, `A entrega de ${fmtDMA(ent)} já passou`)
+        : fim && fim > fimDoDia(ent) ? pill("warning", `${entTxt} · fim depois`, `O fim planejado (${fmtDMHM(fim)}) passa da entrega`)
+        : `<span class="num">${entTxt}</span>`;
+      const produto = limpaTexto(r.produto);
+      return `<tr>
+        <td class="num">${fmt(Number(r.posicao)||0)}</td>
+        <td class="mono">${esc(r.num_ordem || "—")}</td>
+        <td><span class="celula-dupla">${esc(limpaTexto(r.cliente) || "—")}<span class="sub"${produto ? ` title="${esc(produto)}"` : ""}>${esc(produto || "—")}</span></span></td>
+        <td>${esc(limpaTexto(r.atividade) || "—")}</td>
+        <td><span class="sit"><span class="dot" style="background:${/^liberad/i.test(sit) ? "var(--good)" : /pend/i.test(sit) ? "var(--warning)" : "var(--text-muted)"}"></span>${esc(sit)}</span></td>
+        <td class="num">${ini ? fmtDMHM(ini) : "—"} → ${fim ? (ini && mesmoDiaQue(ini, fim) ? fmtHM(fim) : fmtDMHM(fim)) : "—"}</td>
+        <td>${entrega}</td>
+        <td class="num">${pct == null ? "—" : `<span class="mini-barra" aria-hidden="true"><span style="width:${Math.min(100, pct).toFixed(0)}%"></span></span>${fmt(pct)}%`}</td>
+        <td class="num">${fmt(Number(r.saldo)||0)}</td>
+      </tr>`;
+    }), { limite:15, colunas:9, vazio:"Nenhuma OP nesta fila." });
+  }
+  sel.addEventListener("change", render);
+  render();
 })();
 
 /* ============ VIEW: LINHA DO TEMPO (Gantt de apontamentos) ============ */
@@ -3043,28 +3873,175 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   });
 })();
 
-/* ============ VIEW: WIP & CARTEIRA ============ */
-// Nenhuma base real de WIP ou carteira está ligada ao painel. Esta visão
-// mostrava números montados no código (etapas e clientes fixos, "produzido"
-// = carteira × 0,86, "faturado" = × 0,79) e ainda exportava isso em CSV.
-// Regra do projeto: nunca mostrar dado fictício — fica "sem dados" até
-// uma base de WIP/carteira entrar no hub.
+/* ============ VIEW: WIP & CARTEIRA ============
+   WIP: pallets disponíveis em processo (view_usr_pallet_wip_disponiveis),
+   somados pelo hub por etapa, local, cliente e idade. Carteira: itens de
+   pedido com saldo a faturar (View_usr_ListaPedidosVenda, um item por linha).
+   Produzido = peso bruto das rebobinadeiras (a base da apara); faturado = kg
+   das notas de produto acabado, como no BI Dados de Produção. */
 (function(){
+  const n = v => Number(v)||0;
+  const soma = (lista, f) => lista.reduce((a,x)=>a+f(x),0);
+  const wip = bancoLinhas("wip");
+  const cart = bancoLinhas("carteira");
+  const hoje = new Date(); hoje.setHours(0,0,0,0);
+  // vencimento do item: a data negociada, se houver; senão, a pedida pelo cliente
+  const vence = r => dataLocal(r.entrega_negociada) || dataLocal(r.entrega_cliente);
+
+  const wipKg = soma(wip, r=>n(r.kg)), wipPallets = soma(wip, r=>n(r.pallets)), wipMetros = soma(wip, r=>n(r.metros));
+  const velhoKg = soma(wip.filter(r=>/mais de 90/.test(r.idade || "")), r=>n(r.kg));
+  const cartKg = soma(cart, r=>n(r.kg_saldo));
+  const vencKg = soma(cart.filter(r=>{ const d = vence(r); return d && d < hoje; }), r=>n(r.kg_saldo));
+  const pedidos = new Set(cart.map(r=>r.num_pedido)).size;
+  // item sem peso conhecido (milheiro, metro, m² sem gramatura): fica fora das toneladas, e o cartão diz quantos
+  const semPeso = cart.filter(r=>r.kg_saldo == null).length;
   renderKpis(document.getElementById("wip-kpis"), [
-    { label:"WIP total", value:null, suffix:" km", decimals:1, nota:"sem base de WIP ligada", spark:null },
-    { label:"Dentro da carteira", value:null, suffix:"%", decimals:1, nota:"sem base de carteira ligada", spark:null },
-    { label:"Carteira do mês", value:null, suffix:" t", decimals:1, nota:"sem base de carteira ligada", spark:null },
-    { label:"Produzido", value:null, suffix:" t", decimals:1, nota:"sem base de carteira ligada", spark:null },
+    { label:"WIP em processo", value: wip.length ? wipKg / 1000 : null, suffix:" t", decimals:1,
+      nota: wip.length ? `${fmt(wipPallets)} pallets · ${fmt(wipMetros / 1000)} km` : bancoVazio("wip", "sem pallets em processo agora") },
+    { label:"WIP com mais de 90 dias", value: wip.length ? velhoKg / 1000 : null, suffix:" t", decimals:1,
+      nota: wipKg > 0 ? `${fmt1(velhoKg / wipKg * 100)}% do WIP em kg` : "pela idade da OP" },
+    { label:"Carteira em aberto", value: cart.length ? cartKg / 1000 : null, suffix:" t", decimals:1,
+      nota: cart.length ? `${fmt(cart.length)} itens em ${fmt(pedidos)} pedidos${semPeso ? ` · ${fmt(semPeso)} sem peso conhecido` : ""}`
+                        : bancoVazio("carteira", "sem itens com saldo a faturar") },
+    { label:"Entrega vencida", value: cart.length ? vencKg / 1000 : null, suffix:" t", decimals:1,
+      nota: cartKg > 0 ? `${fmt1(vencKg / cartKg * 100)}% da carteira · data pedida já passou` : "data pedida já passou" },
   ]);
-  const vazio = `<div class="empty-state">Sem dados: nenhuma base de WIP ou carteira está ligada ao painel ainda.</div>`;
-  document.getElementById("wip-chart").innerHTML = vazio;
-  document.getElementById("carteira-chart").innerHTML = vazio;
-  document.getElementById("carteira-legend").innerHTML = "";
-  document.querySelector("#wip-table tbody").innerHTML =
-    `<tr><td colspan="6"><div class="empty-state">Sem dados de WIP por cliente.</div></td></tr>`;
-  const exportar = document.getElementById("wip-export");
-  exportar.disabled = true;
-  exportar.title = "Sem dados de WIP para exportar";
+
+  // ---- WIP por etapa, em kg, metros ou pallets
+  const porEtapa = new Map();
+  wip.forEach(r=>{
+    const k = limpaTexto(r.etapa) || "Sem etapa";
+    const e = porEtapa.get(k) || { etapa:k, kg:0, metros:0, pallets:0, clientes:new Set() };
+    e.kg += n(r.kg); e.metros += n(r.metros); e.pallets += n(r.pallets);
+    if(r.cliente) e.clientes.add(r.cliente);
+    porEtapa.set(k, e);
+  });
+  const MEDIDAS = { kg:{ nome:"toneladas", fmt: v=>fmtT(v) }, metros:{ nome:"quilômetros", fmt: v=>fmt(v / 1000) + " km" }, pallets:{ nome:"pallets", fmt: v=>fmt(v) } };
+  let medida = "kg";
+  const holderEtapa = document.getElementById("wip-chart");
+  // as 12 maiores etapas; a cauda (às vezes 1 pallet) vai numa linha "Outras"
+  const MAX_ETAPAS = 12;
+  function desenharEtapa(){
+    const todas = [...porEtapa.values()].filter(e=>e[medida] > 0).sort((a,b)=>b[medida] - a[medida]);
+    if(!todas.length){ semDados(holderEtapa, bancoVazio("wip", "Sem dados de WIP agora.")); return; }
+    const resto = todas.slice(MAX_ETAPAS);
+    const rows = resto.length > 1 ? [...todas.slice(0, MAX_ETAPAS), {
+      etapa:`Outras ${resto.length} etapas`, outras: resto.map(e=>e.etapa), cor:"var(--series-4)",
+      kg: resto.reduce((a,e)=>a+e.kg,0), metros: resto.reduce((a,e)=>a+e.metros,0), pallets: resto.reduce((a,e)=>a+e.pallets,0),
+      clientes: new Set(resto.flatMap(e=>[...e.clientes])),
+    }] : todas;
+    hBarChart(holderEtapa, rows.map(e=>({ label:e.etapa, value:e[medida], display: MEDIDAS[medida].fmt(e[medida]), color: e.cor || "var(--series-3)",
+      tip:`<b>${esc(e.etapa)}</b><br>${fmt(e.pallets)} pallets · ${fmt(e.metros)} m · ${fmt(e.kg)} kg<br>${fmt(e.clientes.size)} ${e.clientes.size === 1 ? "cliente" : "clientes"}` +
+        (e.outras ? `<br><span style="color:var(--text-muted)">${esc(e.outras.slice(0, 8).join(", "))}${e.outras.length > 8 ? "…" : ""}</span>` : "") })),
+      { labelW:130, valueW:74, rowH:26, aria:`WIP por etapa em ${MEDIDAS[medida].nome}` });
+  }
+  const segMedida = document.getElementById("wip-medida");
+  if(wip.length) segmentado(segMedida, [["kg", "kg"], ["metros", "Metros"], ["pallets", "Pallets"]], medida, v=>{ medida = v; desenharEtapa(); });
+  else segMedida.hidden = true;
+  desenharEtapa();
+
+  // ---- idade do WIP (dias desde o início da OP)
+  const IDADES = [["0–7 dias", "var(--series-3)"], ["8–30 dias", "var(--series-3)"], ["31–90 dias", "var(--warning)"], ["mais de 90 dias", "var(--critical)"]];
+  const holderIdade = document.getElementById("wip-idade-chart");
+  if(!wipKg) semDados(holderIdade, bancoVazio("wip", "Sem dados de WIP agora."));
+  else hBarChart(holderIdade, IDADES.map(([k, cor])=>{
+    const rs = wip.filter(r=>r.idade === k), kg = soma(rs, r=>n(r.kg)), pal = soma(rs, r=>n(r.pallets));
+    return { label:k, value:kg, display: fmtT(kg), color:cor, tip:`<b>${esc(k)}</b><br>${fmt(kg)} kg · ${fmt(pal)} pallets<br>${fmt1(kg / wipKg * 100)}% do WIP em kg` };
+  }), { labelW:110, valueW:64, rowH:30, aria:"WIP por idade em toneladas" });
+
+  // ---- WIP por cliente
+  const porCliente = new Map();
+  wip.forEach(r=>{
+    const k = limpaTexto(r.cliente) || "Sem cliente";
+    const c = porCliente.get(k) || { cliente:k, pallets:0, metros:0, kg:0, etapas:new Map(), antiga:null };
+    c.pallets += n(r.pallets); c.metros += n(r.metros); c.kg += n(r.kg);
+    const et = limpaTexto(r.etapa) || "Sem etapa";
+    c.etapas.set(et, (c.etapas.get(et) || 0) + n(r.pallets));
+    const d = dataLocal(r.op_mais_antiga);
+    if(d && (!c.antiga || d < c.antiga)) c.antiga = d;
+    porCliente.set(k, c);
+  });
+  tabelaComMais(document.querySelector("#wip-table tbody"), document.getElementById("wip-mais"),
+    [...porCliente.values()].sort((a,b)=>b.kg - a.kg || b.pallets - a.pallets).map(c=>{
+      const etapas = [...c.etapas].sort((a,b)=>b[1] - a[1]).slice(0, 2).map(([e])=>e).join(", ");
+      const dias = c.antiga ? Math.floor((hoje - c.antiga) / 86400000) : null;
+      return `<tr><td>${esc(c.cliente)}</td><td class="num">${fmt(c.pallets)}</td><td class="num">${fmt(c.metros)}</td><td class="num">${fmt(c.kg)}</td>
+        <td>${esc(etapas)}</td><td class="num">${c.antiga ? `${fmtDMA(c.antiga)} <span style="color:var(--text-muted)">· ${fmt(dias)} ${dias === 1 ? "dia" : "dias"}</span>` : "—"}</td></tr>`;
+    }), { limite:12, colunas:6, vazio: bancoVazio("wip", "Sem dados de WIP por cliente.") });
+  const btnWip = document.getElementById("wip-export");
+  btnWip.disabled = !wip.length;
+  btnWip.title = wip.length ? "Baixar o WIP por etapa, local, cliente e idade (CSV)" : "Sem dados de WIP para exportar";
+  btnWip.onclick = ()=> baixarCsv(`wip-${isoDate(new Date())}.csv`,
+    [["etapa","Etapa"], ["local","Local"], ["cliente","Cliente"], ["situacao","Situação"], ["idade","Idade"], ["pallets","Pallets"],
+     ["ops","OPs"], ["metros","Metros"], ["kg","kg"], ["op_mais_antiga","Início da OP mais antiga"]], wip);
+
+  // ---- carteira x produção x faturamento, nos meses fechados: no mês aberto a
+  // carteira já está inteira e o produzido e o faturado ainda não
+  const mesAberto = isoDate(new Date()).slice(0, 7);
+  const mens = bancoLinhas("mensal").filter(r=>String(r.mes).slice(0, 7) < mesAberto).slice(-12);
+  const serie = k => mens.map(r=> r[k] == null ? null : n(r[k]) / 1000);
+  const defsCart = [
+    { name:"Carteira (data do cliente)", short:"Cart.", color:"var(--series-2)", data: serie("carteira_kg") },
+    { name:"Produzido (peso bruto REBs)", short:"Prod.", color:"var(--series-4)", data: serie("produzido_kg") },
+    { name:"Faturado", short:"Fat.", color:"var(--text-secondary)", dashed:true, data: serie("faturado_kg") },
+  ];
+  const holderCart = document.getElementById("carteira-chart");
+  const legCart = document.getElementById("carteira-legend");
+  if(defsCart.every(d=>d.data.every(v=>v == null))){
+    legCart.innerHTML = "";
+    semDados(holderCart, bancoVazio("mensal", "Sem carteira, produção ou faturamento nos últimos meses."));
+  }else{
+    legCart.innerHTML = defsCart.map(d=>`<span class="legend-item" style="cursor:default"><span class="legend-dot" style="background:${d.color}"></span>${esc(d.name)}</span>`).join("");
+    multiLineChart(holderCart, mens.map(r=>rotuloMes(r.mes)), defsCart,
+      { idPrefix:"cpf", yMin:0, fmtY: v=>fmt(v) + " t", fmtTip: v=>fmt1(v) + " t", aria:"Carteira, produção e faturamento por mês, em toneladas" });
+  }
+
+  // ---- carteira em aberto pelo mês da entrega (vencida primeiro)
+  const holderPrazo = document.getElementById("carteira-prazo-chart");
+  if(!cart.length) semDados(holderPrazo, bancoVazio("carteira", "Sem itens com saldo a faturar."));
+  else{
+    const grupos = new Map();
+    cart.forEach(r=>{
+      const d = vence(r);
+      const k = !d ? "sem" : d < hoje ? "venc" : d.getFullYear() * 100 + d.getMonth();
+      const g = grupos.get(k) || (k === "sem" ? { label:"Sem data", ordem:9e9, cor:"var(--text-muted)" }
+                                : k === "venc" ? { label:"Vencida", ordem:-1, cor:"var(--critical)" }
+                                : { label:`${MESES_CURTOS[d.getMonth()]}/${String(d.getFullYear()).slice(-2)}`, ordem:k, cor:"var(--series-3)" });
+      g.kg = (g.kg || 0) + n(r.kg_saldo);
+      g.itens = (g.itens || 0) + 1;
+      grupos.set(k, g);
+    });
+    hBarChart(holderPrazo, [...grupos.values()].sort((a,b)=>a.ordem - b.ordem).map(g=>({ label:g.label, value:g.kg, display: fmtT(g.kg), color:g.cor,
+      tip:`<b>${esc(g.label)}</b><br>${fmt(g.kg)} kg · ${fmt(g.itens)} ${g.itens === 1 ? "item" : "itens"}` })),
+      { labelW:84, valueW:66, rowH:26, aria:"Carteira em aberto por mês de entrega, em toneladas" });
+  }
+
+  // ---- carteira em aberto por cliente
+  const porCli = new Map();
+  cart.forEach(r=>{
+    const k = limpaTexto(r.cliente) || "Sem cliente";
+    const c = porCli.get(k) || { cliente:k, itens:0, pedidos:new Set(), kg:0, venc:0, prox:null, semPeso:0 };
+    c.itens++; c.pedidos.add(r.num_pedido); c.kg += n(r.kg_saldo);
+    if(r.kg_saldo == null) c.semPeso++;
+    const d = vence(r);
+    if(d && d < hoje) c.venc += n(r.kg_saldo);
+    else if(d && (!c.prox || d < c.prox)) c.prox = d;
+    porCli.set(k, c);
+  });
+  tabelaComMais(document.querySelector("#carteira-table tbody"), document.getElementById("carteira-mais"),
+    [...porCli.values()].sort((a,b)=>b.kg - a.kg).map(c=>`<tr><td>${esc(c.cliente)}</td><td class="num">${fmt(c.itens)}</td><td class="num">${fmt(c.pedidos.size)}</td>
+      <td class="num">${c.kg > 0 || !c.semPeso ? fmtT(c.kg) : `<span title="Itens sem peso conhecido (milheiro, metro ou m² sem gramatura)">—</span>`}</td>
+      <td class="num">${c.venc > 0 ? `<span class="valor-alerta">${fmtT(c.venc)}</span>` : "—"}</td>
+      <td class="num">${c.prox ? (c.prox.getFullYear() === hoje.getFullYear() ? fmtDM(c.prox) : fmtDMA(c.prox)) : "—"}</td></tr>`),
+    { limite:12, colunas:6, vazio: bancoVazio("carteira", "Sem itens com saldo a faturar.") });
+  const btnCart = document.getElementById("carteira-export");
+  btnCart.disabled = !cart.length;
+  btnCart.title = cart.length ? "Baixar os itens da carteira em aberto (CSV)" : "Sem carteira para exportar";
+  btnCart.onclick = ()=> baixarCsv(`carteira-${isoDate(new Date())}.csv`,
+    [["num_pedido","Pedido"], ["cliente","Cliente"], ["item","Item"], ["produto","Produto"], ["unidade","Unidade"], ["situacao","Situação"],
+     ["tipo_produto","Tipo de produto"], ["quantidade","Quantidade"], ["faturada","Faturada"], ["saldo","Saldo"], ["kg_total","kg do item"],
+     ["kg_saldo","kg do saldo"], ["dt_pedido","Data do pedido"], ["entrega_cliente","Entrega pedida pelo cliente"], ["entrega_pcp","Data PCP"],
+     ["entrega_negociada","Data negociada"]], cart);
 })();
 
 /* ============ troca de telas (barra lateral / barra de abas) ============
@@ -3165,6 +4142,31 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     const idMaq = String(m.id).trim().toUpperCase();
     const perdaMaq = window.PERDA_POR_MAQ ? Math.round(window.PERDA_POR_MAQ.get(idMaq) || 0) : null;
     const topMotivos = window.PERDA_MAQ_MOTIVO ? (window.PERDA_MAQ_MOTIVO.get(idMaq) || []).slice(0,4) : [];
+    // Agora (apontamento em andamento e OP aberta) e a fila desta máquina, do banco
+    const ag = bancoLinhas("agora").find(r=>chaveMaq(r.maquina) === idMaq) || null;
+    const fila = bancoLinhas("programacao").filter(r=>chaveMaq(r.maquina) === idMaq).sort((a,b)=>Number(a.posicao) - Number(b.posicao));
+    let secaoAgora = "";
+    if(ag){
+      const e = estadoAgora(ag);
+      const marco = dataLocal(ag.terminou_em || ag.desde);
+      const ativ = limpaTexto(ag.cod_desc).replace(/^\d+\s*-\s*/, "");
+      const plan = Number(ag.qtd_planejada), boa = Number(ag.qtd_boa), term = dataLocal(ag.termino_programado);
+      const itens = [["Atividade", `${esc(ativ)} · ${ag.terminou_em ? "terminou" : "desde"} ${marco ? fmtDMHM(marco) : "—"}`]];
+      if(ag.num_ordem) itens.push(["OP", `${esc(ag.num_ordem)}${ag.cliente ? " · " + esc(limpaTexto(ag.cliente)) : ""}`]);
+      if(plan > 0 && Number.isFinite(boa)) itens.push(["Produzido", `${fmt(boa / plan * 100)}% · ${fmt(boa)} de ${fmt(plan)}`]);
+      if(ag.num_ordem && (ag.vel_real_m_min != null || ag.vel_programada_m_min != null)){
+        itens.push(["Velocidade", `${ag.vel_real_m_min != null && Number(ag.vel_real_m_min) > 0 ? fmt(Number(ag.vel_real_m_min)) + " m/min" : "—"} · programada ${ag.vel_programada_m_min != null ? fmt(Number(ag.vel_programada_m_min)) : "—"}`]);
+      }
+      if(term && !ag.terminou_em) itens.push(["Término previsto", fmtDMHM(term)]);
+      secaoAgora = `<div class="drawer-section-title">Agora</div>
+        <div class="drawer-agora" style="--cor:${e.cor}"><span class="classe-pill"><span class="dot"></span>${esc(e.nome)}</span></div>
+        ${itens.map(([k, v])=>`<div class="drawer-facas-item"><span>${k}</span><span class="quebra">${v}</span></div>`).join("")}`;
+    }
+    const secaoFila = !bancoOk("programacao") ? "" : `<div class="drawer-section-title">Próximas na fila${fila.length ? ` — ${fmt(fila.length)} ${fila.length === 1 ? "OP" : "OPs"}` : ""}</div>
+      ${fila.length ? fila.slice(0, 5).map(r=>{
+        const ini = dataLocal(r.ini_plan);
+        return `<div class="drawer-facas-item"><span class="quebra-esq">${fmt(Number(r.posicao)||0)}. OP ${esc(r.num_ordem || "—")} · ${esc(limpaTexto(r.cliente) || "—")}</span><span>${ini ? fmtDMHM(ini) : "—"}</span></div>`;
+      }).join("") : `<div class="empty-state">Nenhuma OP alocada nesta máquina.</div>`}`;
 
     bodyEl.innerHTML = `
       <div class="drawer-metrics">
@@ -3173,6 +4175,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
         <div class="drawer-metric" title="O BI não calcula apara por máquina; por máquina ele mostra o refugo em kg.">
           <div class="v">${perdaMaq != null ? fmt(perdaMaq) : "—"}</div><div class="l">kg de refugo</div></div>
       </div>
+      ${secaoAgora}
 
       <div class="drawer-section-title">TMR — últimos 12 meses</div>
       ${path ? `<svg width="100%" viewBox="0 0 ${w} ${h}" style="display:block;overflow:visible" class="${reduzMovimento() ? "" : "anima"}" role="img" aria-label="TMR dos últimos 12 meses fechados">
@@ -3207,6 +4210,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
         <span>${esc(t.nome)}</span>
         <span>${fmt(t.kg)} kg</span>
       </div>`).join("") : `<div class="empty-state">Sem refugo por motivo desta máquina no período.</div>`}
+      ${secaoFila}
     `;
     [...bodyEl.children].forEach((el,i)=> el.style.setProperty("--i", i));
     bodyEl.scrollTop = 0;
@@ -3386,7 +4390,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
 const footerNote = document.getElementById("footer-note");
 if(footerNote){
   footerNote.innerHTML = USANDO_DADOS_REAIS
-    ? `Painel interno de Produção &middot; Gualapack Jaguariúna &middot; indicadores, máquinas e motivos de perda vêm das bases reais de Produção &mdash; WIP e carteira ainda não têm base ligada (ver aviso na própria aba).`
+    ? `Painel interno de Produção &middot; Gualapack Jaguariúna &middot; os números vêm do banco da fábrica (Metrics), lido pelo data hub; a apara confirmada (balança) e a aderência diária ainda vêm das planilhas do PCP.`
     : `Painel interno de Produção &middot; Gualapack Jaguariúna &middot; pré-visualização local com valores de referência (sem Supabase configurado).`;
 }
 

@@ -9,7 +9,7 @@ import duckdb
 import polars as pl
 
 from hub import execucao
-from hub.caminhos import SQL
+from hub.caminhos import CONFIG, SQL
 
 
 def preparar_parametros(con: duckdb.DuckDBPyConnection, cfg: dict) -> None:
@@ -18,6 +18,12 @@ def preparar_parametros(con: duckdb.DuckDBPyConnection, cfg: dict) -> None:
     con.register("_recortes", pl.DataFrame(pares, schema={"recorte": pl.String, "maquina": pl.String}, orient="row"))
     con.execute("create or replace table cfg.recorte_maquina as select * from _recortes")
     con.unregister("_recortes")
+    # Tabela-padrão de classificação dos códigos (congelada em CSV, versionada):
+    # a regra do TMR depende dela (clean.classificacao, 010).
+    classes = pl.read_csv(CONFIG / "classificacao_apontamentos.csv", infer_schema_length=0)
+    con.register("_classes", classes)
+    con.execute("create or replace table cfg.classificacao as select * from _classes")
+    con.unregister("_classes")
 
 
 def executar_clean(con: duckdb.DuckDBPyConnection, run_id: int) -> None:

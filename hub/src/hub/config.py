@@ -36,6 +36,8 @@ def carregar(nome_fontes: str = "fontes.local.yaml") -> dict:
         # pra pasta de entrada antes de cada execução (hub/espelho.py).
         "pasta_originais": Path(pastas["originais"]) if pastas.get("originais") else None,
         "espelho": fontes.get("espelho") or [],
+        # Arquivos que ficam na pasta de entrada de propósito, sem ser fonte (não viram aviso).
+        "ignorar_na_pasta": fontes.get("ignorar_na_pasta") or [],
         "fontes": fontes["fontes"],
         "indicadores": _ler("indicadores.yaml")["indicadores"],
         "recortes": _ler("recortes.yaml")["recortes"],

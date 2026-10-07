@@ -41,7 +41,7 @@ indicadores:
         regra: indicadores/tmr_bi_indicadores.sql
       - fonte: hub.calculo
         regra: indicadores/tmr_machine_card.sql
-        usa: [machine_card.horas, machine_card_2025.horas]
+        usa: [banco.apontamentos]
 
   - codigo: VELOCIDADE_MEDIA_M_MIN
     versao: 1
@@ -60,7 +60,7 @@ indicadores:
         regra: indicadores/velocidade_media_bi_indicadores.sql
       - fonte: hub.calculo
         regra: indicadores/velocidade_media_machine_card.sql
-        usa: [machine_card.horas, machine_card_2025.horas]
+        usa: [banco.apontamentos]
 
   - codigo: APARA_APONTADA_PCT
     versao: 2
@@ -83,7 +83,7 @@ indicadores:
         regra: indicadores/apara_bi_indicadores.sql
       - fonte: hub.calculo
         regra: indicadores/apara_bi_regra.sql
-        usa: [base_aparas.prod]
+        usa: [banco.apontamentos]
 
   - codigo: APARA_CONFIRMADA_PCT
     versao: 1
@@ -107,7 +107,7 @@ indicadores:
         usa: [pbi_ind.perda_aparas, pbi_ind.aparas_processo]
       - fonte: hub.calculo
         regra: indicadores/apara_confirmada_regra.sql
-        usa: [refugo.aparas, base_aparas.prod]
+        usa: [refugo.aparas, banco.apontamentos]
 
   - codigo: ADERENCIA_PCT
     versao: 1
@@ -151,82 +151,11 @@ indicadores:
         regra: indicadores/perda_kg_bi_indicadores.sql
       - fonte: hub.calculo
         regra: indicadores/perda_kg_planilha.sql
-        usa: [base_aparas.generico, base_aparas_2025.detalhe]
+        usa: [banco.apontamentos]
 
   # --- Conferências de planilha (não vão pro painel) ------------------------------
-  - codigo: TMR_GRAFICOS_PCT
-    versao: 1
-    nome: TMR pela regra do Gráficos Tendência
-    unidade: pct
-    grao: mes x recorte
-    dono: superior imediato de Produção
-    definicao: >
-      Horas classificadas como PRODUZINDO no cadastro oficial ÷ horas
-      apontadas no recorte e no mês, sem as horas de FIM TURNO. Apontamentos
-      do BI Dados de Produção (tabela Dados). É a regra do Gráficos Tendência;
-      o painel usa a do BI (TMR_PCT).
-    # Onde corrigir quando divergir: o cálculo do hub usa o dado completo do BI.
-    correcao: "Gráficos Tendência › aba TMR - {recorte} › linha {mes} › coluna Produzindo = {valor_comparado}"
-    fonte_oficial: graficos.tmr
-    tolerancia_abs: 1.0            # pontos percentuais
-    status_definicao: em_validacao
-    notas: >
-      Resolvido por evidência em 24/09: com os apontamentos do BI e FIM TURNO
-      fora do total, o hub reproduz a planilha (Corte igual em todos os meses;
-      R18, L04 e Roto com erro médio abaixo de 0,3 p.p.; Laminação = L02+L03+L04).
-      A divergência vinha da Base Apontamento do Indicadores Diário, que está
-      com apontamentos faltando — ver HORAS_APONTADAS.
-      Flexo = R12 + R18 + R20 (definição do dono em 24/09; a R12 saiu em julho).
-      Divergência que é da PLANILHA: em jan e fev o Gráficos Tendência deixou a
-      R12 de fora do Flexo, mesmo com ela apontando. No Machine Card a R12
-      está no grupo FUNGICIDA.
-      Ainda a entender: Laminação em março (planilha 35,8% x 39,1%).
-      Até 24/09 este era o TMR_PCT; em 25/09 o dono escolheu a regra do BI.
-    medicoes:
-      - fonte: graficos.tmr
-        regra: indicadores/tmr_referencia.sql
-      - fonte: hub.calculo
-        regra: indicadores/tmr_hub.sql
-        usa: [machine_card.horas, machine_card_2025.horas]
-
-  - codigo: SETUP_PCT
-    versao: 1
-    nome: Horas em setup
-    unidade: pct
-    grao: mes x recorte
-    dono: superior imediato de Produção
-    definicao: Horas com classe SETUP ÷ horas apontadas no recorte e no mês, sem FIM TURNO.
-    correcao: "Gráficos Tendência › aba TMR - {recorte} › linha {mes} › coluna Setup = {valor_comparado}"
-    fonte_oficial: graficos.tmr
-    tolerancia_abs: 1.0
-    status_definicao: em_validacao
-    medicoes:
-      - fonte: graficos.tmr
-        regra: indicadores/setup_referencia.sql
-      - fonte: hub.calculo
-        regra: indicadores/setup_hub.sql
-        usa: [machine_card.horas, machine_card_2025.horas]
-
-  - codigo: INATIVO_PCT
-    versao: 1
-    nome: Horas inativas
-    unidade: pct
-    grao: mes x recorte
-    dono: superior imediato de Produção
-    definicao: Horas com classe INATIVIDADE ÷ horas apontadas no recorte e no mês, sem FIM TURNO.
-    correcao: "Gráficos Tendência › aba TMR - {recorte} › linha {mes} › coluna Inativo = {valor_comparado}"
-    fonte_oficial: graficos.tmr
-    tolerancia_abs: 1.0
-    status_definicao: em_validacao
-    medicoes:
-      - fonte: graficos.tmr
-        regra: indicadores/inativo_referencia.sql
-      - fonte: hub.calculo
-        regra: indicadores/inativo_hub.sql
-        usa: [machine_card.horas, machine_card_2025.horas]
-
   - codigo: HORAS_APONTADAS
-    versao: 2
+    versao: 3
     nome: Horas apontadas (recorte da Base Apontamento)
     unidade: h
     grao: mes x recorte
@@ -240,7 +169,8 @@ indicadores:
     tolerancia_pct: 0.01           # 1%
     status_definicao: oficial
     notas: >
-      v1 comparava o total de horas e divergia em 51 meses: a planilha descarta
+      v3 (05/10/2026): a planilha saiu; a conferência é o banco com o mesmo
+      filtro (horas_banco.sql). v1 comparava o total de horas e divergia em 51 meses: a planilha descarta
       parada sem OP, WIP e revisão por construção (filtro do Power Query), não
       por falha. Com o mesmo filtro dos dois lados, 56 de 56 meses batem abaixo
       de 0,1%. Por isso a Base Apontamento NÃO serve pra TMR: ela não tem todo o
@@ -248,8 +178,9 @@ indicadores:
     medicoes:
       - fonte: pbi.apontamentos
         regra: indicadores/horas_bi.sql
-      - fonte: indicadores.base_apontamento
-        regra: indicadores/horas_excel.sql
+      - fonte: hub.calculo
+        regra: indicadores/horas_banco.sql
+        usa: [banco.apontamentos]
 
   - codigo: VELOCIDADE_M_MIN
     versao: 2
@@ -318,8 +249,6 @@ indicadores:
     medicoes:
       - fonte: sequenciamento.scrap_bi
         regra: indicadores/producao_kg_bi.sql
-      - fonte: graficos.volume_corte
-        regra: indicadores/producao_kg_graficos.sql
 
   - codigo: SCRAP_PCT
     versao: 1

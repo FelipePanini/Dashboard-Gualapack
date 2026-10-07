@@ -55,18 +55,16 @@ def test_config_supabase_le_o_arquivo_do_painel(tmp_path):
                    "cadastro_url": "https://x.supabase.co/functions/v1/super-action"}
 
 
-def _com_apontamentos_bi(con):
+def _com_apontamentos_banco(con):
     con.execute("create schema if not exists raw; create schema if not exists clean")
-    con.execute("""create table raw.pbi__apontamentos as select * from (values
-        ('R18', '1',  '01 - Setup',      date '2026-08-31', timestamp '2026-08-31 06:00:00', timestamp '2026-08-31 07:00:00', '10'),
-        ('R18', '20', '20 - Produzindo', date '2026-09-02', timestamp '2026-09-02 06:00:00', timestamp '2026-09-02 09:59:59.999999', '10'),
-        ('R18', '99', '99 - Fim Turno',  date '2026-09-02', timestamp '2026-09-02 10:00:00', timestamp '2026-09-02 10:30:00', null),
-        ('L04', '20', '20 - Produzindo', date '2026-09-02', timestamp '2026-09-02 06:00:00', timestamp '2026-09-02 08:00:00', '11')
-      ) t(cod_recurso, cod_apont, cod_desc, dt_producao, hora_inicio, hora_fim, num_ordem)""")
-    con.execute("""create table clean.pbi_apontamento as select * from (values
-        (date '2026-08-31', 'R18', '01', 1.0), (date '2026-09-02', 'R18', '20', 2.5),
-        (date '2026-09-02', 'R18', '20', 1.5), (date '2026-09-02', 'R18', '99', 0.5),
-        (date '2026-09-02', 'L04', '20', 2.0)) t(dia, maquina, cod_apont, horas)""")
+    # apontamentos do banco: evento aberto (fim vazio, "data zero") e registro instantâneo (fim = início)
+    con.execute("""create table raw.banco__apontamentos as select * from (values
+        ('R18', '1',  '01 - Setup',      timestamp '2026-08-31 00:00', timestamp '2026-08-31 06:00:00', timestamp '2026-08-31 07:00:00', '10', timestamp '2026-08-31 07:00'),
+        ('R18', '20', '20 - Produzindo', timestamp '2026-09-02 00:00', timestamp '2026-09-02 06:00:00', timestamp '2026-09-02 09:59:59.999999', '10', timestamp '2026-09-02 06:01'),
+        ('R18', '99', '99 - Fim Turno',  timestamp '2026-09-02 00:00', timestamp '2026-09-02 10:00:00', timestamp '1899-12-30 00:00:00', null, timestamp '2026-09-02 10:30'),
+        ('L04', '20', '20 - Produzindo', timestamp '2026-09-02 00:00', timestamp '2026-09-02 06:00:00', timestamp '2026-09-02 08:00:00', '11', timestamp '2026-09-02 06:00'),
+        ('L04', '40', '40 - Refugo por Operador', timestamp '2026-09-02 00:00', timestamp '2026-09-02 08:00:00', timestamp '2026-09-02 08:00:00', '11', timestamp '2026-09-02 08:00')
+      ) t(cod_recurso, cod_apont, cod_desc, dt_producao, hora_inicio, hora_fim, num_ordem, dt_inclusao)""")
     con.execute("""create table clean.classificacao as select * from (values
         ('01', 'SETUP'), ('20', 'PRODUZINDO')) t(cod, classe)""")
     # tabela Horas do Machine Card, já limpa (110_machine_card.sql)
@@ -87,17 +85,22 @@ def _com_apontamentos_bi(con):
 
 def test_codigos_ultimo_dia_e_series(tmp_path):
     con = _con_com_dados(tmp_path)
-    _com_apontamentos_bi(con)
+    _com_apontamentos_banco(con)
     pacote = publicacao.montar_pacote(con, 1, {"pasta_entrada": tmp_path, "indicadores": []})
     json.dumps(pacote)
 
     assert pacote["codigos"] == [{"cod": "01", "descricao": "01 - Setup", "classe": "SETUP"},
                                  {"cod": "20", "descricao": "20 - Produzindo", "classe": "PRODUZINDO"},
+                                 {"cod": "40", "descricao": "40 - Refugo por Operador", "classe": "SEM CLASSIFICACAO"},
                                  {"cod": "99", "descricao": "99 - Fim Turno", "classe": "SEM CLASSIFICACAO"}]
-    # só o último dia do BI, hora da fábrica sem fuso e sem microssegundo
+    # só o último dia do banco, hora da fábrica sem fuso e sem microssegundo
     assert {e["hora_inicio"][:10] for e in pacote["ultimo_dia"]} == {"2026-09-02"}
     assert {"maquina": "R18", "cod_apont": "20", "hora_inicio": "2026-09-02T06:00:00",
             "hora_fim": "2026-09-02T09:59:59", "num_ordem": "10"} in pacote["ultimo_dia"]
+    # evento em andamento vai até o dado mais novo; registro instantâneo (refugo) fica de fora
+    assert {"maquina": "R18", "cod_apont": "99", "hora_inicio": "2026-09-02T10:00:00",
+            "hora_fim": "2026-09-02T10:30:00", "num_ordem": None} in pacote["ultimo_dia"]
+    assert not [e for e in pacote["ultimo_dia"] if e["cod_apont"] == "40"]
 
     # série mensal de apara: refugo de todas as máquinas, peso bruto só das REBs
     assert pacote["apara_mes"] == [{"mes": "2026-08-01", "refugo": 80.0, "peso_bruto_rebs": 1000.0,
@@ -136,7 +139,7 @@ class _SupabaseFalso:
 
 def test_publicar_manda_so_o_mes_que_mudou(tmp_path, monkeypatch):
     con = _con_com_dados(tmp_path)
-    _com_apontamentos_bi(con)
+    _com_apontamentos_banco(con)
     supa = _SupabaseFalso()
     monkeypatch.setattr(publicacao, "senha_do_cofre", lambda email: "x")
     monkeypatch.setattr(publicacao, "config_supabase", lambda: {"url": "https://x", "anon_key": "k"})
@@ -165,7 +168,7 @@ def test_publicar_manda_so_o_mes_que_mudou(tmp_path, monkeypatch):
 
 def test_supabase_sem_o_002_nao_marca_mes_como_publicado(tmp_path, monkeypatch):
     con = _con_com_dados(tmp_path)
-    _com_apontamentos_bi(con)
+    _com_apontamentos_banco(con)
     antigo = _SupabaseFalso(versao=1)
     monkeypatch.setattr(publicacao, "senha_do_cofre", lambda email: "x")
     monkeypatch.setattr(publicacao, "config_supabase", lambda: {"url": "https://x", "anon_key": "k"})
@@ -188,3 +191,30 @@ def test_publicacao_desligada_ou_sem_usuario_nao_quebra(tmp_path, monkeypatch):
     assert publicacao.publicar(con, 1, {"publicacao": {"ativa": False}}).startswith("desligada")
     monkeypatch.setattr(publicacao, "senha_do_cofre", lambda email: None)
     assert publicacao.publicar(con, 1, {"publicacao": {"ativa": True, "email": "x@y.invalid"}}).startswith("sem usuário")
+
+
+def test_sem_o_005_as_series_novas_ficam_de_fora_sem_quebrar(tmp_path, monkeypatch):
+    con = _con_com_dados(tmp_path)
+    _com_apontamentos_banco(con)
+    con.execute("""create table clean.laudo_dia as select * from (values
+        (date '2026-09-02', 'Aprovado', 3, 12.0)) t(dia, status, laudos, analises)""")
+    con.execute("""create table clean.maquina_agora as select * from (values
+        ('R18', 'FIM TURNO', '99', '99 - Fim Turno', timestamp '2026-09-02 10:00:00')) t(maquina, classe, cod_apont, cod_desc, desde)""")
+
+    class Supabase002(_SupabaseFalso):
+        def post(self, url, **kw):
+            dados = json.loads(kw["data"])["dados"] if url.endswith("/rpc/hub_publicar") else None
+            if dados and dados.get("conjunto") == "laudo_dia":           # a função do 002 não conhece
+                self.enviados.append(dados)
+                return type("R", (), {"status_code": 400, "text": '{"message":"conjunto desconhecido: laudo_dia"}',
+                                      "json": lambda s: {}})()
+            return super().post(url, **kw)
+    supa = Supabase002()
+    monkeypatch.setattr(publicacao, "senha_do_cofre", lambda email: "x")
+    monkeypatch.setattr(publicacao, "config_supabase", lambda: {"url": "https://x", "anon_key": "k"})
+    monkeypatch.setattr(publicacao.requests, "Session", lambda: supa)
+    cfg = {"pasta_entrada": tmp_path, "indicadores": [], "publicacao": {"ativa": True, "email": "e@x.invalid"}}
+    resumo = publicacao.publicar(con, 1, cfg)
+    assert "horas_maquina_dia 2 mês(es)" in resumo and "sem o 005_banco.sql" in resumo and "laudo_dia" in resumo
+    assert supa.enviados[0]["agora"][0]["desde"] == "2026-09-02T10:00:00"   # foto vai no pacote, hora da fábrica
+    assert con.execute("select count(*) from publicacao_mes where conjunto = 'laudo_dia'").fetchone()[0] == 0

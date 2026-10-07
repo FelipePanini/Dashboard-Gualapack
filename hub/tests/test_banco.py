@@ -1,12 +1,83 @@
-from datetime import date
+from datetime import date, datetime
+from decimal import Decimal
 
 import polars as pl
-import xlsxwriter
+import pytest
 
-from hub import banco, coleta
+from hub import banco, coleta, sqlserver
 from hub.origens import localizar
 
 
+# -- trava de somente leitura -------------------------------------------------------
+@pytest.mark.parametrize("sql", [
+    "SELECT a FROM dbo.t",
+    "  select a from dbo.t where x = 'DELETE' ;",                        # literal não conta
+    "WITH x AS (SELECT 1 AS a) SELECT a FROM x",
+    "SELECT [Data Desejada (Cliente)], [Update] FROM dbo.v",              # nome entre colchetes não conta
+    "SELECT a FROM t -- DROP TABLE t\n WHERE b = 1",                      # comentário não conta
+    "SELECT Min_Set_Prog, Mini_Set_Real, usr_tipodaperda FROM dbo.v",     # palavra dentro de nome não conta
+])
+def test_so_leitura_aceita_consulta(sql):
+    assert sqlserver.so_leitura(sql) == sql
+
+
+@pytest.mark.parametrize("sql", [
+    "DELETE FROM dbo.t",
+    "UPDATE dbo.t SET a = 1",
+    "INSERT INTO dbo.t VALUES (1)",
+    "SELECT a INTO dbo.nova FROM dbo.t",                                  # SELECT ... INTO cria tabela
+    "SELECT a FROM dbo.t; DROP TABLE dbo.t",                              # dois comandos
+    "EXEC sp_who",
+    "USE Metrics; SELECT 1",
+    "MERGE dbo.t USING dbo.s ON 1 = 1 WHEN MATCHED THEN DELETE;",
+    "TRUNCATE TABLE dbo.t",
+    "SELECT * FROM OPENROWSET('x', 'y', 'z')",
+    "CREATE VIEW v AS SELECT 1",
+    "WITH x AS (SELECT 1 AS a) DELETE FROM dbo.t",
+])
+def test_so_leitura_recusa_o_que_altera_o_banco(sql):
+    with pytest.raises(sqlserver.ComandoRecusado):
+        sqlserver.so_leitura(sql)
+
+
+def test_consultas_do_hub_passam_na_trava():
+    from hub import extracoes
+    sqlserver.so_leitura(f"SELECT {', '.join('[' + c + ']' for c in banco.COLUNAS)} FROM dbo.{banco.VIEW} "
+                         "WHERE DtProducao >= ? AND DtProducao < ?")
+    for ex in extracoes.EXTRACOES:
+        sqlserver.so_leitura(ex.sql)
+
+
+def test_consultar_recusa_antes_de_chegar_ao_banco():
+    class ConexaoQueNaoPodeSerUsada:
+        def cursor(self):
+            raise AssertionError("a trava devia ter recusado antes de abrir cursor")
+    with pytest.raises(sqlserver.ComandoRecusado):
+        sqlserver.consultar(ConexaoQueNaoPodeSerUsada(), "DELETE FROM dbo.t")
+
+
+def test_consultar_tenta_de_novo_um_erro_passageiro(monkeypatch):
+    monkeypatch.setattr(sqlserver.time, "sleep", lambda s: None)
+    tentativas = []
+
+    class Cursor:
+        description = [("a",)]
+        def execute(self, sql, *p):
+            tentativas.append(sql)
+            if len(tentativas) == 1:
+                raise RuntimeError("DDBC Error: Unknown DDBC error")
+        def fetchall(self):
+            return [(1,)]
+        def close(self):
+            pass
+
+    class Con:
+        def cursor(self):
+            return Cursor()
+    assert sqlserver.consultar(Con(), "SELECT a FROM t") == (["a"], [(1,)]) and len(tentativas) == 2
+
+
+# -- apontamentos -----------------------------------------------------------------------
 def test_meses_para_extrair_releem_os_recentes_e_os_que_faltam(tmp_path):
     banco.arquivo_do_mes(tmp_path, date(2025, 1, 1)).write_bytes(b"x")
     banco.arquivo_do_mes(tmp_path, date(2025, 4, 1)).write_bytes(b"x")
@@ -15,12 +86,9 @@ def test_meses_para_extrair_releem_os_recentes_e_os_que_faltam(tmp_path):
     assert meses == [date(2025, 2, 1), date(2025, 3, 1), date(2025, 4, 1)]
 
 
-def test_consulta_do_mes_filtra_no_banco_e_nao_traz_nome_de_operador():
-    m = banco.m_do_mes("servidor-teste", date(2025, 12, 1))
-    assert "#datetime(2025, 12, 1, 0, 0, 0)" in m and "#datetime(2026, 1, 1, 0, 0, 0)" in m
-    assert 'Sql.Database("servidor-teste", "Metrics")' in m
+def test_colunas_dos_apontamentos_nao_trazem_dado_pessoal():
     for pessoal in ["NomeOperador", "Operador", "Obs", "usr_refugooperador", "CodOperador", "Supervisor"]:
-        assert f'"{pessoal}"' not in m
+        assert pessoal not in banco.COLUNAS
 
 
 def test_padronizar_nomes_tipos_e_ordem():
@@ -34,71 +102,7 @@ def test_padronizar_nomes_tipos_e_ordem():
     assert df["qtd_horas"].to_list() == [None, 1.5]
 
 
-def _excel_falso(linhas_por_mes):
-    """Substitui o Excel: escreve a pasta de trabalho de saída com uma aba por mês."""
-    def rodar(spec, saida):
-        wb = xlsxwriter.Workbook(str(saida))
-        for c in spec:
-            ws = wb.add_worksheet(c["nome"])
-            cab = ["IdApontamento", "NumOrdem", "CodApont", "DtProducao", "QtdHoras"]
-            ws.write_row(0, 0, cab)
-            for i, linha in enumerate(linhas_por_mes.get(c["nome"], []), start=1):
-                ws.write_row(i, 0, linha)
-        wb.close()
-        return {c["nome"]: "ok" for c in spec}
-    return rodar
-
-
-def test_extrair_so_substitui_o_mes_quando_o_dado_muda(tmp_path, monkeypatch):
-    cfg = {"banco": {"ativo": True, "conector": "excel", "servidor": "s", "desde": "2026-08", "reextrair_meses": 2, "pasta": str(tmp_path)}}
-    dados = {"m2026_08": [["2", "44000", "20", "2026-08-03 00:00:00", "1.0"], ["1", "44000", "01", "2026-08-03 00:00:00", "0.5"]],
-             "m2026_09": [["3", "45000", "40", "2026-09-01 00:00:00", "0.2"]]}
-    monkeypatch.setattr(banco, "_rodar_excel", _excel_falso(dados))
-    mudaram, avisos = banco.extrair(cfg, hoje=date(2026, 9, 15))
-    assert [m.split()[0] for m in mudaram] == ["08/2026", "09/2026"] and avisos == []
-    assert pl.read_parquet(banco.arquivo_do_mes(tmp_path, date(2026, 8, 1)))["id_apontamento"].to_list() == ["1", "2"]
-
-    mudaram, _ = banco.extrair(cfg, hoje=date(2026, 9, 15))
-    assert mudaram == []                                           # mesmo dado: nada é regravado
-
-    dados["m2026_09"].append(["4", "45000", "20", "2026-09-02 00:00:00", "3.0"])
-    mudaram, _ = banco.extrair(cfg, hoje=date(2026, 9, 15))
-    assert mudaram == ["09/2026 (2 linhas)"]
-
-
-def test_mes_passado_vazio_nao_apaga_o_arquivo_anterior(tmp_path, monkeypatch):
-    cfg = {"banco": {"ativo": True, "conector": "excel", "servidor": "s", "desde": "2026-08", "reextrair_meses": 2, "pasta": str(tmp_path)}}
-    monkeypatch.setattr(banco, "_rodar_excel", _excel_falso({"m2026_08": [["1", "1", "20", "2026-08-03 00:00:00", "1.0"]]}))
-    banco.extrair(cfg, hoje=date(2026, 9, 15))
-    monkeypatch.setattr(banco, "_rodar_excel", _excel_falso({}))
-    mudaram, avisos = banco.extrair(cfg, hoje=date(2026, 9, 15))
-    assert mudaram == [] and any("08/2026" in a and "vazio" in a for a in avisos)
-    assert pl.read_parquet(banco.arquivo_do_mes(tmp_path, date(2026, 8, 1))).height == 1
-
-
-def test_sem_excel_vira_aviso_e_mantem_o_que_ja_tinha(tmp_path, monkeypatch):
-    cfg = {"banco": {"ativo": True, "conector": "excel", "servidor": "s", "desde": "2026-09", "reextrair_meses": 1, "pasta": str(tmp_path)}}
-
-    def quebra(spec, saida):
-        raise RuntimeError("Excel não abriu")
-    monkeypatch.setattr(banco, "_rodar_excel", quebra)
-    mudaram, avisos = banco.extrair(cfg, hoje=date(2026, 9, 15))
-    assert mudaram == [] and "não rodou" in avisos[0]
-
-
-def test_coleta_empilha_os_parquets_mensais(tmp_path):
-    for mes, h in [("2026-08", 1.0), ("2026-09", 2.0)]:
-        pl.DataFrame({"id_apontamento": [mes], "qtd_horas": [h]}).write_parquet(tmp_path / f"apontamentos_{mes}.parquet")
-    fonte = {"id": "banco.apontamentos", "tipo": "parquet", "varios": True,
-             "arquivo": str(tmp_path / "apontamentos_*.parquet"), "colunas_obrigatorias": ["id_apontamento", "qtd_horas"]}
-    arquivos = localizar(fonte)
-    df, motor = coleta.ler_isolado(fonte, arquivos)
-    assert motor == "parquet" and sorted(df["qtd_horas"].to_list()) == [1.0, 2.0]
-
-
-def test_quadro_sql_reproduz_o_que_o_excel_gravava():
-    from datetime import datetime
-    from decimal import Decimal
+def test_quadro_sql_padroniza_o_que_o_driver_devolve():
     nomes = ["IdApontamento", "CodApont", "Turno", "DtProducao", "QtdHoras", "usr_Bobina", "QtdProduzida"]
     linhas = [(8265257349126.0, "40", 2, datetime(2026, 8, 1), 0.5, "1300           ", 17417),
               (8265257349125.0, "01", 1, datetime(2026, 8, 1), Decimal("1.250"), None, 0)]
@@ -110,28 +114,58 @@ def test_quadro_sql_reproduz_o_que_o_excel_gravava():
     assert df.schema["dt_producao"] == pl.Datetime("us")
 
 
-def test_leitura_direta_e_o_padrao_e_o_excel_so_reserva(tmp_path, monkeypatch):
-    cfg = {"banco": {"ativo": True, "servidor": "s", "desde": "2026-09", "reextrair_meses": 1, "pasta": str(tmp_path)}}
-    quadro = banco.quadro_sql(["IdApontamento", "DtProducao"], [(1.0, __import__("datetime").datetime(2026, 9, 2))])
+def _mes(*ids):
+    return banco.quadro_sql(["IdApontamento", "DtProducao"], [(float(i), datetime(2026, 9, 2)) for i in ids])
 
-    def excel_nao(spec, saida):
-        raise AssertionError("com a conexão direta funcionando, o Excel não deve ser aberto")
-    monkeypatch.setattr(banco, "_ler_sql", lambda meses: {m: quadro for m in meses})
-    monkeypatch.setattr(banco, "_rodar_excel", excel_nao)
+
+def test_extrair_so_substitui_o_mes_quando_o_dado_muda(tmp_path, monkeypatch):
+    cfg = {"banco": {"ativo": True, "desde": "2026-08", "reextrair_meses": 2, "pasta": str(tmp_path)}}
+    dados = {date(2026, 8, 1): _mes(2, 1), date(2026, 9, 1): _mes(3)}
+    monkeypatch.setattr(banco, "_ler_meses", lambda meses: {m: dados[m] for m in meses})
     mudaram, avisos = banco.extrair(cfg, hoje=date(2026, 9, 15))
-    assert mudaram == ["09/2026 (1 linhas)"] and avisos == []
+    assert [m.split()[0] for m in mudaram] == ["08/2026", "09/2026"] and avisos == []
+    assert pl.read_parquet(banco.arquivo_do_mes(tmp_path, date(2026, 8, 1)))["id_apontamento"].to_list() == ["1", "2"]
+
+    mudaram, _ = banco.extrair(cfg, hoje=date(2026, 9, 15))
+    assert mudaram == []                                           # mesmo dado: nada é regravado
+
+    dados[date(2026, 9, 1)] = _mes(3, 4)
+    mudaram, _ = banco.extrair(cfg, hoje=date(2026, 9, 15))
+    assert mudaram == ["09/2026 (2 linhas)"]
+
+
+def test_mes_passado_vazio_nao_apaga_o_arquivo_anterior(tmp_path, monkeypatch):
+    cfg = {"banco": {"ativo": True, "desde": "2026-08", "reextrair_meses": 2, "pasta": str(tmp_path)}}
+    monkeypatch.setattr(banco, "_ler_meses", lambda meses: {m: _mes(1) for m in meses})
+    banco.extrair(cfg, hoje=date(2026, 9, 15))
+    monkeypatch.setattr(banco, "_ler_meses", lambda meses: {m: _mes() for m in meses})
+    mudaram, avisos = banco.extrair(cfg, hoje=date(2026, 9, 15))
+    assert any("08/2026" in a and "vazio" in a for a in avisos)
+    assert pl.read_parquet(banco.arquivo_do_mes(tmp_path, date(2026, 8, 1))).height == 1
+
+
+def test_sem_conexao_vira_aviso_e_mantem_o_que_ja_tinha(tmp_path, monkeypatch):
+    cfg = {"banco": {"ativo": True, "desde": "2026-09", "reextrair_meses": 1, "pasta": str(tmp_path)}}
 
     def sem_conexao(meses):
         raise RuntimeError("Login failed for user 'x' (18456)")
-    monkeypatch.setattr(banco, "_ler_sql", sem_conexao)
-    monkeypatch.setattr(banco, "_rodar_excel", _excel_falso({"m2026_09": [["1", "1", "20", "2026-09-02 00:00:00", "1.0"]]}))
+    monkeypatch.setattr(banco, "_ler_meses", sem_conexao)
     mudaram, avisos = banco.extrair(cfg, hoje=date(2026, 9, 15))
-    assert any("usei o Excel como reserva" in a for a in avisos)
-    assert not any("'x'" in a for a in avisos)                    # o aviso não repete o usuário
+    assert mudaram == [] and "não rodou" in avisos[0] and "'x'" not in avisos[0]   # o aviso não repete o usuário
 
 
-def test_mes_com_erro_na_leitura_direta_vira_aviso_e_nao_apaga(tmp_path, monkeypatch):
-    cfg = {"banco": {"ativo": True, "servidor": "s", "desde": "2026-09", "reextrair_meses": 1, "pasta": str(tmp_path)}}
-    monkeypatch.setattr(banco, "_ler_sql", lambda meses: {m: "tempo esgotado" for m in meses})
+def test_mes_com_erro_na_leitura_vira_aviso_e_nao_apaga(tmp_path, monkeypatch):
+    cfg = {"banco": {"ativo": True, "desde": "2026-09", "reextrair_meses": 1, "pasta": str(tmp_path)}}
+    monkeypatch.setattr(banco, "_ler_meses", lambda meses: {m: "tempo esgotado" for m in meses})
     mudaram, avisos = banco.extrair(cfg, hoje=date(2026, 9, 15))
     assert mudaram == [] and avisos == ["09/2026: o banco não respondeu (tempo esgotado)"]
+
+
+def test_coleta_empilha_os_parquets_mensais(tmp_path):
+    for mes, h in [("2026-08", 1.0), ("2026-09", 2.0)]:
+        pl.DataFrame({"id_apontamento": [mes], "qtd_horas": [h]}).write_parquet(tmp_path / f"apontamentos_{mes}.parquet")
+    fonte = {"id": "banco.apontamentos", "tipo": "parquet", "varios": True,
+             "arquivo": str(tmp_path / "apontamentos_*.parquet"), "colunas_obrigatorias": ["id_apontamento", "qtd_horas"]}
+    arquivos = localizar(fonte)
+    df, motor = coleta.ler_isolado(fonte, arquivos)
+    assert motor == "parquet" and sorted(df["qtd_horas"].to_list()) == [1.0, 2.0]

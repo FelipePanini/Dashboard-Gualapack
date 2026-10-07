@@ -1,5 +1,7 @@
 # Modelo de config/fontes.local.yaml (este vai pro git, o local não).
-# Copie para fontes.local.yaml e troque o caminho da pasta de entrada.
+# Copie para fontes.local.yaml e troque os caminhos. Servidor e banco da leitura
+# direta ficam em config/sqlserver.local.yaml; usuário e senha, no Cofre de
+# Credenciais do Windows (scripts/guardar_acesso_banco.py).
 #
 # "arquivo" é o NOME do arquivo: ele é procurado em qualquer subpasta da
 # pasta de entrada. Aceita {ano} e curinga (* ?). Precisa achar exatamente
@@ -10,24 +12,26 @@
 # "_" no lugar de espaço e entre palavras em CamelCase ("CodApont" -> cod_apont).
 #
 # Tipos de fonte:
+#   parquet       arquivo gravado pela leitura do banco (hub/banco.py e
+#                 hub/extracoes.py), um por mês ou uma foto do estado atual
 #   excel_tabela  aba de base, cabeçalho na primeira linha
 #   excel_bloco   tabela pequena dentro de aba de relatório: começa na célula
 #                 "ancora" (abaixo do "titulo", se houver) e vai até a 1ª linha vazia.
 #                 Com "abas" (recorte -> aba), lê o mesmo bloco em várias abas.
 #   pbix          tabela do modelo de um Power BI (.pbix, modo Importação), ou
-#                 "conteudo: medidas" pras fórmulas DAX. Não precisa de Power BI
-#                 nem de acesso ao banco: lê o dado salvo no arquivo.
+#                 "conteudo: medidas" pras fórmulas DAX. Lê o dado salvo no arquivo.
 #
 # Opcionais: varios (empilha todos os arquivos do padrão), colunas_excluir
 # (dado pessoal sai na leitura), coluna_data, formato_data (quando a data vem
 # como texto), data_conta_se (só conta a data onde essa coluna > 0),
-# granularidade: mensal, linhas_minimas, frescor_dias (0 = histórico).
+# granularidade: mensal, linhas_minimas, frescor_dias (0 = histórico),
+# aceita_dado_mais_antigo (foto que pode trazer dado antigo, como o WIP).
 
 ano: 2026
 
 pastas:
   entrada: 'C:\Users\<voce>\<Área de Trabalho>\Dados do Painel'
-  # Pasta compartilhada onde as planilhas são mantidas (opcional).
+  # Pasta compartilhada onde as planilhas manuais são mantidas (opcional).
   originais: 'C:\Users\<voce>\<OneDrive>\<pasta compartilhada>'
 
 # Espelho (opcional): antes de cada execução, o original mais novo que a cópia
@@ -37,11 +41,27 @@ pastas:
 #   curinga             série (um arquivo por mês): atualiza os que já estão
 #                       na pasta de entrada e traz o próximo quando aparece
 #   so_o_ultimo: true   revisões (Rev2 -> Rev3): fica só a última
+# Só as planilhas de lançamento manual: o resto vem do banco.
 espelho:
-  - '02 - Indicadores\Indicadores Diário - {ano}.xlsx'
   - 'Refugo\*SEQUENCIAMENTO DOS FARDOS DE APARAS JGR*{ano}.xlsx'
   - original: 'Refugo\Sequenciamento Acumulado {ano} Rev*.xlsx'
     so_o_ultimo: true
+  - '<pasta>\Refugo Aparas.xlsx'
+
+# Arquivos que ficam na pasta de entrada mas não são mais fonte (as planilhas
+# que o banco substituiu): não viram aviso de "arquivo não catalogado".
+ignorar_na_pasta:
+  - 'Indicadores Diário - *.xlsx'
+  - 'Machine Card Oficial - *.xlsx'
+
+# Banco da fábrica: leitura direta, só SELECT (hub/sqlserver.py). Os
+# apontamentos vêm um mês por vez desde "desde" (relê os "reextrair_meses"
+# mais recentes); as outras leituras (hub/extracoes.py) gravam na mesma pasta.
+banco:
+  ativo: true
+  desde: '2025-01'
+  reextrair_meses: 2
+  pasta: 'C:\Users\<voce>\<repositório>\hub\data\extracao\banco'
 
 # Publicação no Supabase: ver scripts/criar_usuario_hub.py e
 # sql/supabase/001_trusted.sql. Com ativa: false o hub só gera o relatório local.
@@ -50,16 +70,26 @@ publicacao:
   email: hub-dados@painel-gualapack.invalid
 
 fontes:
-  - id: indicadores.base_apontamento
-    tipo: excel_tabela
-    descricao: Evento de máquina.
-    dono: <área>
-    arquivo: 'Indicadores Diário - {ano}.xlsx'
-    aba: Base Apontamento
+  - id: banco.apontamentos
+    tipo: parquet
+    descricao: "Evento de máquina (View_usr_apontamentos_999999), um arquivo por mês."
+    dono: Produção
+    arquivo: 'C:\Users\<voce>\<repositório>\hub\data\extracao\banco\apontamentos_*.parquet'
+    varios: true
     colunas_obrigatorias: [num_ordem, cod_recurso, cod_apont, dt_producao, qtd_horas]
     coluna_data: dt_producao
     linhas_minimas: 1000
     frescor_dias: 2
+
+  - id: banco.carteira
+    tipo: parquet
+    descricao: "Itens de pedido de venda, menos os cancelados (View_usr_ListaPedidosVenda)."
+    dono: Comercial
+    arquivo: 'C:\Users\<voce>\<repositório>\hub\data\extracao\banco\carteira.parquet'
+    colunas_obrigatorias: [num_pedido, nome, status, data_desejada_cliente, quantidade, quantidade_faturada, total_kg]
+    coluna_data: data_do_pedido
+    aceita_dado_mais_antigo: true
+    frescor_dias: 3
 
   - id: fardos.mensal
     tipo: excel_tabela
@@ -79,3 +109,9 @@ fontes:
     colunas_excluir: [nome_operador]
     coluna_data: dt_producao
     frescor_dias: 3
+
+# As outras leituras do banco seguem o modelo de banco.carteira, uma entrada
+# por arquivo de hub/extracoes.py: banco.estrutura_largura, maquina_agora,
+# programacao, programacao_pcp, wip, gramatura_produto (fotos) e
+# banco.faturamento, entregas, setup, laudos (um arquivo por mês, com
+# "varios: true" e o curinga <nome>_*.parquet).

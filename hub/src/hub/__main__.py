@@ -15,7 +15,7 @@ import sys
 import time
 from datetime import date
 
-from hub import banco, coleta, config, db, espelho, execucao, medicao, publicacao, relatorio, transformacao, validacao
+from hub import banco, coleta, config, db, espelho, execucao, extracoes, medicao, publicacao, relatorio, transformacao, validacao
 from hub.caminhos import CONFIG, DADOS, LOGS, SQL
 from hub.origens import Origens, localizar
 
@@ -77,6 +77,10 @@ def executar(gatilho: str = "manual", so_se_mudou: bool = False) -> int:
     # Depois puxa do banco os meses recentes: mês que mudou grava parquet novo,
     # e isso também faz o "algo mudou" disparar.
     _, avisos_banco = banco.extrair(cfg)
+    # As outras leituras do banco (máquinas agora, programação, WIP, carteira,
+    # faturamento, entregas, setup, laudos): o que mudou também dispara a execução.
+    _, avisos_extracoes = extracoes.extrair(cfg)
+    avisos_banco = avisos_banco + avisos_extracoes
     for aviso in avisos_banco:
         log.warning("banco: %s", aviso)
     if so_se_mudou:
@@ -93,10 +97,10 @@ def executar(gatilho: str = "manual", so_se_mudou: bool = False) -> int:
     for aviso in avisos_espelho:  # entram no relatório e na página Qualidade dos dados
         execucao.registrar_erro(con, run, None, aviso, codigo="espelho", gravidade="aviso")
     for aviso in avisos_banco:
-        execucao.registrar_erro(con, run, "banco.apontamentos", aviso, codigo="banco", gravidade="aviso")
+        execucao.registrar_erro(con, run, None, aviso, codigo="banco", gravidade="aviso")
 
     coleta.sincronizar_fontes(con, cfg["fontes"])
-    coleta.inventariar_pasta(con, run, cfg["pasta_entrada"], cfg["fontes"])
+    coleta.inventariar_pasta(con, run, cfg["pasta_entrada"], cfg["fontes"], cfg.get("ignorar_na_pasta", []))
     with Origens(cfg["pasta_entrada"]) as origens:
         for fonte in cfg["fontes"]:
             try:
