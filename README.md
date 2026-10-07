@@ -219,10 +219,10 @@ vale daqui pra frente em `demo/index.html`:
 
 ## Pendências e limitações conhecidas
 
-- **`hub/sql/supabase/005_banco.sql`** (as tabelas e a leitura das telas do
-  banco: agora, fila, WIP, carteira, entregas, setup, laudos e a classe dos
-  códigos) precisa estar aplicado no Supabase. Sem ele, essas partes mostram
-  "Sem dados" e o resto do painel funciona igual.
+- **SQL do Supabase:** aplicados até o `hub/sql/supabase/005_banco.sql`
+  (07/10/2026). Num Supabase novo, rodar os 5 em ordem (`hub/README.md`). Sem
+  o 005, as telas do banco mostram "Sem dados" e o resto do painel funciona
+  igual.
 - **Aderência ainda de planilha.** O banco guarda só a programação atual.
   Desde 05/10/2026 o hub guarda uma foto por dia da programação do PCP; com
   algumas semanas de fotos dá pra calcular a aderência sem a planilha.

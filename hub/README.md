@@ -266,7 +266,7 @@ Uma vez só, nesta ordem:
    aqui em `hub/`: `uv run hub publicar`. Sem o 005, o hub publica o resto
    normalmente e avisa o que ficou de fora.
 
-Feitos: 1 a 3 em 25/09, 4 a 6 em 30/09. O 8 (que já faz o 7) aguarda.
+Feitos: 1 a 3 em 25/09, 4 a 6 em 30/09, o 8 (que já faz o 7) em 07/10.
 
 ### Conferência com o motor do BI (30/09)
 
