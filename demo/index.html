@@ -1076,8 +1076,8 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
           <div class="panel">
             <div class="panel-head">
               <div>
-                <h3 class="panel-title">Aparas GPK — Apontado x Confirmado</h3>
-                <div class="panel-sub" id="aparas-panel-sub">% sobre peso bruto REBs &middot; últimos 12 meses</div>
+                <h3 class="panel-title">Aparas GPK — Confirmado x Apontado</h3>
+                <div class="panel-sub" id="aparas-panel-sub">% sobre peso bruto REBs &middot; últimos 12 meses &middot; meta de 12% na confirmada</div>
               </div>
               <div class="legend" id="aparas-legend"></div>
             </div>
@@ -1154,7 +1154,7 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
             <div class="panel-head">
               <div>
                 <h3 class="panel-title">Apara por classificação de produto</h3>
-                <div class="panel-sub">% apontada sobre peso bruto, por família de estrutura</div>
+                <div class="panel-sub">% apontada sobre peso bruto, por família de estrutura &middot; a balança não separa por família</div>
               </div>
             </div>
             <div class="grafico" id="classe-chart"></div>
@@ -1174,13 +1174,13 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
           <div class="panel-head">
             <div>
               <h3 class="panel-title">Ordens com maior refugo</h3>
-              <div class="panel-sub">OPs do período ordenadas por % de apara apontada</div>
+              <div class="panel-sub">OPs do período ordenadas por % de apara apontada (a confirmada não existe por OP)</div>
             </div>
           </div>
           <div class="table-wrap">
             <table id="ops-table">
               <thead>
-                <tr><th>OP</th><th>Máquina</th><th>Descrição</th><th>Peso bruto</th><th>Refugo</th><th>% apara</th><th>Motivo principal</th></tr>
+                <tr><th>OP</th><th>Máquina</th><th>Descrição</th><th>Peso bruto</th><th>Refugo</th><th>% apontada</th><th>Motivo principal</th></tr>
               </thead>
               <tbody></tbody>
             </table>
@@ -1612,7 +1612,11 @@ function classeDoCodigo(codApont){
   return { chave, ...CLASSES_PARADA[chave] };
 }
 
-const META_APARAS = 5.0;
+// Meta de apara: 12% sobre a apara CONFIRMADA (balança), a que a Gualapack usa
+// pra tudo (definida pelo dono em 07/10/2026). A apontada fica como
+// comparação, sem meta e sem cor de status.
+const META_APARAS = 12;
+const fmtMeta = () => fmtNum(META_APARAS, Number.isInteger(META_APARAS) ? 0 : 1) + "%";
 
 /* Grupo físico (Machine Card) -> processo/rota exibidos no painel. O Machine
    Card mistura máquinas de verdade com categorias administrativas (GERAL,
@@ -2401,11 +2405,6 @@ function tmrStatus(v){
 // Máquina sem nenhuma hora apontada no período não é "Crítico" com 0%: não
 // há medição. Fica neutra ("Sem apontamento"). As faixas acima não mudam.
 const statusMaquina = m => m.horasTot > 0 ? tmrStatus(m.tmr) : "none";
-function aparasStatus(v){
-  if(v <= META_APARAS) return "good";
-  if(v <= META_APARAS + 2) return "warning";
-  return "critical";
-}
 const statusLabel = { good:"Dentro da meta", warning:"Atenção", critical:"Crítico", none:"Sem apontamento" };
 const statusCor   = { good:"var(--good)", warning:"var(--warning)", critical:"var(--critical)", none:"var(--text-muted)" };
 
@@ -2806,12 +2805,12 @@ function comparaMesAnterior(atual, chave, { unidade = "p.p.", casas = 1, maiorMe
   return { tom: melhorou ? "bom" : "ruim", seta: dif > 0 ? "sobe" : "desce",
            texto: `${fmtNum(Math.abs(dif), casas)} ${unidade} vs ${nomeMes}` };
 }
-// Apara contra a meta (5%): a única comparação que o BI também faz no cartão.
+// Apara confirmada contra a meta (12%). Só a confirmada é comparada: a meta é dela.
 function comparaMeta(apara){
   if(apara == null || !Number.isFinite(apara)) return null;
   return apara <= META_APARAS
-    ? { tom:"bom", seta:null, texto:`Dentro da meta de ${fmt1(META_APARAS)}%` }
-    : { tom:"ruim", seta:null, texto:`Acima da meta de ${fmt1(META_APARAS)}%` };
+    ? { tom:"bom", seta:null, texto:`Dentro da meta de ${fmtMeta()}` }
+    : { tom:"ruim", seta:null, texto:`Acima da meta de ${fmtMeta()}` };
 }
 
 /* Tudo abaixo lê MAQUINAS/TIPOS_PERDA/etc — só pode rodar depois que
@@ -2843,8 +2842,10 @@ const produtividade = PRODUTIVIDADE; // m²/h — null quando nenhuma base carre
 const perdaTotalKg  = TIPOS_PERDA.reduce((a,t)=>a+t.kg,0);
 
 const kpisGerais = [
-  { label:"Apara apontada", value:aparasMedia, suffix:"%", decimals:1,
-    comp: comparaMeta(aparasMedia), nota:`confirmado ${fmtPct(confirmMedia)}`, spark: APARAS_MENSAL.apontado.slice() },
+  // A confirmada é mensal: período sem dia 1º (um dia, uma semana) fica sem ela, como no BI.
+  { label:"Apara confirmada", value:confirmMedia, suffix:"%", decimals:1, comp: comparaMeta(confirmMedia),
+    nota: confirmMedia == null ? `só por mês · apontada ${fmtPct(aparasMedia)}` : `apontada ${fmtPct(aparasMedia)}`,
+    spark: APARAS_MENSAL.confirmado.slice() },
   { label:"TMR médio", value:tmrMedio, suffix:"%", decimals:1,
     comp: comparaMesAnterior(tmrMedio, "tmr"), nota:"tempo de máquina rodando", spark: serieMensal("tmr") },
 ];
@@ -2856,17 +2857,17 @@ kpisGerais.push({ label:"Aderência ao plano", value:aderMedia, suffix:"%", deci
     comp: comparaMesAnterior(aderMedia, "ader"), nota:"km realizados ÷ planejados", spark: serieMensal("ader") });
 renderKpis(document.getElementById("kpi-row"), kpisGerais);
 
-/* Gráfico principal: apara apontada x confirmada */
+/* Gráfico principal: apara confirmada x apontada (a meta de 12% é da confirmada) */
 (function(){
   const holder = document.getElementById("aparas-chart");
   const legend = document.getElementById("aparas-legend");
   const sub = document.getElementById("aparas-panel-sub");
-  const visible = new Set(["apontado","confirmado"]);
+  const visible = new Set(["confirmado","apontado"]);
   let janela = 12;
 
   const defs = [
-    { id:"apontado",   name:"Apontado (operador)", short:"Apont.", color:"var(--series-2)" },
-    { id:"confirmado", name:"Confirmado (balança)", short:"Conf.",  color:"var(--series-4)", dashed:true },
+    { id:"confirmado", name:"Confirmado (balança)", short:"Conf.",  color:"var(--series-2)" },
+    { id:"apontado",   name:"Apontado (operador)", short:"Apont.", color:"var(--series-4)", dashed:true },
   ];
 
   function render(){
@@ -2880,7 +2881,7 @@ renderKpis(document.getElementById("kpi-row"), kpisGerais);
     multiLineChart(holder, labels, series, {
       idPrefix:"ap", meta:META_APARAS,
       fmtY: v=> v.toFixed(0)+"%", fmtTip: v=> fmt1(v)+"%",
-      aria:"Apara apontada e confirmada por mês"
+      aria:`Apara confirmada e apontada por mês, meta de ${fmtMeta()} na confirmada`
     });
   }
 
@@ -3221,11 +3222,11 @@ function diferencaMesmoMes(){
 renderKpis(document.getElementById("aparas-kpis"), [
   { label:"Refugo total", value: perdaTotalKg/1000, suffix:" t", decimals:1,
     nota:"acumulado do período", spark: serieMensal("perdaT") },
+  { label:"Apara confirmada", value: confirmMedia, suffix:"%", decimals:1, comp: comparaMeta(confirmMedia),
+    nota: confirmMedia == null ? "medição por balança, só por mês" : "medição por balança", spark: APARAS_MENSAL.confirmado.slice() },
   { label:"Apara apontada", value: aparasMedia, suffix:"%", decimals:1,
-    comp: comparaMeta(aparasMedia), nota:"apontada pelo operador", spark: APARAS_MENSAL.apontado.slice() },
-  { label:"Apara confirmada", value: confirmMedia, suffix:"%", decimals:1,
-    nota:"medição por balança", spark: APARAS_MENSAL.confirmado.slice() },
-  { label:"Diferença apont. x conf.", value: diferencaMesmoMes(), suffix:" p.p.", decimals:1,
+    nota:"apontada pelo operador · sem meta", spark: APARAS_MENSAL.apontado.slice() },
+  { label:"Diferença conf. x apont.", value: diferencaMesmoMes(), suffix:" p.p.", decimals:1,
     nota:"quanto o apontamento subestima",
     spark: APARAS_MENSAL.confirmado.map((c,i)=> c != null && APARAS_MENSAL.apontado[i] != null ? c - APARAS_MENSAL.apontado[i] : null) },
 ]);
@@ -3251,12 +3252,12 @@ hBarChart(document.getElementById("perda-tipo-chart"), TIPOS_PERDA.map(t=>({
   })), { labelW:100, valueW:78, rowH:28, aria:"Perda por máquina" });
 })();
 
-// Acima da meta é alerta (vermelho); dentro, verde. É a única comparação do gráfico.
+// É a apara APONTADA: a balança (confirmada) não separa por família. Por isso
+// sem a linha da meta e sem verde/vermelho: a meta de 12% é da confirmada.
 hBarChart(document.getElementById("classe-chart"), CLASSIFICACOES.map(c=>({
-  label:c.nome, value:c.aparas, display: fmt1(c.aparas)+"%",
-  color: c.aparas>META_APARAS ? "var(--critical)" : "var(--good)",
-  tip:`<b>${esc(c.nome)}</b><br>${fmt1(c.aparas)}% de apara · ${fmt(c.kg)} kg produzidos`
-})), { labelW:200, valueW:58, rowH:30, target: META_APARAS, targetLabel:`meta ${fmt1(META_APARAS)}%`, aria:"Apara por classificação de produto" });
+  label:c.nome, value:c.aparas, display: fmt1(c.aparas)+"%", color:"var(--series-3)",
+  tip:`<b>${esc(c.nome)}</b><br>${fmt1(c.aparas)}% de apara apontada · ${fmt(c.kg)} kg produzidos`
+})), { labelW:200, valueW:58, rowH:30, aria:"Apara apontada por classificação de produto" });
 
 (function(){
   const holder = document.getElementById("producao-kg-chart");
@@ -3281,15 +3282,13 @@ hBarChart(document.getElementById("classe-chart"), CLASSIFICACOES.map(c=>({
   const rows = OPS.map(o=>({ ...o, pct: "pct" in o ? o.pct : o.refugo/o.peso*100 }))
     .sort((a,b)=>(b.pct ?? -1)-(a.pct ?? -1));
   tbody.innerHTML = rows.length ? rows.map(o=>{
-    const st = o.pct == null ? "none" : aparasStatus(o.pct);
     return `<tr>
       <td class="mono">${esc(o.op)}</td>
       <td>${esc(o.maq)}</td>
       <td class="quebra">${esc(o.desc)}</td>
       <td class="num">${fmt(o.peso)} kg</td>
       <td class="num">${fmt(o.refugo)} kg</td>
-      <td>${o.pct == null ? `<span class="num" title="OP sem peso bruto na rebobinadeira no período">—</span>`
-          : `<span class="status-pill status-${st}"><span class="dot" style="background:currentColor"></span>${fmt1(o.pct)}%</span>`}</td>
+      <td class="num">${o.pct == null ? `<span title="OP sem peso bruto na rebobinadeira no período">—</span>` : `${fmt1(o.pct)}%`}</td>
       <td class="quebra">${esc(o.motivo)}</td>
     </tr>`;
   }).join("") : `<tr><td colspan="7"><div class="empty-state">Sem OPs com refugo no período.</div></td></tr>`;

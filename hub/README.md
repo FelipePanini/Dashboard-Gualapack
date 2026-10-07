@@ -201,6 +201,9 @@ jeitos:
   | Perda por motivo / máquina, OPs | kg de perda apontada (código 40) | apontamentos |
   | Apara por classificação | apontado por grupo de produto (Aparas_Geral v3) | BASE_PROD |
   | Produtividade | m² ÷ horas produzindo | apontamentos + largura da estrutura |
+
+  A apara de referência é a **confirmada**, com meta de 12% (decisão do dono
+  em 07/10/2026); a apontada fica como comparação, sem meta.
 - **As telas que vêm direto do banco** (`sql/supabase/005_banco.sql`): fotos
   do estado atual que o painel lê inteiras (máquinas agora, fila de
   programação, WIP, carteira) e séries por dia somadas no período (entregas

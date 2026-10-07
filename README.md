@@ -119,8 +119,8 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 | Agora: o que cada máquina está fazendo | `View_usr_apontamentos_999999` (evento em andamento) + `CTREntradasMaquina` (OP aberta) | classe pela classificação oficial; velocidade real = metros ÷ horas produzindo da OP; programada e término previsto da OP |
 | TMR, horas, paradas, linha do tempo | `View_usr_apontamentos_999999` | produzindo ÷ horas sem FIM TURNO e INATIVIDADE (BI Indicadores Produção) |
 | Perda por motivo e por máquina, OPs com mais refugo | idem, código 40 | kg apontados |
-| Apara apontada, produção em kg | idem, consulta BASE_PROD | refugo ÷ (refugo + peso bruto das rebobinadeiras) |
-| Apara confirmada | planilhas Sequenciamento (fardos, acumulado) e Refugo Aparas | scrap ÷ (peso bruto das REBs + scrap) |
+| Apara apontada (comparação, sem meta), produção em kg | idem, consulta BASE_PROD | refugo ÷ (refugo + peso bruto das rebobinadeiras) |
+| Apara confirmada (a de referência; meta 12%) | planilhas Sequenciamento (fardos, acumulado) e Refugo Aparas | scrap ÷ (peso bruto das REBs + scrap); só por mês |
 | Produtividade (m²/h) e velocidade | apontamentos, código 20, + `EstrProcessos` (largura) | m² = metros × largura; ÷ horas produzindo |
 | Aderência ao plano | planilha ADERÊNCIA DIÁRIA (PCP) | produzido ÷ planejado |
 | Entregas no prazo | `View_usr_Entregas_Desempenho` (a consulta da Aderência Semanal) | Ótimo: faturado até a data do cliente; Bom: até a do PCP; Regular, Ruim e Péssimo: até 5, 10 e mais de 10 dias depois da do PCP |
@@ -193,8 +193,9 @@ vale daqui pra frente em `demo/index.html`:
   unidade = 1 px, texto de 11 px pra cima, redesenho ao mudar de largura.
   Rótulo que não cabe ganha reticências, com o nome inteiro no `<title>`.
 - **Seta e cor no cartão só com comparação de verdade**: contra a meta
-  (apara) ou contra o mês anterior da série real do hub. O resto é texto
-  neutro.
+  (apara confirmada, 12%) ou contra o mês anterior da série real do hub. O
+  resto é texto neutro. A apara apontada (por OP, por família de produto) não
+  tem meta e aparece sem cor de status.
 - **Máquina sem apontamento no período** fica neutra ("Sem apontamento",
   "—"), não "Crítico 0%". As faixas do TMR (75% e 62%) continuam as mesmas
   até a meta ser definida.

@@ -56,14 +56,15 @@ Regras:
 Definições (as do BI Indicadores de Produção):
 - TMR = horas produzindo ÷ horas totais sem FIM TURNO e sem INATIVIDADE (Machine Card).
 - Velocidade = metros ÷ horas produzindo ÷ 60 (m/min). Velocidade de referência = o melhor mês da própria máquina nos 12 meses anteriores.
-- Apara apontada = refugo ÷ (refugo + peso bruto das rebobinadeiras REB 01, 04, 05, 09 e 10). Meta: 5%.
-- Apara confirmada = scrap da balança ÷ (peso bruto das REBs + scrap). É mensal: entra o mês cujo dia 1º está no período; período sem dia 1º fica sem confirmada, como no BI.
+- Apara confirmada = scrap da balança ÷ (peso bruto das REBs + scrap). É a apara que a Gualapack usa pra tudo. Meta: 12%. É mensal: entra o mês cujo dia 1º está no período; período sem dia 1º fica sem confirmada, como no BI.
+- Apara apontada = refugo ÷ (refugo + peso bruto das rebobinadeiras REB 01, 04, 05, 09 e 10). Serve de comparação com a confirmada; não tem meta.
+- Pergunta sobre apara sem dizer qual: responda com a confirmada e a meta de 12%, e use a apontada só como apoio (e quando não houver confirmada no período).
 - Apara por máquina não existe no BI: por máquina, use o refugo em kg.
 - Perda (refugo) = kg com código de apontamento 40, por motivo e por máquina.
 - Aderência = produzido ÷ planejado, pela data de início planejada da programação. Pode passar de 100%.
 - Produtividade = m² ÷ horas de máquina produzindo. Não é a do BI, que divide por horas trabalhadas.
 - Os totais incluem todas as máquinas apontadas, como no BI; a lista por máquina tem as máquinas de produção do painel.
-- WIP e carteira: não há base ligada ao painel.`;
+- Agora no chão de fábrica, entregas no prazo, fila de programação, setup, WIP, carteira e laudos do CQ estão no painel, mas você ainda não tem ferramenta para eles: diga isso e indique a tela do painel onde estão.`;
 
 const FERRAMENTAS = [
   {
