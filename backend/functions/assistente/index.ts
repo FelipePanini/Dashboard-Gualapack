@@ -483,11 +483,19 @@ Deno.serve(async (req: Request) => {
   } catch (e) {
     if (e instanceof ErroClaude) {
       console.error("anthropic", e.status, e.message);
+      // A API é pré-paga: sem crédito ela responde 400 "credit balance is too low".
+      // Tentar de novo não resolve, então a mensagem diz o que fazer.
+      const semCredito = e.status === 400 && /credit balance/i.test(e.message);
+      const semModelo = e.status === 404 && /model/i.test(e.message);
       const mensagem = e.status === 401 || e.status === 403
         ? "A chave da Anthropic foi recusada. Confira o segredo ANTHROPIC_API_KEY no Supabase."
-        : e.status === 429 || e.status === 529
-          ? "O serviço da IA está ocupado agora. Tente de novo em alguns instantes."
-          : "Não consegui falar com a IA agora. Tente de novo em alguns instantes.";
+        : semCredito
+          ? "A conta da Anthropic usada pelo assistente está sem créditos. Avise quem administra o painel."
+          : semModelo
+            ? `O modelo ${MODELO} não está disponível na conta da Anthropic. Confira o segredo ASSISTENTE_MODELO no Supabase.`
+            : e.status === 429 || e.status === 529
+              ? "O serviço da IA está ocupado agora. Tente de novo em alguns instantes."
+              : "Não consegui falar com a IA agora. Tente de novo em alguns instantes.";
       return responder({ erro: "anthropic", mensagem }, 502);
     }
     console.error("assistente", (e as Error).message);
