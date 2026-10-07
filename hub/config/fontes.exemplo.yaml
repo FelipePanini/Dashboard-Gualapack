@@ -47,6 +47,7 @@ espelho:
   - original: 'Refugo\Sequenciamento Acumulado {ano} Rev*.xlsx'
     so_o_ultimo: true
   - '<pasta>\Refugo Aparas.xlsx'
+  - '<pasta>\Histórico Aderência Programação.xlsx'
 
 # Arquivos que ficam na pasta de entrada mas não são mais fonte (as planilhas
 # que o banco substituiu): não viram aviso de "arquivo não catalogado".
@@ -99,6 +100,18 @@ fontes:
     colunas_obrigatorias: [data, qtd_bruta_kg, qtd_liquida_kg]
     colunas_excluir: [nome]
     coluna_data: data
+    frescor_dias: 3
+
+  # Planejado da aderência (página Ad. Plan Mensal do BI). Planilha larga:
+  # "colunas" deixa só as 4 que o hub usa (sql/clean/210_plano.sql).
+  - id: aderencia.programacao
+    tipo: excel_tabela
+    arquivo: 'Histórico Aderência Programação.xlsx'
+    aba: PROGRAMAÇÃO
+    colunas: [num_ordem, cod_recurso, qtd_planejada, dt_ini_plan]
+    colunas_obrigatorias: [num_ordem, cod_recurso, qtd_planejada, dt_ini_plan]
+    coluna_data: dt_ini_plan
+    aceita_dado_mais_antigo: true
     frescor_dias: 3
 
   - id: pbi.apontamentos

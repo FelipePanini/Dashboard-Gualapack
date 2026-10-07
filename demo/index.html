@@ -414,6 +414,9 @@ body.entrada .view.active > section:not(.kpi-row) ~ section:not(.kpi-row) ~ sect
   display:flex; flex-direction:column; min-width:0;
 }
 .panel[hidden]{ display:none; }
+/* linha do tempo: legenda abaixo do título (o seletor de dias fica ao lado dele) */
+.gantt-legenda{ margin:-2px 0 12px; }
+.grafico.carregando{ opacity:.45; transition: opacity .2s var(--ease-out); }
 body.no-scroll{ overflow:hidden; }
 .panel-head{ display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:14px; gap:12px; flex-wrap:wrap; }
 .panel-head > div:first-child{ min-width:0; }
@@ -457,6 +460,7 @@ button.legend-item:hover{ color: var(--text-primary); }
   box-shadow: 0 1px 2px rgba(10,21,36,0.14), 0 3px 10px -4px rgba(10,21,36,0.18); pointer-events:none;
 }
 .segmented-thumb.pronto{ transition: transform .5s var(--spring), width .5s var(--spring); }
+.segmented[hidden]{ display:none; }
 
 /* ---------- quadro de máquinas, agrupado pela rota ---------- */
 .machine-board{ display:flex; flex-direction:column; gap:22px; }
@@ -1265,7 +1269,7 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
           <div class="panel-head">
             <div>
               <h3 class="panel-title">Planejado x Realizado por máquina</h3>
-              <div class="panel-sub">Km lineares no período &middot; barra clara = planejado, sólida = realizado</div>
+              <div class="panel-sub" id="ader-chart-sub">Km lineares no período &middot; barra clara = planejado, sólida = realizado</div>
             </div>
           </div>
           <div class="grafico" id="ader-chart"></div>
@@ -1335,10 +1339,11 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
           <div class="panel-head">
             <div>
               <h3 class="panel-title">Linha do tempo de apontamentos</h3>
-              <div class="panel-sub" id="gantt-panel-sub">Ocupação das máquinas nas últimas 24 h &middot; passe o mouse para ver a OP</div>
+              <div class="panel-sub" id="gantt-panel-sub">Ocupação das máquinas no dia de produção, das 06:00 às 06:00 &middot; passe o mouse para ver o motivo e a OP</div>
             </div>
-            <div class="legend" id="status-legend"></div>
+            <div class="segmented" id="tempo-dias" role="group" aria-label="Dia de produção" hidden></div>
           </div>
+          <div class="legend gantt-legenda" id="status-legend"></div>
           <div class="grafico" id="gantt-chart"></div>
         </section>
 
@@ -1726,7 +1731,8 @@ let USANDO_DADOS_REAIS = false;
 function calcAderenciaProcesso(maquinas){
   return ["Impressão","Laminação","Corte / Refile"].map(p=>{
     const ms = maquinas.filter(m=>m.processo===p);
-    const planejado = ms.reduce((a,m)=>a+m.planKm,0);
+    // período com hoje dentro: compara com o planejado até hoje (planHojeKm)
+    const planejado = ms.reduce((a,m)=>a+(m.planHojeKm ?? m.planKm),0);
     const realizado = ms.reduce((a,m)=>a+m.realKm,0);
     return { nome:p, planejado, realizado, pct: planejado>0 ? realizado/planejado*100 : null };
   });
@@ -1774,12 +1780,14 @@ function isoDate(d){ return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(
    segue até ter todas; sem o total, segue até uma página vir vazia (página
    curta não prova que acabou: pode ser o limite do servidor). A ordem fixa
    (chave única da view) garante que nenhuma linha se repita ou suma entre uma
-   página e outra. Devolve { data, error }, como o cliente do Supabase. */
-async function lerTudo(client, view, ordem){
+   página e outra. Devolve { data, error }, como o cliente do Supabase.
+   filtro (opcional): q => q.eq(...), aplicado a cada página. */
+async function lerTudo(client, view, ordem, filtro){
   const PAGINA = 1000, linhas = [];
   let total = null;
   for(let i = 0; i < 100; i++){
     let q = client.from(view).select("*", i === 0 ? { count:"exact" } : undefined);
+    if(filtro) q = filtro(q);
     ordem.forEach(c=>{ q = q.order(c, { ascending:true, nullsFirst:false }); });
     const { data, error, count } = await q.range(linhas.length, linhas.length + PAGINA - 1);
     if(error) return { data:null, error };
@@ -1806,13 +1814,22 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
   // amanhã, não hoje.
   const pDe  = periodoDe ? isoDate(periodoDe) : null;
   const pAte = periodoAte ? isoDate(periodoAte) : null;
+  // Aderência (Ad. Plan Mensal do BI): no mês em andamento (do dia 1 até hoje),
+  // o planejado é o do mês inteiro, como o BI. Período com hoje dentro compara o
+  // realizado com o planejado até hoje (planejado_ate_hoje).
+  const hoje0 = new Date(); hoje0.setHours(0,0,0,0);
+  const comHoje = !!(periodoAte && periodoAte > hoje0);
+  const mesAberto = comHoje && periodoDe && periodoDe.getDate() === 1 &&
+                    periodoDe.getFullYear() === hoje0.getFullYear() && periodoDe.getMonth() === hoje0.getMonth();
+  const pAtePlano = mesAberto ? isoDate(new Date(hoje0.getFullYear(), hoje0.getMonth()+1, 1)) : pAte;
   try{
     // 1ª rodada: o que o data hub publica + a lista de máquinas (tabela
     // pequena: id e grupo). Fora do throw de propósito: sem o hub publicado,
     // essas funções não existem e o painel segue com as consultas antigas.
     const [hubMaqRes, hubParadasRes, hubGanttRes, hubMotivoRes, hubRefugoMaqRes, hubOpsRes, hubClasseRes, hubAparaRes,
            hubFontesRes, hubAparaPeriodoRes, hubMensalRes, hubPerdaMaqMotivoRes, listaRes, hubCodigosRes,
-           bAgoraRes, bFilaRes, bWipRes, bCarteiraRes, bEntregasRes, bSetupRes, bLaudosRes, bMensalRes] = await Promise.all([
+           bAgoraRes, bFilaRes, bWipRes, bCarteiraRes, bEntregasRes, bSetupRes, bLaudosRes, bMensalRes,
+           bDiasRes, bPlanoRes, bPlanoMesRes] = await Promise.all([
       // Horas por máquina/código publicadas pelo hub (Machine Card) e o resto
       // dos cartões (002_cartoes.sql).
       client.rpc("rpc_hub_maquinas", { p_de: pDe, p_ate: pAte }),
@@ -1845,6 +1862,11 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
       client.rpc("rpc_hub_setup", { p_de: pDe, p_ate: pAte }),
       client.rpc("rpc_hub_laudos", { p_de: pDe, p_ate: pAte }),
       client.rpc("rpc_hub_mensal_banco", { p_meses: 13 }),
+      // 006_tempo_aderencia.sql: dias da linha do tempo (os eventos de cada dia
+      // vêm quando o dia é escolhido) e planejado x realizado como o BI.
+      client.from("v_hub_eventos_dias").select("dia,eventos").order("dia", { ascending:false }),
+      client.rpc("rpc_hub_plano", { p_de: pDe, p_ate: pAtePlano }),
+      client.from("v_hub_plano_mensal").select("*"),
     ]);
     // Com o hub publicado (002), nenhuma consulta antiga é usada: todas têm
     // equivalente no hub. Elas somam centenas de milhares de linhas e, em
@@ -1862,7 +1884,8 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
     // (PGRST202/205: SQL ainda não aplicado) não é erro passageiro.
     const passageiro = [hubParadasRes, hubGanttRes, hubMotivoRes, hubRefugoMaqRes, hubOpsRes, hubClasseRes, hubAparaRes,
                         hubFontesRes, hubAparaPeriodoRes, hubMensalRes, hubPerdaMaqMotivoRes, hubCodigosRes,
-                        bAgoraRes, bFilaRes, bWipRes, bCarteiraRes, bEntregasRes, bSetupRes, bLaudosRes, bMensalRes]
+                        bAgoraRes, bFilaRes, bWipRes, bCarteiraRes, bEntregasRes, bSetupRes, bLaudosRes, bMensalRes,
+                        bDiasRes, bPlanoRes, bPlanoMesRes]
       .map(r=>r.error).find(e=>e && e.code !== "PGRST202" && e.code !== "PGRST205");
     if(passageiro && tentativa === 1) throw passageiro;
     // período sem nenhum apontamento também é hub (vazio), não caminho antigo
@@ -2039,21 +2062,23 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
       motivo: prettyCodigo(r.motivo_principal),
     }));
 
-    // Segmentos reais do Gantt: agrupa por máquina, hora do dia como float.
-    const idsValidos = new Set(MAQUINAS.map(m=>m.id));
-    const porMaquina = new Map();
-    const eventos = HUB_HORAS && !hubGanttRes.error && (hubGanttRes.data||[]).length ? hubGanttRes.data : ganttRes.data;
-    (eventos||[]).forEach(r=>{
-      if(!idsValidos.has(r.cod_recurso)) return;
-      const ini = new Date(r.hora_inicio), fim = new Date(r.hora_fim);
-      const dayStart = new Date(ini); dayStart.setHours(0,0,0,0);
-      const h = d => Math.max(0, Math.min(24, (d-dayStart)/3600000));
-      const list = porMaquina.get(r.cod_recurso) || [];
-      const c = classeDoCodigo(r.cod_apont);
-      list.push({ cor: c.cor, classe: c.chave, classeNome: c.nome, nome: prettyCodigo(r.cod_desc).replace(/^\d+\s*-\s*/, ""), ini:h(ini), fim:h(fim) });
-      porMaquina.set(r.cod_recurso, list);
-    });
-    GANTT_POR_MAQUINA = porMaquina.size > 0 ? porMaquina : null;
+    // Linha do tempo: com o 006, os dias de produção publicados (os eventos de
+    // cada dia vêm quando ele é escolhido). Sem ele, o último dia (v_hub_ultimo_dia),
+    // na mesma janela das 06:00 às 06:00.
+    GANTT_POR_MAQUINA = null;
+    LINHA_TEMPO.cliente = client;
+    LINHA_TEMPO.porDia.clear();
+    LINHA_TEMPO.dia = null;
+    LINHA_TEMPO.dias = !bDiasRes.error ? (bDiasRes.data||[]).filter(r=>r.eventos > 0).map(r=>String(r.dia).slice(0,10)).sort() : [];
+    if(!LINHA_TEMPO.dias.length){
+      const eventos = HUB_HORAS && !hubGanttRes.error && (hubGanttRes.data||[]).length ? hubGanttRes.data : ganttRes.data;
+      const dias = (eventos||[]).map(r=>dataLocal(r.hora_inicio)).filter(Boolean).map(diaDeProducao).sort();
+      if(dias.length){
+        const dia = dias[dias.length-1];
+        LINHA_TEMPO.dias = [dia];
+        LINHA_TEMPO.porDia.set(dia, Promise.resolve(segmentosDoDia(eventos, dia)));
+      }
+    }
 
     ADERENCIA_PROCESSO = calcAderenciaProcesso(MAQUINAS);
     // Produtividade = m² ÷ HORAS DE MÁQUINA (tempo produzindo da OP).
@@ -2223,6 +2248,41 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
           }])),
         };
       }
+      // Aderência como a página Ad. Plan Mensal do BI (006): planejado da
+      // Histórico Aderência Programação, realizado dos apontamentos sem WIP e
+      // sem revisão. Sem o 006, fica a conta acima (ADERÊNCIA DIÁRIA).
+      window.PLANO = null;
+      if(!bPlanoRes.error && (bPlanoRes.data||[]).some(r=>n(r.planejado) > 0)){
+        const porMaqPlano = new Map(bPlanoRes.data.map(r=>[chave(r.maquina), r]));
+        MAQUINAS.forEach(m=>{
+          const r = porMaqPlano.get(chave(m.id)) || {};
+          const plan = n(r.planejado), ateHoje = n(r.planejado_ate_hoje), real = n(r.realizado);
+          const base = comHoje ? ateHoje : plan;
+          m.planKm = Math.round(plan/1000);
+          m.planHojeKm = comHoje ? Math.round(ateHoje/1000) : null;
+          m.realKm = Math.round(real/1000);
+          m.aderencia = base > 0 ? real/base*100 : null;
+        });
+        // cartões: todas as máquinas da programação, como o total do BI
+        const somaP = c => bPlanoRes.data.reduce((a,r)=>a+n(r[c]),0);
+        const base = comHoje ? somaP("planejado_ate_hoje") : somaP("planejado");
+        Object.assign(window.HUB_TOTAIS, {
+          planKm: somaP("planejado")/1000, planHojeKm: comHoje ? somaP("planejado_ate_hoje")/1000 : null,
+          realKm: somaP("realizado")/1000, aderencia: base > 0 ? somaP("realizado")/base*100 : null,
+        });
+        window.PLANO = { comHoje, mesAberto };
+        ADERENCIA_PROCESSO = calcAderenciaProcesso(MAQUINAS);
+        // tendência e comparação com o mês anterior na mesma conta
+        if(window.SERIE_MENSAL && !bPlanoMesRes.error && (bPlanoMesRes.data||[]).length){
+          const pm = new Map(bPlanoMesRes.data.map(r=>[String(r.mes).slice(0,7), r]));
+          const S = window.SERIE_MENSAL;
+          const colP = f => S.meses.map(mes=>{ const r = pm.get(mes); return r && n(r.planejado) > 0 ? f(n(r.planejado), n(r.realizado)) : null; });
+          S.ader = colP((pl, re) => 100*re/pl);
+          S.planKm = colP(pl => pl/1000);
+          S.realKm = colP((pl, re) => re/1000);
+          S.gapKm = colP((pl, re) => (pl-re)/1000);
+        }
+      }
       if(!hubPerdaMaqMotivoRes.error){
         const porMaqMotivo = new Map();
         (hubPerdaMaqMotivoRes.data||[]).forEach(r=>{
@@ -2251,7 +2311,8 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
     window.BANCO = { estado:{} };
     const faltaNoSupabase = e => e && (e.code === "PGRST202" || e.code === "PGRST205");
     Object.entries({ agora:bAgoraRes, programacao:bFilaRes, wip:bWipRes, carteira:bCarteiraRes, entregas:bEntregasRes,
-                     setup:bSetupRes, laudos:bLaudosRes, mensal:bMensalRes }).forEach(([parte, r])=>{
+                     setup:bSetupRes, laudos:bLaudosRes, mensal:bMensalRes,
+                     eventos_dias:bDiasRes, plano:bPlanoRes, plano_mensal:bPlanoMesRes }).forEach(([parte, r])=>{
       window.BANCO.estado[parte] = !r.error ? "ok" : faltaNoSupabase(r.error) ? "faltando" : "erro";
       window.BANCO[parte] = !r.error && Array.isArray(r.data) ? r.data : [];
       if(r.error && !faltaNoSupabase(r.error)) console.error(`Falha ao carregar ${parte} do banco — essa parte fica sem dados:`, r.error);
@@ -2309,6 +2370,61 @@ const fmtDMHM = d => `${fmtDM(d)} ${fmtHM(d)}`;
 const fmtDMA  = d => `${fmtDM(d)}/${String(d.getFullYear()).slice(-2)}`;
 const rotuloMes = iso => { const d = dataLocal(String(iso).slice(0,10)); return d ? MESES_CURTOS[d.getMonth()] : String(iso); };
 const mesmoDiaQue = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
+const DIAS_SEMANA = ["dom","seg","ter","qua","qui","sex","sáb"];
+
+/* ---- linha do tempo por dia de produção (006_tempo_aderencia.sql) ----
+   O dia de produção vai das 06:00 às 06:00 do dia seguinte: o turno da noite
+   (00h às 06h) ainda é do dia anterior no banco. Até 07/10 a linha do tempo
+   contava da meia-noite, e o turno da noite caía por cima da manhã. */
+const INICIO_DIA_PRODUCAO = 6;
+const LINHA_TEMPO = { dias: [], dia: null, porDia: new Map(), cliente: null };
+function inicioDoDia(iso){ const d = dataLocal(iso); d.setHours(INICIO_DIA_PRODUCAO, 0, 0, 0); return d; }
+// dia de produção de um instante: antes das 06:00 ainda é o dia anterior
+function diaDeProducao(t){ return isoDate(new Date(t.getTime() - INICIO_DIA_PRODUCAO*3600000)); }
+// Eventos de um dia → segmentos por máquina, em horas desde as 06:00 (0 a 24).
+// Evento que vem do dia anterior ou passa do fim do dia fica cortado na janela.
+function segmentosDoDia(eventos, iso){
+  const inicio = inicioDoDia(iso);
+  const ids = new Set(MAQUINAS.map(m=>m.id));
+  const porMaquina = new Map();
+  const h = d => Math.max(0, Math.min(24, (d - inicio)/3600000));
+  (eventos||[]).forEach(r=>{
+    if(!ids.has(r.cod_recurso)) return;
+    const de = dataLocal(r.hora_inicio), ate = dataLocal(r.hora_fim);
+    if(!de || !ate) return;
+    const ini = h(de), fim = h(ate);
+    if(!(fim > ini)) return;
+    const c = classeDoCodigo(r.cod_apont);
+    const lista = porMaquina.get(r.cod_recurso) || [];
+    lista.push({ cor: c.cor, classe: c.chave, classeNome: c.nome, nome: prettyCodigo(r.cod_desc || r.cod_apont).replace(/^\d+\s*-\s*/, ""),
+                 ini, fim, de, ate, op: r.num_ordem || null });
+    porMaquina.set(r.cod_recurso, lista);
+  });
+  return porMaquina;
+}
+// Eventos de um dia, buscados uma vez só (voltar a um dia não busca de novo).
+function eventosDoDia(iso){
+  if(!LINHA_TEMPO.porDia.has(iso)){
+    LINHA_TEMPO.porDia.set(iso, lerTudo(LINHA_TEMPO.cliente, "v_hub_eventos",
+      ["cod_recurso", "hora_inicio", "hora_fim", "cod_apont", "num_ordem"], q=>q.eq("dia", iso)).then(r=>{
+        if(r.error){ LINHA_TEMPO.porDia.delete(iso); throw r.error; }
+        return segmentosDoDia(r.data, iso);
+      }));
+  }
+  return LINHA_TEMPO.porDia.get(iso);
+}
+// Dia que abre: o último dia de produção já fechado (o de ontem, depois das 06:00).
+function diaPadraoLinhaTempo(){
+  const fechados = LINHA_TEMPO.dias.filter(iso => inicioDoDia(iso).getTime() + 24*3600000 <= Date.now());
+  return fechados.length ? fechados[fechados.length-1] : LINHA_TEMPO.dias[LINHA_TEMPO.dias.length-1] || null;
+}
+function rotuloDiaProducao(iso){
+  const hoje = diaDeProducao(new Date());
+  if(iso === hoje) return "Hoje";
+  if(iso === isoDate(addDaysGlobal(dataLocal(hoje), -1))) return "Ontem";
+  const d = dataLocal(iso);
+  return `${DIAS_SEMANA[d.getDay()]} ${String(d.getDate()).padStart(2,"0")}`;
+}
 const fimDoDia = d => { const r = new Date(d); r.setHours(23,59,59,999); return r; };
 function fmtDuracao(min){
   min = Math.max(0, Math.round(min));
@@ -2346,6 +2462,14 @@ function baixarCsv(nome, colunas, linhas){
   setTimeout(()=> URL.revokeObjectURL(url), 2000);
 }
 
+/* Tela estreita: o controle segmentado rola de lado; o botão escolhido fica à
+   vista, no meio (no celular, o "Ontem" da linha do tempo ficava cortado). */
+function botaoAVista(b, suave){
+  const c = b.parentElement;
+  if(c.scrollWidth <= c.clientWidth + 1) return;
+  const alvo = Math.max(0, b.offsetLeft - (c.clientWidth - b.offsetWidth)/2);
+  c.scrollTo({ left: alvo, behavior: suave && !reduzMovimento() ? "smooth" : "auto" });
+}
 /* Controle segmentado (a seleção desliza com mola), como o filtro das máquinas. */
 function segmentado(container, opcoes, ativo, aoMudar){
   container.innerHTML = `<span class="segmented-thumb" aria-hidden="true"></span>` + opcoes.map(([v, txt])=>
@@ -2356,6 +2480,7 @@ function segmentado(container, opcoes, ativo, aoMudar){
     if(!b || !b.offsetWidth) return;
     thumb.style.width = b.offsetWidth + "px";
     thumb.style.transform = `translateX(${b.offsetLeft}px)`;
+    botaoAVista(b, thumb.classList.contains("pronto"));
     if(!thumb.classList.contains("pronto")) requestAnimationFrame(()=> thumb.classList.add("pronto"));
   };
   container.querySelectorAll("button").forEach(b=> b.addEventListener("click", ()=>{
@@ -2934,6 +3059,7 @@ const ORDEM_ETAPAS = ["Impressão", "Laminação", "Corte / Refile", "Coating"];
     if(!b || !b.offsetWidth) return;
     thumb.style.width = b.offsetWidth + "px";
     thumb.style.transform = `translateX(${b.offsetLeft}px)`;
+    botaoAVista(b, thumb.classList.contains("pronto"));
     if(!thumb.classList.contains("pronto")) requestAnimationFrame(()=> thumb.classList.add("pronto"));
   }
 
@@ -3489,28 +3615,46 @@ const STATUS_LAUDO = [
 (function(){
   // Consolidado inclui todas as máquinas (Coating incluído); com o hub, todas
   // as da programação no período, como o cartão do BI.
-  const planTot = window.HUB_TOTAIS ? window.HUB_TOTAIS.planKm : MAQUINAS.reduce((a,m)=>a+m.planKm,0);
-  const realTot = window.HUB_TOTAIS ? window.HUB_TOTAIS.realKm : MAQUINAS.reduce((a,m)=>a+m.realKm,0);
+  const tot = window.HUB_TOTAIS;
+  const planTot = tot ? tot.planKm : MAQUINAS.reduce((a,m)=>a+m.planKm,0);
+  const realTot = tot ? tot.realKm : MAQUINAS.reduce((a,m)=>a+m.realKm,0);
+  // Com o 006 e o período chegando até hoje, a aderência compara com o
+  // planejado até hoje; o cartão Planejado mostra o do período inteiro (o mês
+  // inteiro no mês em andamento, como o BI).
+  const comHoje = !!(window.PLANO && window.PLANO.comHoje && tot && tot.planHojeKm != null);
+  const planBase = comHoje ? tot.planHojeKm : planTot;
   // período sem programação (ex.: antes da base de aderência começar): "—", não 0 km
   const semPlano = !(planTot > 0);
-  const aderPeriodo = semPlano ? null : realTot/planTot*100;
+  const aderPeriodo = planBase > 0 ? realTot/planBase*100 : null;
   renderKpis(document.getElementById("ader-kpis"), [
     { label:"Aderência ao plano", value: aderPeriodo, suffix:"%", decimals:1, comp: comparaMesAnterior(aderPeriodo, "ader"),
-      nota:"km realizados ÷ planejados", spark: serieMensal("ader") },
-    { label:"Planejado", value: semPlano ? null : planTot, suffix:" km", decimals:0, nota:"programação do período", spark: serieMensal("planKm") },
+      nota: comHoje ? "realizado ÷ planejado até hoje" : "km realizados ÷ planejados", spark: serieMensal("ader") },
+    { label:"Planejado", value: semPlano ? null : planTot, suffix:" km", decimals:0,
+      nota: comHoje ? `${window.PLANO.mesAberto ? "no mês" : "no período"} · ${fmt(tot.planHojeKm)} km até hoje` : "programação do período",
+      spark: serieMensal("planKm") },
     { label:"Realizado", value: semPlano ? null : realTot, suffix:" km", decimals:0, nota:"apontado pelas máquinas", spark: serieMensal("realKm") },
-    { label:"GAP", value: semPlano ? null : planTot-realTot, suffix:" km", decimals:0, nota:"o que faltou para o plano", spark: serieMensal("gapKm") },
+    { label:"GAP", value: semPlano ? null : planTot-realTot, suffix:" km", decimals:0,
+      nota: comHoje ? `o que falta para o planejado ${window.PLANO.mesAberto ? "do mês" : "do período"}` : "o que faltou para o plano",
+      spark: serieMensal("gapKm") },
   ]);
+  const subAder = document.getElementById("ader-chart-sub");
+  if(subAder) subAder.textContent = window.PLANO
+    ? (comHoje ? `Km lineares ${window.PLANO.mesAberto ? "no mês" : "no período"}, como o Ad. Plan Mensal do BI · barra clara = planejado, traço = planejado até hoje, sólida = realizado; % até hoje`
+               : "Km lineares no período, como o Ad. Plan Mensal do BI · barra clara = planejado, sólida = realizado")
+    : "Km lineares no período · barra clara = planejado, sólida = realizado";
 
   const holder = document.getElementById("ader-chart");
   // só máquinas com programação no período; sem plano, a barra seria 0 ÷ 0
-  const dados = MAQUINAS.filter(m=>m.aderencia != null && m.planKm > 0)
-                        .map(m=>({ nome:m.nome, plan:m.planKm, real:m.realKm, pct:m.aderencia }));
-  const corAder = p => p>=88 ? "var(--good)" : p>=82 ? "var(--warning)" : "var(--critical)";
+  // máquinas com programação no período; sem plano, a barra seria 0 ÷ 0. No mês
+  // em andamento entra também quem só tem programação depois de hoje (% "—").
+  const dados = MAQUINAS.filter(m=>m.planKm > 0 && (m.aderencia != null || m.planHojeKm != null))
+                        .map(m=>({ nome:m.nome, plan:m.planKm, hoje:m.planHojeKm ?? null, real:m.realKm, pct:m.aderencia }));
+  const corAder = p => p == null ? "var(--text-muted)" : p>=88 ? "var(--good)" : p>=82 ? "var(--warning)" : "var(--critical)";
+  const pctTxt = p => p == null ? "—" : Math.round(p)+"%";
   if(!dados.length){
     holder.innerHTML = `<div class="empty-state">Sem dados de programação no período.</div>`;
   }else{
-    const resumo = dados.slice(0,6).map(d=>`${d.nome} ${Math.round(d.pct)}%`).join("; ");
+    const resumo = dados.slice(0,6).map(d=>`${d.nome} ${pctTxt(d.pct)}`).join("; ");
     const maxV = Math.max(...dados.map(d=>Math.max(d.plan, d.real))) || 1;
     montarGrafico(holder, (W, animar)=>{
       let svg;
@@ -3527,12 +3671,15 @@ const STATUS_LAUDO = [
           ${dados.map((d,i)=>{
             const cx=padL+i*colW+colW/2;
             const hp=(d.plan/maxV)*plotH, hr=(d.real/maxV)*plotH;
+            // traço do planejado até hoje, por cima da barra do planejado
+            const yh = d.hoje != null && d.hoje < d.plan ? padT+plotH-(d.hoje/maxV)*plotH : null;
             return `<g class="col-barra acol" data-i="${i}">
               <rect x="${padL+i*colW}" y="${padT}" width="${colW}" height="${plotH+padB}" fill="transparent"/>
               <rect x="${(cx-bw-2).toFixed(1)}" y="${(padT+plotH-hp).toFixed(1)}" width="${bw.toFixed(1)}" height="${hp.toFixed(1)}" rx="4" fill="var(--surface-sunken)" stroke="var(--border-strong)"/>
+              ${yh != null ? `<line x1="${(cx-bw-5).toFixed(1)}" y1="${yh.toFixed(1)}" x2="${(cx+1).toFixed(1)}" y2="${yh.toFixed(1)}" stroke="var(--text-secondary)" stroke-width="2" stroke-linecap="round"/>` : ""}
               ${hr > 0 ? `<rect class="barra-v" style="--i:${i}" x="${(cx+2).toFixed(1)}" y="${(padT+plotH-hr).toFixed(1)}" width="${bw.toFixed(1)}" height="${hr.toFixed(1)}" rx="4" fill="${corAder(d.pct)}"/>` : ""}
               <text x="${cx}" y="${H-21}" text-anchor="middle" font-size="12" fill="var(--text-secondary)">${esc(cortarTexto(d.nome, colW-6, 12))}</text>
-              <text x="${cx}" y="${H-5}" text-anchor="middle" font-size="12" font-weight="650" class="num" fill="${corAder(d.pct)}">${Math.round(d.pct)}%</text>
+              <text x="${cx}" y="${H-5}" text-anchor="middle" font-size="12" font-weight="650" class="num" fill="${corAder(d.pct)}">${pctTxt(d.pct)}</text>
             </g>`;
           }).join("")}
         </svg>`;
@@ -3543,12 +3690,14 @@ const STATUS_LAUDO = [
         svg = `<svg class="${animar ? "anima" : ""}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc("Planejado contra realizado por máquina: " + resumo)}">
           ${dados.map((d,i)=>{
             const y=i*(rowH+gap), wp=(d.plan/maxV)*barMax, wr=(d.real/maxV)*barMax;
+            const xh = d.hoje != null && d.hoje < d.plan ? barX+(d.hoje/maxV)*barMax : null;
             return `<g class="linha-barra acol" data-i="${i}">
               <rect class="fundo-hover" x="-6" y="${y-1}" width="${W+12}" height="${rowH+2}" rx="8"/>
               <text x="0" y="${y+rowH/2+4}" font-size="12" fill="var(--text-secondary)">${esc(cortarTexto(d.nome, labelW, 12))}</text>
               <rect x="${barX}" y="${y+7}" width="${wp.toFixed(1)}" height="20" rx="6" fill="var(--surface-sunken)" stroke="var(--border-strong)"/>
               ${wr > 0 ? `<rect class="barra-h" style="--i:${i}" x="${barX}" y="${y+11}" width="${wr.toFixed(1)}" height="12" rx="4" fill="${corAder(d.pct)}"/>` : ""}
-              <text x="${W}" y="${y+rowH/2+4}" text-anchor="end" font-size="12" font-weight="650" class="num" fill="${corAder(d.pct)}">${Math.round(d.pct)}%</text>
+              ${xh != null ? `<line x1="${xh.toFixed(1)}" y1="${y+4}" x2="${xh.toFixed(1)}" y2="${y+30}" stroke="var(--text-secondary)" stroke-width="2" stroke-linecap="round"/>` : ""}
+              <text x="${W}" y="${y+rowH/2+4}" text-anchor="end" font-size="12" font-weight="650" class="num" fill="${corAder(d.pct)}">${pctTxt(d.pct)}</text>
             </g>`;
           }).join("")}
         </svg>`;
@@ -3557,7 +3706,8 @@ const STATUS_LAUDO = [
       holder.querySelectorAll(".acol").forEach(g=>{
         const d = dados[+g.dataset.i];
         g.addEventListener("mousemove", e=> attachTip(holder,
-          `<b>${esc(d.nome)}</b><br>Planejado ${fmt(d.plan)} km<br>Realizado ${fmt(d.real)} km<br>Aderência ${fmt1(d.pct)}%`, e));
+          `<b>${esc(d.nome)}</b><br>Planejado ${fmt(d.plan)} km` + (d.hoje != null ? ` · até hoje ${fmt(d.hoje)} km` : "") +
+          `<br>Realizado ${fmt(d.real)} km<br>Aderência ${d.pct == null ? "— (sem programação até hoje)" : fmt1(d.pct) + "%" + (d.hoje != null ? " até hoje" : "")}`, e));
         g.addEventListener("mouseleave", ()=> clearTip(holder));
       });
     });
@@ -3575,7 +3725,8 @@ const STATUS_LAUDO = [
         <text x="46" y="52" text-anchor="middle" font-size="17" font-weight="700" class="num" fill="var(--text-primary)">${semValor ? "—" : Math.round(p.pct)+"%"}</text>
       </svg>
       <div class="proc-name">${esc(p.nome)}</div>
-      <div class="proc-sub num">${semValor ? "sem programação no período" : `${fmt(p.realizado)} de ${fmt(p.planejado)} km`}</div>
+      <div class="proc-sub num">${semValor ? (window.PLANO && window.PLANO.comHoje ? "sem programação até hoje" : "sem programação no período")
+        : `${fmt(p.realizado)} de ${fmt(p.planejado)} km${window.PLANO && window.PLANO.comHoje ? " planejados até hoje" : ""}`}</div>
     </div>`;
   }).join("");
 })();
@@ -3721,92 +3872,158 @@ function renderGantt(){
   const holder = document.getElementById("gantt-chart");
   if(!holder) return;
   const legend = document.getElementById("status-legend");
-  const HOURS = 24;
-
-  // calculado uma vez: redimensionar redesenha os mesmos segmentos
-  const segsPorMaq = MAQUINAS.map(m=>{
-    // Máquina com segmentos reais carregados (último dia com apontamento).
-    const real = GANTT_POR_MAQUINA && GANTT_POR_MAQUINA.get(m.id);
-    if(real && real.length) return real;
-    // Com dado real, máquina sem apontamento no dia fica com a linha vazia.
-    // O sorteio abaixo só vale no modo de referência (sem Supabase).
-    if(USANDO_DADOS_REAIS) return [];
-    const segs = [];
-    let t = 0, guard = 0;
-    while(t < HOURS && guard++ < 60){
-      const produzindo = Math.random()*100 < m.tmr;
-      const st = produzindo ? STATUS_APONTAMENTO[0] : STATUS_APONTAMENTO[1 + Math.floor(Math.random()*(STATUS_APONTAMENTO.length-1))];
-      const dur = produzindo ? 1.2 + Math.random()*3.4 : 0.4 + Math.random()*1.3;
-      const end = Math.min(HOURS, t+dur);
-      segs.push({ st, nome: st.nome, ini:t, fim:end });
-      t = end;
-    }
-    return segs;
-  });
-  const corSeg = s => s.cor || statusColor(s.st);
-  const hh = h => String(Math.floor(h)).padStart(2,"0")+":"+String(Math.round((h%1)*60)).padStart(2,"0");
-
-  montarGrafico(holder, (W, animar)=>{
-    const rowH = 26, gap = 6, padL = W < 520 ? 70 : 96, padB = 26;
-    const H = MAQUINAS.length*(rowH+gap) + padB;
-    const plotW = W - padL - 4;
-    const passo = [2,3,4,6,12].find(s => plotW/HOURS*s >= 54) || 12;
-
-    let grid = "";
-    for(let h=0; h<=HOURS; h+=passo){
-      const x = padL + (h/HOURS)*plotW;
-      grid += `<line x1="${x}" y1="0" x2="${x}" y2="${H-padB}" stroke="var(--border)" stroke-width="1"/>`;
-      // A última marca cai na borda do gráfico: centralizada ela sai cortada.
-      const anchor = h === 0 ? "start" : h === HOURS ? "end" : "middle";
-      grid += `<text x="${x}" y="${H-8}" text-anchor="${anchor}" class="eixo">${String(h%24).padStart(2,"0")}:00</text>`;
-    }
-    const linhas = MAQUINAS.map((m,i)=>{
-      const y = i*(rowH+gap);
-      const segs = segsPorMaq[i].map((s,si)=>{
-        const x = padL + (s.ini/HOURS)*plotW;
-        const w = Math.max(1.5, ((s.fim-s.ini)/HOURS)*plotW);
-        return `<rect class="gseg barra-h" style="--i:${i}" data-m="${i}" data-s="${si}" x="${x.toFixed(1)}" y="${y+4}" width="${w.toFixed(1)}" height="${rowH-8}" rx="3" fill="${corSeg(s)}"/>`;
-      }).join("");
-      return `<g>
-        <text x="0" y="${y+rowH/2+4}" font-size="12" font-weight="600" fill="var(--text-secondary)">${esc(cortarTexto(m.nome, padL-10, 12, 600))}</text>
-        <rect x="${padL}" y="${y+4}" width="${plotW}" height="${rowH-8}" rx="3" fill="var(--surface-sunken)"/>
-        ${segs || `<text x="${padL+8}" y="${y+rowH/2+4}" font-size="11.5" fill="var(--text-muted)">sem apontamento</text>`}
-      </g>`;
-    }).join("");
-    const comApont = segsPorMaq.filter(s=>s.length).length;
-    holder.innerHTML = `<svg class="${animar ? "anima" : ""}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img"
-      aria-label="${esc(`Linha do tempo de apontamentos: ${comApont} de ${MAQUINAS.length} máquinas com apontamento no dia`)}">
-      <style>.gseg{ cursor:default; } .gseg:hover{ filter:brightness(1.15); }</style>
-      ${grid}${linhas}
-    </svg>`;
-    holder.querySelectorAll(".gseg").forEach(r=>{
-      const m = MAQUINAS[+r.dataset.m];
-      const s = segsPorMaq[+r.dataset.m][+r.dataset.s];
-      r.addEventListener("mousemove", e=> attachTip(holder,
-        `<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:2px;background:${corSeg(s)};display:inline-block;"></span>${esc(s.nome)}</span>` +
-        (s.classeNome && s.classeNome !== s.nome ? ` <span style="color:var(--text-muted)">· ${esc(s.classeNome)}</span>` : "") +
-        `<br>${hh(s.ini)} → ${hh(s.fim)} · ${fmt1(s.fim-s.ini)} h`, e));
-      r.addEventListener("mouseleave", ()=> clearTip(holder));
-    });
-  });
-
-  if(legend){
-    // Legenda = as classes que aparecem no dia, na ordem fixa das classes.
-    const presentes = new Set(segsPorMaq.flat().map(s=>s.classe).filter(Boolean));
-    const itens = GANTT_POR_MAQUINA
-      ? ORDEM_CLASSES.filter(c=>presentes.has(c)).map(c=>({ nome:CLASSES_PARADA[c].nome, cor:CLASSES_PARADA[c].cor }))
-      : STATUS_APONTAMENTO.map(s=>({ nome:s.nome, cor:statusColor(s) }));
-    legend.innerHTML = itens.map(it=>
-      `<span class="legend-item" style="cursor:default;"><span class="legend-dot" style="background:${it.cor}"></span>${esc(it.nome)}</span>`
-    ).join("");
-  }
-
   const sub = document.getElementById("gantt-panel-sub");
-  if(sub){
-    sub.textContent = GANTT_POR_MAQUINA
-      ? "Ocupação das máquinas no último dia com apontamento carregado · passe o mouse para ver o motivo"
-      : "Ocupação das máquinas nas últimas 24 h · passe o mouse para ver o motivo";
+  const seletor = document.getElementById("tempo-dias");
+  const HOURS = 24;
+  const corSeg = s => s.cor || statusColor(s.st);
+  // hora no eixo: 0 = 06:00 do dia de produção
+  const rotuloHora = h => String((INICIO_DIA_PRODUCAO + h) % 24).padStart(2,"0") + ":00";
+  const hh = h => { const m = Math.round(((INICIO_DIA_PRODUCAO + h) % 24) * 60); return String(Math.floor(m/60) % 24).padStart(2,"0")+":"+String(m%60).padStart(2,"0"); };
+
+  function desenhar(segsPorMaq, iso){
+    const inicio = iso ? inicioDoDia(iso) : null;
+    const agoraH = inicio ? (Date.now() - inicio)/3600000 : null;
+    const comAgora = agoraH != null && agoraH > 0 && agoraH < HOURS;
+    const quando = d => inicio && mesmoDiaQue(d, inicio) ? fmtHM(d) : fmtDMHM(d);
+    montarGrafico(holder, (W, animar)=>{
+      const rowH = 26, gap = 6, padL = W < 520 ? 70 : 96, padB = 26;
+      const H = MAQUINAS.length*(rowH+gap) + padB;
+      const plotW = W - padL - 4;
+      const xDe = h => padL + (h/HOURS)*plotW;
+      const passo = [2,3,4,6,12].find(s => plotW/HOURS*s >= 54) || 12;
+      const meiaNoite = 24 - INICIO_DIA_PRODUCAO;
+
+      let grid = "";
+      for(let h=0; h<=HOURS; h+=passo){
+        const x = xDe(h);
+        grid += `<line x1="${x}" y1="0" x2="${x}" y2="${H-padB}" stroke="var(--border)" stroke-width="1"/>`;
+        // a hora colada no rótulo "agora" sai (os dois se sobreporiam)
+        if(comAgora && Math.abs(x - xDe(agoraH)) < 40) continue;
+        // A última marca cai na borda do gráfico: centralizada ela sai cortada.
+        const anchor = h === 0 ? "start" : h === HOURS ? "end" : "middle";
+        grid += `<text x="${x}" y="${H-8}" text-anchor="${anchor}" class="eixo">${rotuloHora(h)}</text>`;
+      }
+      // virada do dia do calendário (o turno da noite ainda é deste dia de produção)
+      grid += `<line x1="${xDe(meiaNoite)}" y1="0" x2="${xDe(meiaNoite)}" y2="${H-padB}" stroke="var(--border-strong)" stroke-width="1" stroke-dasharray="3 4"/>`;
+      const linhas = MAQUINAS.map((m,i)=>{
+        const y = i*(rowH+gap);
+        const segs = segsPorMaq[i].map((s,si)=>{
+          const x = xDe(s.ini);
+          const w = Math.max(1.5, ((s.fim-s.ini)/HOURS)*plotW);
+          return `<rect class="gseg barra-h" style="--i:${i}" data-m="${i}" data-s="${si}" x="${x.toFixed(1)}" y="${y+4}" width="${w.toFixed(1)}" height="${rowH-8}" rx="3" fill="${corSeg(s)}"/>`;
+        }).join("");
+        return `<g>
+          <text x="0" y="${y+rowH/2+4}" font-size="12" font-weight="600" fill="var(--text-secondary)">${esc(cortarTexto(m.nome, padL-10, 12, 600))}</text>
+          <rect x="${padL}" y="${y+4}" width="${plotW}" height="${rowH-8}" rx="3" fill="var(--surface-sunken)"/>
+          ${segs || `<text x="${padL+8}" y="${y+rowH/2+4}" font-size="11.5" fill="var(--text-muted)">sem apontamento</text>`}
+        </g>`;
+      }).join("");
+      const agora = comAgora ? (()=>{
+        const x = xDe(agoraH), anchor = agoraH > HOURS - 1.5 ? "end" : "middle";
+        return `<line x1="${x.toFixed(1)}" y1="0" x2="${x.toFixed(1)}" y2="${H-padB}" stroke="var(--accent)" stroke-width="2" stroke-linecap="round"/>
+          <text x="${x.toFixed(1)}" y="${H-8}" text-anchor="${anchor}" class="eixo" font-weight="700" fill="var(--accent)">agora</text>`;
+      })() : "";
+      const comApont = segsPorMaq.filter(s=>s.length).length;
+      const qual = iso ? `dia de produção ${fmtDM(dataLocal(iso))}` : "dia";
+      holder.innerHTML = `<svg class="${animar ? "anima" : ""}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img"
+        aria-label="${esc(`Linha do tempo de apontamentos, ${qual}: ${comApont} de ${MAQUINAS.length} máquinas com apontamento`)}">
+        <style>.gseg{ cursor:default; } .gseg:hover{ filter:brightness(1.15); }</style>
+        ${grid}${linhas}${agora}
+      </svg>`;
+      holder.querySelectorAll(".gseg").forEach(r=>{
+        const m = MAQUINAS[+r.dataset.m];
+        const s = segsPorMaq[+r.dataset.m][+r.dataset.s];
+        // horário real do evento (o que vem do dia anterior aparece com a data)
+        const horario = s.de ? `${quando(s.de)} → ${quando(s.ate)} · ${fmt1((s.ate - s.de)/3600000)} h`
+                             : `${hh(s.ini)} → ${hh(s.fim)} · ${fmt1(s.fim-s.ini)} h`;
+        r.addEventListener("mousemove", e=> attachTip(holder,
+          `<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:2px;background:${corSeg(s)};display:inline-block;"></span>${esc(s.nome)}</span>` +
+          (s.classeNome && s.classeNome !== s.nome ? ` <span style="color:var(--text-muted)">· ${esc(s.classeNome)}</span>` : "") +
+          `<br>${horario}` + (s.op ? `<br>OP ${esc(s.op)}` : ""), e));
+        r.addEventListener("mouseleave", ()=> clearTip(holder));
+      });
+    });
+    holder.classList.remove("carregando");
+
+    if(legend){
+      // Legenda = as classes que aparecem no dia, na ordem fixa das classes.
+      const presentes = new Set(segsPorMaq.flat().map(s=>s.classe).filter(Boolean));
+      const itens = USANDO_DADOS_REAIS
+        ? ORDEM_CLASSES.filter(c=>presentes.has(c)).map(c=>({ nome:CLASSES_PARADA[c].nome, cor:CLASSES_PARADA[c].cor }))
+        : STATUS_APONTAMENTO.map(s=>({ nome:s.nome, cor:statusColor(s) }));
+      legend.innerHTML = itens.map(it=>
+        `<span class="legend-item" style="cursor:default;"><span class="legend-dot" style="background:${it.cor}"></span>${esc(it.nome)}</span>`
+      ).join("");
+    }
+    if(sub){
+      if(!iso) sub.textContent = "Ocupação das máquinas num dia de produção (06:00 às 06:00) · pré-visualização com dados sorteados";
+      else{
+        const d = dataLocal(iso), seguinte = addDaysGlobal(d, 1);
+        sub.textContent = comAgora
+          ? `Hoje, dia de produção em andamento: das 06:00 de ${fmtDM(d)} até agora · passe o mouse para ver o motivo e a OP`
+          : `Dia de produção ${DIAS_SEMANA[d.getDay()]} ${fmtDM(d)}: das 06:00 às 06:00 de ${fmtDM(seguinte)} · passe o mouse para ver o motivo e a OP`;
+      }
+    }
   }
+
+  // Pré-visualização (sem Supabase): segmentos sorteados.
+  if(!USANDO_DADOS_REAIS){
+    if(seletor) seletor.hidden = true;
+    desenhar(MAQUINAS.map(m=>{
+      const segs = [];
+      let t = 0, guard = 0;
+      while(t < HOURS && guard++ < 60){
+        const produzindo = Math.random()*100 < m.tmr;
+        const st = produzindo ? STATUS_APONTAMENTO[0] : STATUS_APONTAMENTO[1 + Math.floor(Math.random()*(STATUS_APONTAMENTO.length-1))];
+        const dur = produzindo ? 1.2 + Math.random()*3.4 : 0.4 + Math.random()*1.3;
+        const end = Math.min(HOURS, t+dur);
+        segs.push({ st, nome: st.nome, ini:t, fim:end });
+        t = end;
+      }
+      return segs;
+    }), null);
+    return;
+  }
+
+  if(!LINHA_TEMPO.dias.length){
+    if(seletor) seletor.hidden = true;
+    if(legend) legend.innerHTML = "";
+    semDados(holder, "Sem apontamentos publicados para a linha do tempo.");
+    return;
+  }
+
+  // Um dia por vez; trocar de dia redesenha com a mesma animação.
+  let pedido = 0;
+  async function mostrar(iso){
+    const meu = ++pedido;
+    if(!holder.querySelector("svg")) holder.innerHTML = `<div class="empty-state">Carregando a linha do tempo…</div>`;
+    else holder.classList.add("carregando");
+    let porMaquina;
+    try{ porMaquina = await eventosDoDia(iso); }
+    catch(err){
+      if(meu !== pedido) return;
+      console.error(`Falha ao carregar a linha do tempo de ${iso}:`, err);
+      holder.classList.remove("carregando");
+      if(legend) legend.innerHTML = "";
+      semDados(holder, BANCO_MSG.erro);
+      return;
+    }
+    if(meu !== pedido) return;   // trocou de dia enquanto carregava
+    desenhar(MAQUINAS.map(m=> porMaquina.get(m.id) || []), iso);
+  }
+
+  if(!LINHA_TEMPO.dia || !LINHA_TEMPO.dias.includes(LINHA_TEMPO.dia)) LINHA_TEMPO.dia = diaPadraoLinhaTempo();
+  // os últimos 7 dias, do mais antigo ao mais novo (como uma linha do tempo)
+  const ultimos = LINHA_TEMPO.dias.slice(-7);
+  if(!ultimos.includes(LINHA_TEMPO.dia)) ultimos.push(LINHA_TEMPO.dia);
+  if(seletor){
+    seletor.hidden = ultimos.length < 2;
+    if(ultimos.length >= 2) segmentado(seletor, ultimos.map(iso=>[iso, rotuloDiaProducao(iso)]), LINHA_TEMPO.dia, iso=>{
+      LINHA_TEMPO.dia = iso;
+      mostrar(iso);
+    });
+  }
+  mostrar(LINHA_TEMPO.dia);
 }
 renderGantt();
 // Só o modo de referência tem cores fixas por tema; com dado real as cores
@@ -4491,7 +4708,8 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     const tot = window.HUB_TOTAIS;
     const l = MAQUINAS.filter(m=>m.aderencia != null && m.planKm > 0).sort((a,b)=>a.aderencia - b.aderencia);
     let s = `Aderência ao plano ${per}: ${b(pct1(aderMedia))}${comparado(comp)}` +
-      (tot ? `, ${fmt(tot.realKm)} de ${fmt(tot.planKm)} km planejados` : "") + ".";
+      (tot && tot.planHojeKm != null ? `, ${fmt(tot.realKm)} km realizados de ${fmt(tot.planHojeKm)} km planejados até hoje (${fmt(tot.planKm)} km no período)`
+       : tot ? `, ${fmt(tot.realKm)} de ${fmt(tot.planKm)} km planejados` : "") + ".";
     if(l.length) s += ` Menor: ${b(esc(l[0].nome))} com ${fmt(l[0].aderencia)}%.`;
     return s + " Mais na tela Aderência.";
   }
@@ -4722,7 +4940,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
 const footerNote = document.getElementById("footer-note");
 if(footerNote){
   footerNote.innerHTML = USANDO_DADOS_REAIS
-    ? `Painel interno de Produção &middot; Gualapack Jaguariúna &middot; os números vêm do banco da fábrica (Metrics), lido pelo data hub; a apara confirmada (balança) e a aderência diária ainda vêm das planilhas do PCP.`
+    ? `Painel interno de Produção &middot; Gualapack Jaguariúna &middot; os números vêm do banco da fábrica (Metrics), lido pelo data hub; a apara confirmada (balança) e o planejado da aderência ainda vêm das planilhas do PCP.`
     : `Painel interno de Produção &middot; Gualapack Jaguariúna &middot; pré-visualização local com valores de referência (sem Supabase configurado).`;
 }
 

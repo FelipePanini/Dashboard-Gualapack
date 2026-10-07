@@ -22,6 +22,7 @@ tempo, sem observação nem operador.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import math
 import re
@@ -203,6 +204,47 @@ def ultimo_dia(con: duckdb.DuckDBPyConnection) -> list[dict]:
            order by 1, 3""").fetchall()]
 
 
+# Linha do tempo: os eventos de cada um dos últimos dias de produção. O dia de
+# produção vai das 06:00 às 06:00 do dia seguinte (o turno da noite, de 00h às
+# 06h, ainda é do dia anterior no banco). Entra no dia todo evento que toca essa
+# janela, até o que começou no dia anterior e seguia aberto (fica nos dois).
+DIAS_LINHA_DO_TEMPO = 14
+INICIO_DIA_PRODUCAO = 6
+
+
+def eventos_por_dia(con: duckdb.DuckDBPyConnection) -> dict[date, list[dict]]:
+    """{dia de produção: eventos}, dos últimos DIAS_LINHA_DO_TEMPO dias com
+    apontamento. Evento em andamento vai até o dado mais novo; registro
+    instantâneo (fim = início) fica de fora, como no ultimo_dia."""
+    if not tabela_existe(con, "raw.banco__apontamentos"):
+        return {}
+    linhas = con.execute(
+        f"""with a as (select * from raw.banco__apontamentos
+                        where cod_recurso is not null and hora_inicio > timestamp '2000-01-01'
+                          and hora_inicio < current_date + interval 2 day),
+                ref as (select max(dt_inclusao) filter (where dt_inclusao < current_date + interval 2 day) as agora from a),
+                dias as (select distinct cast(dt_producao as date) as dia from a
+                         where dt_producao < current_date + interval 2 day order by 1 desc limit {DIAS_LINHA_DO_TEMPO}),
+                ev as (select upper(trim(cod_recurso)) as maquina, {_COD} as cod_apont, hora_inicio,
+                              case when hora_fim is null or hora_fim < timestamp '1901-01-01'
+                                   then greatest(ref.agora, hora_inicio) else hora_fim end as hora_fim,
+                              nullif(trim(num_ordem), '') as num_ordem
+                       from a, ref
+                       where (hora_fim is null or hora_fim < timestamp '1901-01-01' or hora_fim > hora_inicio)
+                         and cast(a.dt_producao as date) >= (select min(dia) from dias) - 3)
+           select d.dia, ev.maquina, ev.cod_apont, ev.hora_inicio, ev.hora_fim, ev.num_ordem
+           from dias d join ev
+             on ev.hora_inicio < d.dia + interval {24 + INICIO_DIA_PRODUCAO} hour
+            and ev.hora_fim > d.dia + interval {INICIO_DIA_PRODUCAO} hour
+           order by 1, 2, 4, 5""").fetchall()
+    dias: dict[date, list[dict]] = {}
+    for dia, maquina, cod, ini, fim, op in linhas:
+        dias.setdefault(dia, []).append({"dia": dia.isoformat(), "maquina": maquina, "cod_apont": cod,
+                                         "hora_inicio": _hora_fabrica(ini), "hora_fim": _hora_fabrica(fim),
+                                         "num_ordem": op})
+    return dias
+
+
 # Séries por dia que o painel soma no período escolhido (002_cartoes.sql).
 # Cada uma: tabela de onde sai e a consulta das linhas, com as colunas da
 # tabela trusted de mesmo nome. Vão um mês por vez, e só o mês que mudou.
@@ -247,10 +289,17 @@ CONJUNTOS: dict[str, tuple[str, str]] = {
     # faturamento de produto acabado (kg = m² × gramatura ÷ 1000)
     "faturamento_dia": ("clean.faturamento_dia", """
         select dia, cliente, notas, itens, round(m2, 3) as m2, round(kg, 3) as kg from clean.faturamento_dia"""),
+    # --- 006_tempo_aderencia.sql ---
+    # planejado x realizado por máquina, como a página Ad. Plan Mensal do BI
+    "plano_dia": ("clean.plano_dia", """
+        select dia, maquina, round(planejado, 3) as planejado, round(realizado, 3) as realizado
+        from clean.plano_dia"""),
 }
 # Conjuntos que só existem a partir do 005_banco.sql: sem ele, o Supabase não
 # conhece o conjunto e eles ficam de fora, com um aviso (o resto publica normal).
 CONJUNTOS_005 = {"entrega_dia", "setup_dia", "laudo_dia", "faturamento_dia"}
+# ... e a partir do 006_tempo_aderencia.sql (o evento_dia vai um dia por vez)
+CONJUNTOS_006 = {"plano_dia", "evento_dia"}
 
 # Fotos do estado atual: vão inteiras no pacote, a cada publicação (005_banco.sql).
 FOTOS: dict[str, tuple[str, str]] = {
@@ -291,15 +340,23 @@ def linhas_do_mes(con: duckdb.DuckDBPyConnection, conjunto: str, mes: date) -> l
 def apara_mes(con: duckdb.DuckDBPyConnection) -> list[dict]:
     """Série mensal do gráfico de apara: refugo e peso bruto das REBs
     (BASE_PROD) e scrap da balança (Refugo Aparas). O painel faz as contas
-    do BI com isso (v_hub_apara_mensal)."""
+    do BI com isso (v_hub_apara_mensal).
+
+    producao_conf: a produção que vai na conta da apara confirmada, a VOLUME
+    JGR da própria Refugo Aparas, que vai só até o último dia pesado. No mês
+    aberto o peso bruto do banco já tem o dia de hoje, sem fardo pesado ainda:
+    em 07/10 às 09h dava 13,0% contra 13,9% da planilha. Só no mês aberto: nos
+    fechados vale o peso bruto do banco, que é o do BI (em jan–mar/2026 a VOLUME
+    JGR da planilha é outra, 303 t contra 360 t em janeiro)."""
     return [{"mes": r[0].isoformat(), "refugo": _num(r[1]), "peso_bruto_rebs": _num(r[2]),
-             "scrap_total": _num(r[3])} for r in con.execute(
+             "scrap_total": _num(r[3]), "producao_conf": _num(r[4])} for r in con.execute(
         """with b as (
              select date_trunc('month', dia)::date as mes, sum(refugo) as refugo,
                     sum(peso_bruto) filter (where maquina_real in ('REB 01', 'REB 04', 'REB 05', 'REB 09', 'REB 10'))
                       as pb_rebs
              from clean.base_prod group by 1)
-           select coalesce(b.mes, c.mes), b.refugo, b.pb_rebs, c.scrap_total
+           select coalesce(b.mes, c.mes), b.refugo, b.pb_rebs, c.scrap_total,
+                  case when c.mes = date_trunc('month', current_date) then c.volume_jgr end
            from b full join clean.apara_confirmada_mes c on c.mes = b.mes
            order by 1""").fetchall()]
 
@@ -352,7 +409,7 @@ def publicar(con: duckdb.DuckDBPyConnection, run_id: int, cfg: dict, republicar:
     if republicar:
         con.execute("delete from publicacao_mes")
     ja_foi = {(c, m): a for c, m, a in con.execute("select conjunto, mes, assinatura from publicacao_mes").fetchall()}
-    enviados, sem_005 = {}, []
+    enviados, sem_005, sem_006 = {}, [], []
     for conjunto in CONJUNTOS:
         for mes, assinatura in sorted(assinaturas(con, conjunto).items()):
             if ja_foi.get((conjunto, mes)) == assinatura:
@@ -362,9 +419,9 @@ def publicar(con: duckdb.DuckDBPyConnection, run_id: int, cfg: dict, republicar:
                 resposta = enviar({"conjunto": conjunto, "de": mes.isoformat(), "ate": _fim_do_mes(mes).isoformat(),
                                    "linhas": linhas})
             except PublicacaoFalhou as e:
-                if conjunto in CONJUNTOS_005 and "conjunto desconhecido" in str(e):
-                    sem_005.append(conjunto)
-                    break  # o Supabase ainda não tem o 005: os outros meses deste conjunto também não entram
+                if conjunto in CONJUNTOS_005 | CONJUNTOS_006 and "conjunto desconhecido" in str(e):
+                    (sem_005 if conjunto in CONJUNTOS_005 else sem_006).append(conjunto)
+                    break  # o Supabase ainda não tem o SQL: os outros meses deste conjunto também não entram
                 raise
             if resposta.get("linhas") != len(linhas):
                 raise PublicacaoFalhou(f"o Supabase não gravou '{conjunto}' ({resposta}): falta rodar "
@@ -374,7 +431,34 @@ def publicar(con: duckdb.DuckDBPyConnection, run_id: int, cfg: dict, republicar:
                                                                      publicado_em = excluded.publicado_em""",
                         [conjunto, mes, assinatura])
             enviados[conjunto] = enviados.get(conjunto, 0) + 1
-    series = ", ".join(f"{c} {n} mês(es)" for c, n in enviados.items()) or "nenhuma série mudou"
+
+    # Linha do tempo: um dia de produção por chamada, só o dia que mudou (o de
+    # hoje muda a cada rodada; os anteriores, quase nunca).
+    dias_enviados = 0
+    for dia, linhas in sorted(eventos_por_dia(con).items()):
+        assinatura = hashlib.md5(json.dumps(linhas, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+        if ja_foi.get(("evento_dia", dia)) == assinatura:
+            continue
+        try:
+            resposta = enviar({"conjunto": "evento_dia", "de": dia.isoformat(), "ate": dia.isoformat(), "linhas": linhas})
+        except PublicacaoFalhou as e:
+            if "conjunto desconhecido" in str(e):
+                sem_006.append("evento_dia")
+                break
+            raise
+        if resposta.get("linhas") != len(linhas):
+            raise PublicacaoFalhou(f"o Supabase não gravou os eventos de {dia} ({resposta})")
+        con.execute("""insert into publicacao_mes values (?, ?, ?, current_timestamp)
+                       on conflict (conjunto, mes) do update set assinatura = excluded.assinatura,
+                                                                 publicado_em = excluded.publicado_em""",
+                    ["evento_dia", dia, assinatura])
+        dias_enviados += 1
+
+    series = ", ".join(f"{c} {n} mês(es)" for c, n in enviados.items())
+    if dias_enviados:
+        series = (series + ", " if series else "") + f"linha do tempo {dias_enviados} dia(s)"
+    series = series or "nenhuma série mudou"
     falta = (f"; sem o 005_banco.sql no Supabase, ficaram de fora: {', '.join(sem_005)}" if sem_005 else "")
+    falta += (f"; sem o 006_tempo_aderencia.sql no Supabase, ficaram de fora: {', '.join(sem_006)}" if sem_006 else "")
     return (f"publicado: {len(pacote['validacao'])} validações, {len(pacote['fontes'])} fontes, "
             f"{len(pacote['avisos'])} avisos, {len(pacote.get('ultimo_dia', []))} eventos do último dia; {series}{falta}")

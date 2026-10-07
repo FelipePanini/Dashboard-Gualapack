@@ -205,6 +205,9 @@ def ler_fonte(fonte: dict, caminho, motor: str = "calamine") -> pl.DataFrame:
     excluir = [c for c in fonte.get("colunas_excluir", []) if c in df.columns]
     if excluir:
         df = df.drop(excluir)
+    # "colunas": só essas ficam (planilha larga em que o hub usa poucas colunas)
+    if fonte.get("colunas"):
+        df = df.select([c for c in fonte["colunas"] if c in df.columns])
     _checar_colunas(fonte, df)
     minimo = fonte.get("linhas_minimas", 1)
     if df.height < minimo:

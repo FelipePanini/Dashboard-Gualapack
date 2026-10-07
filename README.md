@@ -22,7 +22,7 @@ com login; cadastro só com chave de convite).
 ```
 SQL Server da fábrica (banco Metrics)      planilhas de lançamento manual (PCP)
         │  só leitura (SELECT)                      │  fardos, acumulado, refugo aparas
-        │                                           │  e aderência diária
+        │                                           │  e histórico da programação (aderência)
         ▼                                           ▼
 Data hub (hub/) — Python + DuckDB num PC da rede da fábrica, a cada 10 min
         │  limpa, aplica as regras dos BIs, confere e publica só o resumo
@@ -55,8 +55,9 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
    planilhas e os BIs leem: os números batem com o BI e não dependem de
    alguém atualizar uma planilha. Ficam em planilha só os lançamentos que não
    existem no banco: sequenciamento dos fardos, acumulado e refugo aparas (a
-   apara confirmada na balança) e a aderência diária (o banco guarda só a
-   programação atual; o hub passou a guardar uma foto por dia dela).
+   apara confirmada na balança) e o planejado da aderência (a Histórico
+   Aderência Programação do PCP: o banco guarda só a programação atual; o hub
+   passou a guardar uma foto por dia dela).
 
 2. **O peso fica no PC, o Supabase recebe o resumo.** O hub guarda as
    extrações em arquivos locais e calcula tudo num DuckDB. Pro Supabase vão
@@ -76,8 +77,8 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 
 5. **Resumo, não eventos, no Supabase.** O plano gratuito tem 500 MB, e
    vários anos de eventos de máquina estouraram esse limite uma vez. Por isso
-   o Supabase recebe séries somadas por dia, e só o último dia vai evento a
-   evento (linha do tempo).
+   o Supabase recebe séries somadas por dia, e só os últimos 14 dias de
+   produção vão evento a evento (linha do tempo), um dia por vez.
 
 6. **Cada mês substitui o que gravou antes, nunca por vazio.** O hub relê os
    meses recentes a cada execução e só regrava um mês quando o dado muda. Mês
@@ -117,12 +118,13 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 | No painel | No banco (Metrics) ou planilha | Regra |
 |---|---|---|
 | Agora: o que cada máquina está fazendo | `View_usr_apontamentos_999999` (evento em andamento) + `CTREntradasMaquina` (OP aberta) | classe pela classificação oficial; velocidade real = metros ÷ horas produzindo da OP; programada e término previsto da OP |
-| TMR, horas, paradas, linha do tempo | `View_usr_apontamentos_999999` | produzindo ÷ horas sem FIM TURNO e INATIVIDADE (BI Indicadores Produção) |
+| TMR, horas, paradas | `View_usr_apontamentos_999999` | produzindo ÷ horas sem FIM TURNO e INATIVIDADE (BI Indicadores Produção) |
+| Linha do tempo | idem, evento a evento | um dia de produção por vez, das 06:00 às 06:00 do dia seguinte (o turno da noite ainda é do dia anterior); abre no último dia fechado, com os 7 dias mais recentes no seletor |
 | Perda por motivo e por máquina, OPs com mais refugo | idem, código 40 | kg apontados |
 | Apara apontada (comparação, sem meta), produção em kg | idem, consulta BASE_PROD | refugo ÷ (refugo + peso bruto das rebobinadeiras) |
-| Apara confirmada (a de referência; meta 12%) | planilhas Sequenciamento (fardos, acumulado) e Refugo Aparas | scrap ÷ (peso bruto das REBs + scrap); só por mês |
+| Apara confirmada (a de referência; meta 12%) | planilhas Sequenciamento (fardos, acumulado) e Refugo Aparas | scrap ÷ (peso bruto das REBs + scrap); só por mês. No mês em andamento, a produção é a dos dias já pesados (VOLUME JGR da Refugo Aparas), não a de até agora |
 | Produtividade (m²/h) e velocidade | apontamentos, código 20, + `EstrProcessos` (largura) | m² = metros × largura; ÷ horas produzindo |
-| Aderência ao plano | planilha ADERÊNCIA DIÁRIA (PCP) | produzido ÷ planejado |
+| Aderência ao plano | planilha Histórico Aderência Programação (PCP, aba PROGRAMAÇÃO) + apontamentos | como a página Ad. Plan Mensal do BI: planejado = QtdPlanejada pelo dia de início planejado; realizado = QtdProduzida sem WIP e sem revisão (km = metros ÷ 1000). No mês em andamento, o planejado é o do mês inteiro e a % compara com o planejado até hoje |
 | Entregas no prazo | `View_usr_Entregas_Desempenho` (a consulta da Aderência Semanal) | Ótimo: faturado até a data do cliente; Bom: até a do PCP; Regular, Ruim e Péssimo: até 5, 10 e mais de 10 dias depois da do PCP |
 | Fila de programação | `view_usr_ProgramacaoPlanner` | OPs alocadas e não finalizadas, na ordem do PCP |
 | Setup programado x real | `View_usr_Acompanhamento_Prod` | minutos programados x reais por OP |
@@ -144,7 +146,7 @@ página Qualidade dos dados.
    PC da fábrica): lê o banco, copia as planilhas manuais que mudaram na pasta
    compartilhada e publica o que mudou.
 2. **As planilhas manuais** (sequenciamento dos fardos, acumulado, refugo
-   aparas e aderência diária) continuam sendo atualizadas pelo time; o hub
+   aparas e histórico da programação) continuam sendo atualizadas pelo time; o hub
    pega a versão nova na rodada seguinte.
 3. **Conferir:** o selo no topo do painel mostra até quando vai o dado e fica
    âmbar quando passa de 2 dias; a tela Agora mostra a hora do apontamento
@@ -226,13 +228,20 @@ vale daqui pra frente em `demo/index.html`:
 
 ## Pendências e limitações conhecidas
 
-- **SQL do Supabase:** aplicados até o `hub/sql/supabase/005_banco.sql`
-  (07/10/2026). Num Supabase novo, rodar os 5 em ordem (`hub/README.md`). Sem
-  o 005, as telas do banco mostram "Sem dados" e o resto do painel funciona
-  igual.
-- **Aderência ainda de planilha.** O banco guarda só a programação atual.
-  Desde 05/10/2026 o hub guarda uma foto por dia da programação do PCP; com
-  algumas semanas de fotos dá pra calcular a aderência sem a planilha.
+- **SQL do Supabase:** 6 arquivos, de `001` a `006_tempo_aderencia.sql`;
+  num Supabase novo, rodar em ordem (`hub/README.md`). Sem o 005, as telas do
+  banco mostram "Sem dados". Sem o 006, a linha do tempo mostra só o dia mais
+  recente e a aderência fica na conta antiga (ADERÊNCIA DIÁRIA). O resto do
+  painel funciona igual.
+- **Planejado da aderência ainda de planilha.** O banco guarda só a
+  programação atual. Desde 05/10/2026 o hub guarda uma foto por dia da
+  programação do PCP; com algumas semanas de fotos dá pra calcular o
+  planejado sem a planilha.
+- **% Aderência do BI não reproduzida no mês em andamento.** O BI divide pelo
+  "Planejado teórico" (tabela Disponibilidade, não lida pelo hub). O painel
+  compara com o planejado até hoje, pelo dia de início planejado, e diz isso
+  no cartão. Meses fechados: planejado e realizado iguais ao BI (set/2026,
+  13 máquinas).
 - **Três planilhas manuais** (sequenciamento dos fardos, acumulado e refugo
   aparas) seguem como fonte da apara confirmada. Trocar por API ou agente:
   decisão pendente.
@@ -259,8 +268,6 @@ vale daqui pra frente em `demo/index.html`:
 - **Apara por classificação** mistura populações diferentes (o refugo vem de
   mais máquinas que o peso bruto). Aguardando uma fonte com classificação e
   peso na mesma linha.
-- **Unidade da aderência** (`qtd_planejada` / `qtd_produzida`) ainda não
-  confirmada. Por isso não está rotulada como km nem m.
 - **Upload manual desatualizado.** A tela `upload.html` e a função `ingest`
   são do fluxo anterior. Atualizar ou aposentar: decisão pendente.
 - **Oito views no banco sem uso pelo painel.** A lista está no topo de

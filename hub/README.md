@@ -197,13 +197,25 @@ jeitos:
   | Paradas | horas por código, fora PRODUZINDO | apontamentos (tabela Horas) |
   | Apara apontada | refugo ÷ (refugo + peso bruto das REBs) | apontamentos (BASE_PROD) |
   | Apara confirmada | scrap ÷ (peso bruto das REBs + scrap) | Refugo Aparas (planilha) + BASE_PROD |
-  | Aderência | produzido ÷ planejado (% Realizado Prog) | Aderência Semanal, ADERENCIA_BI (planilha) |
+  | Aderência | realizado ÷ planejado, km lineares (Ad. Plan Mensal) | Histórico Aderência Programação (planilha, aba PROGRAMAÇÃO) + apontamentos sem WIP e sem revisão (`sql/clean/210_plano.sql`, 006) |
   | Perda por motivo / máquina, OPs | kg de perda apontada (código 40) | apontamentos |
   | Apara por classificação | apontado por grupo de produto (Aparas_Geral v3) | BASE_PROD |
   | Produtividade | m² ÷ horas produzindo | apontamentos + largura da estrutura |
 
   A apara de referência é a **confirmada**, com meta de 12% (decisão do dono
-  em 07/10/2026); a apontada fica como comparação, sem meta.
+  em 07/10/2026); a apontada fica como comparação, sem meta. No mês em
+  andamento, a confirmada divide pela produção dos dias já pesados (VOLUME
+  JGR da Refugo Aparas), não pela de até agora: o peso bruto do banco já tem
+  o dia de hoje, sem fardo pesado ainda (em 07/10 às 09h: 13,0% contra 13,9%
+  da planilha). Nos meses fechados, as duas produções são iguais.
+
+  A aderência (006) é a da página Ad. Plan Mensal do BI: conferida em
+  set/2026, planejado e realizado iguais nas 13 máquinas (20.431 km
+  planejados, 17.604 km realizados). A REVISORA 01 fica de fora (planejado
+  sem realizado possível, e fora do gráfico do BI). No mês em andamento, o
+  planejado é o do mês inteiro, como o BI, e a % compara com o planejado até
+  hoje. Sem o 006, o painel segue com a conta antiga (produzido ÷ planejado da
+  ADERÊNCIA DIÁRIA, o "% Realizado Prog" da página Ad. Plan Diária).
 - **As telas que vêm direto do banco** (`sql/supabase/005_banco.sql`): fotos
   do estado atual que o painel lê inteiras (máquinas agora, fila de
   programação, WIP, carteira) e séries por dia somadas no período (entregas
@@ -214,17 +226,23 @@ jeitos:
   como no BI, não a média das máquinas. A regra do TMR foi escolhida pelo
   dono em 25/09 (o Gráficos Tendência usa outra; segue conferido à parte).
   Em ago/2026: TMR geral 42,7%, R18 50,7%, apontado 11,49%, confirmado
-  14,63%, aderência 76,0%, perda 45.116 kg — iguais ao BI. A linha do tempo
-  continua com os apontamentos do BI Dados de Produção. Sem o 002 aplicado,
-  o painel segue como era.
+  14,63%, aderência 76,0% (a conta antiga, % Realizado Prog), perda
+  45.116 kg — iguais ao BI. Sem o 002 aplicado, o painel segue como era.
+- **A linha do tempo** (006): os eventos de cada um dos últimos 14 dias de
+  produção (das 06:00 às 06:00 do dia seguinte; o turno da noite ainda é do
+  dia anterior no banco), um dia por publicação e só o dia que mudou. O
+  evento que vem do dia anterior aparece nos dois dias, cortado na janela. O
+  painel abre no último dia fechado e busca outro dia só quando ele é
+  escolhido.
 - **Página Qualidade dos dados** (`demo/qualidade.html`, ícone de prancheta
   no menu): placar por status, cada indicador mês a mês e recorte a recorte,
   o que corrigir nas planilhas, as fontes e os avisos.
 
 Só sai do PC o que é agregado: horas e metros por máquina/dia/código, peso
 bruto e refugo por OP/dia (com a descrição do produto), perda por
-OP/dia/tipo, programado × produzido por OP/dia, kg e m² por máquina/dia, os
-eventos do último dia (máquina, código, início, fim, OP), valores por mês e
+OP/dia/tipo, programado × produzido por OP/dia e planejado × realizado por
+máquina/dia, kg e m² por máquina/dia, os eventos dos últimos 14 dias
+(máquina, código, início, fim, OP), valores por mês e
 recorte, o catálogo de indicadores, o estado de cada fonte (sem caminho de
 arquivo) e os avisos (com os caminhos apagados). Das telas do banco: a
 atividade e a OP de cada máquina agora, a fila por máquina, o WIP somado por
@@ -268,6 +286,13 @@ Uma vez só, nesta ordem:
    laudos; já inclui a view do 7). Tem de mostrar `funcoes_ok = true`. Depois,
    aqui em `hub/`: `uv run hub publicar`. Sem o 005, o hub publica o resto
    normalmente e avisa o que ficou de fora.
+9. No **SQL Editor** → rodar `sql/supabase/006_tempo_aderencia.sql` (linha do
+   tempo por dia de produção, aderência do Ad. Plan Mensal e a apara
+   confirmada do mês em andamento). Tem de mostrar `funcoes_ok = true`. A
+   próxima rodada do hub publica o que faltava. Sem o 006, o hub publica o
+   resto e avisa o que ficou de fora. Precisa da fonte
+   `aderencia.programacao` no `config/fontes.local.yaml` (a Histórico
+   Aderência Programação, aba PROGRAMAÇÃO, só as 4 colunas usadas).
 
 Feitos: 1 a 3 em 25/09, 4 a 6 em 30/09, o 8 (que já faz o 7) em 07/10.
 
