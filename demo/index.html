@@ -11,6 +11,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="./supabase-config.js"></script>
 <script src="./assets/ui.js"></script>
+<script type="module" src="./assets/metal.js"></script>
 <style>
 /* Some vazio até a sessão ser confirmada — evita mostrar dados antes do login.
    O indicador de carregamento fica visível mesmo assim (visibility pode ser
@@ -328,6 +329,26 @@ h1,h2,h3{ font-family: inherit; letter-spacing: -0.015em; text-wrap: balance; }
 .brand-word .ink-accent{ color: var(--accent); }
 .brand-rule{ width:100%; height:1px; background: var(--border-strong); margin:5px 0 4px; }
 .brand-region{ font-size:10.5px; letter-spacing:.16em; color: var(--text-muted); text-transform:uppercase; }
+/* ---------- metal líquido (assets/metal.js): marca e assistente ---------- */
+.metal-palco{ position:relative; }
+.metal-camada{ position:absolute; pointer-events:none; }
+/* o texto continua na página (leitor de tela); some da vista só com o metal desenhado */
+.brand-word.metal-ativo > span:not(.metal-camada){ color: transparent; }
+.metal-anel{
+  position:absolute; inset:-5px; border-radius:50%; pointer-events:none;
+  -webkit-mask: radial-gradient(circle closest-side, transparent calc(100% - 5px), #000 calc(100% - 4.5px));
+          mask: radial-gradient(circle closest-side, transparent calc(100% - 5px), #000 calc(100% - 4.5px));
+}
+/* contorno fino, como cromo gravado: o brilho branco do cromo some no fundo claro
+   e as faixas escuras somem no escuro */
+.brand-word.metal-ativo .metal-camada{ filter: drop-shadow(0 0 .45px rgba(10,21,36,.6)) drop-shadow(0 1px .6px rgba(10,21,36,.16)); }
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .brand-word.metal-ativo .metal-camada{ filter: drop-shadow(0 0 .6px rgba(220,235,255,.75)); } }
+:root[data-theme="dark"] .brand-word.metal-ativo .metal-camada{ filter: drop-shadow(0 0 .6px rgba(220,235,255,.75)); }
+.rail-mark.metal-ativo{ background: linear-gradient(155deg, #2f78c4, #0c3868); }
+.rail-mark.metal-ativo .brandmark{ color: transparent; }
+.assistant-head-badge .metal-anel{ inset:-3px;
+  -webkit-mask: radial-gradient(circle closest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px));
+          mask: radial-gradient(circle closest-side, transparent calc(100% - 3px), #000 calc(100% - 2.5px)); }
 .topbar-divider{ width:1px; align-self:stretch; background:var(--border); }
 .topbar-right{ display:flex; align-items:center; gap:8px; flex:none; }
 .pill-select, .icon-btn{
@@ -600,7 +621,7 @@ svg.anima .anel{ animation: anel 1s var(--ease-out) backwards .1s; }
 .assistant-panel.open{ opacity:1; transform:none; pointer-events:auto; transition: opacity .18s var(--ease-out), transform .55s var(--spring); }
 .assistant-head{ padding:14px 16px; border-bottom:1px solid var(--glass-border); display:flex; align-items:center; gap:10px; }
 .assistant-head-badge{
-  width:28px; height:28px; border-radius:8px; background: var(--accent-soft); color: var(--accent);
+  position:relative; width:28px; height:28px; border-radius:50%; background: var(--accent-soft); color: var(--accent);
   display:flex; align-items:center; justify-content:center; flex:none;
 }
 .assistant-head-badge svg{ width:15px; height:15px; }
@@ -1007,7 +1028,7 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
 
 <div class="shell">
   <aside class="rail">
-    <div class="rail-mark"><span class="brandmark">G</span></div>
+    <div class="rail-mark" data-metal="g"><span class="brandmark">G</span></div>
     <nav class="rail-nav" aria-label="Telas do painel">
       <span class="rail-indicator" id="rail-indicator" aria-hidden="true"></span>
       <button class="rail-btn active" data-view="overview" title="Visão geral" aria-label="Visão geral" aria-current="page">
@@ -1058,7 +1079,7 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
     <header class="topbar">
       <div class="topbar-left">
         <div class="brand-lockup">
-          <div class="brand-word"><span class="ink-primary">Guala</span><span class="ink-accent">pack</span></div>
+          <div class="brand-word" data-metal="marca"><span class="ink-primary">Guala</span><span class="ink-accent">pack</span></div>
           <div class="brand-rule"></div>
           <div class="brand-region">Brasil</div>
         </div>
@@ -1555,6 +1576,7 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
   <div class="assistant-panel" id="assistant-panel" hidden>
     <div class="assistant-head">
       <div class="assistant-head-badge">
+        <span class="metal-anel" data-metal="anel" aria-hidden="true"></span>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a5 5 0 0 1 5 5v2a5 5 0 0 1-10 0V7a5 5 0 0 1 5-5Z"/><path d="M8 21h8M12 17v4"/><circle cx="9" cy="7" r=".6" fill="currentColor" stroke="none"/><circle cx="15" cy="7" r=".6" fill="currentColor" stroke="none"/></svg>
       </div>
       <div>
@@ -1574,6 +1596,7 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
     </div>
   </div>
   <button class="assistant-fab" id="assistant-fab" aria-label="Abrir assistente" aria-expanded="false" aria-controls="assistant-panel">
+    <span class="metal-anel" data-metal="anel" aria-hidden="true"></span>
     <svg class="icone-abrir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a5 5 0 0 1 5 5v2a5 5 0 0 1-10 0V7a5 5 0 0 1 5-5Z"/><path d="M8 21h8M12 17v4"/></svg>
     <svg class="icone-fechar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
   </button>

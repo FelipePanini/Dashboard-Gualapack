@@ -100,7 +100,7 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 
 | Caminho | O que é |
 |---|---|
-| [`demo/`](./demo/) | O site: `index.html` (painel), `login.html`, `admin.html` (convites), `qualidade.html` (validação publicada pelo hub), `upload.html` (upload manual, legado), `assets/ui.js` (menus e dicas no tema do painel). O nome `demo` ficou porque é o endereço já publicado. |
+| [`demo/`](./demo/) | O site: `index.html` (painel), `login.html`, `admin.html` (convites), `qualidade.html` (validação publicada pelo hub), `upload.html` (upload manual, legado), `assets/ui.js` (menus e dicas no tema do painel), `assets/metal.js` e `assets/metal-*.png` (metal líquido na marca e no assistente). O nome `demo` ficou porque é o endereço já publicado. |
 | [`backend/sql/`](./backend/sql/) | Estrutura do banco: login e convites, tabelas dos dados, funções e views (as do fluxo anterior). |
 | [`backend/sync-drive/`](./backend/sync-drive/) | Fluxo anterior: a carga diária das planilhas do Drive (etapas 1 e 2). |
 | [`backend/functions/`](./backend/functions/) | Funções do Supabase: cadastro com convite e upload manual. A `assistente` (chat com o Claude, API paga) está sem uso desde 07/10/2026. |
@@ -204,6 +204,24 @@ vale daqui pra frente em `demo/index.html`:
   - Todo `title` (e `<title>` de SVG) vira a dica do painel, que aparece
     depois de 0,5 s. Na barra lateral, a dica fica à direita do botão.
   - Basta usar `<select>` e `title` normais.
+- **Metal líquido na marca e no assistente** (`demo/assets/metal.js`, desde
+  08/10). É o visual do hero-liquid-metal do cult-ui, com o mesmo shader
+  LiquidMetal da Paper Design (`@paper-design/shaders`, CDN jsdelivr, sem
+  React). Aparece em:
+  - o G da barra lateral;
+  - o "Gualapack" do topo e o da tela de entrada;
+  - um anel de metal em volta do botão do assistente e do selo do chat.
+
+  Detalhes:
+  - As letras foram pré-processadas uma vez a partir da Playfair Display
+    Italic 700 (`assets/metal-*.png`). O "Gualapack" segue a linha de base
+    medida na página.
+  - O cromo é tingido pelas cores do painel e acompanha o tema. No logotipo,
+    um contorno fino garante a leitura nos dois temas.
+  - O texto continua na página (leitor de tela) e só sai da vista quando o
+    metal desenha. Sem WebGL ou sem o CDN, fica a marca de sempre.
+  - O movimento pausa fora da tela e com a aba oculta, e fica parado com
+    "Reduzir movimento".
 - **Seta e cor no cartão só com comparação de verdade**: contra a meta
   (apara confirmada, 12%) ou contra o mês anterior da série real do hub. O
   resto é texto neutro. A apara apontada (por OP, por família de produto) não
