@@ -287,6 +287,9 @@
 
   /* ---------------------------------------------------------------- dicas */
   let dica = null, dicaAlvo = null, dicaPendente = null, dicaTempo = 0, ultimaDica = 0;
+  // depois de um clique, a dica desse elemento só volta quando o mouse sair dele de
+  // verdade (mudança de layout logo após o clique não conta)
+  let clicado = null, clicadoEm = 0;
   const ATRASO = 500, QUENTE = 600;   // depois de uma dica, a próxima vem na hora (como no macOS)
 
   // título nativo (atributo ou <title> do SVG) vira data-dica: a dica nativa não aparece mais
@@ -356,12 +359,14 @@
   document.addEventListener("pointerover", e => {
     if(e.pointerType !== "mouse") return;
     const el = alvoDe(e.target);
+    if(el && el === clicado) return;
     if(el && (el === dicaAlvo || el === dicaPendente)) return;
     if(!el){ if(dica || dicaTempo) esconderDica(); return; }
     esconderDica();
     agendar(el);
   });
   document.addEventListener("pointerout", e => {
+    if(clicado && alvoDe(e.relatedTarget) !== clicado && alvoDe(e.target) === clicado && Date.now() - clicadoEm > 800) clicado = null;
     if(!dicaAlvo && !dicaTempo) return;
     const para = alvoDe(e.relatedTarget);
     if(para !== alvoDe(e.target)) esconderDica();
@@ -372,7 +377,8 @@
     if(el === e.target) agendar(el);
   });
   document.addEventListener("focusout", () => esconderDica());
-  ["mousedown", "wheel"].forEach(t => document.addEventListener(t, () => esconderDica(), { capture:true, passive:true }));
+  document.addEventListener("mousedown", e => { clicado = alvoDe(e.target); clicadoEm = Date.now(); esconderDica(); }, { capture:true, passive:true });
+  document.addEventListener("wheel", () => esconderDica(), { capture:true, passive:true });
   document.addEventListener("scroll", () => esconderDica(), { capture:true, passive:true });
   document.addEventListener("keydown", e => { if(e.key === "Escape") esconderDica(); });
 

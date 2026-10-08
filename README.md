@@ -204,6 +204,20 @@ vale daqui pra frente em `demo/index.html`:
   - Todo `title` (e `<title>` de SVG) vira a dica do painel, que aparece
     depois de 0,5 s. Na barra lateral, a dica fica à direita do botão.
   - Basta usar `<select>` e `title` normais.
+- **Prévia do vidro em tudo** (08/10, `html.vidro`). Fica desligada para
+  todos até o dono aprovar. Para ver, abra o painel com `?vidro=1`; para
+  desligar, `?vidro=0`. A escolha fica lembrada no navegador.
+  - O vidro segue a divisão do HIG (`liquid-glass.md`, `materials.md`):
+    Liquid Glass de verdade (desfoque, saturação, brilho de borda) nos
+    controles e no que flutua (barras, botões, seletores, menus, gaveta,
+    chat). Os cartões e painéis de conteúdo usam o material padrão, um vidro
+    fosco mais denso, para os números continuarem legíveis.
+  - O fundo é um degradê azul suave e fixo, que dá ao vidro o que refratar.
+  - No celular, a barra de abas vira uma cápsula flutuante com 7 abas; a
+    "Qualidade dos dados" vai para o cartão da conta.
+  - Contraste do texto mais fraco no pior ponto: 5,1:1 no claro e 4,9:1 no
+    escuro. Com "Reduzir transparência" ou "Aumentar contraste", tudo volta
+    a ser opaco.
 - **Seta e cor no cartão só com comparação de verdade**: contra a meta
   (apara confirmada, 12%) ou contra o mês anterior da série real do hub. O
   resto é texto neutro. A apara apontada (por OP, por família de produto) não

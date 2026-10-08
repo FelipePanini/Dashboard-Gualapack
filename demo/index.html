@@ -11,6 +11,15 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="./supabase-config.js"></script>
 <script src="./assets/ui.js"></script>
+<script>
+// Prévia do vidro (Liquid Glass): ?vidro=1 liga, ?vidro=0 desliga; fica lembrado neste
+// navegador. Roda antes da primeira pintura, pra não piscar.
+(function(){ try{
+  const p = new URLSearchParams(location.search).get("vidro");
+  if(p === "1" || p === "0") localStorage.setItem("gualapack-vidro", p);
+  if(localStorage.getItem("gualapack-vidro") === "1") document.documentElement.classList.add("vidro");
+}catch(e){} })();
+</script>
 <style>
 /* Some vazio até a sessão ser confirmada — evita mostrar dados antes do login.
    O indicador de carregamento fica visível mesmo assim (visibility pode ser
@@ -963,6 +972,153 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
 @media (max-width: 380px){
   .kpi-row{ grid-template-columns: minmax(0,1fr); }
 }
+
+/* =========================================================================
+   VIDRO (html.vidro; prévia com ?vidro=1): o vidro em todos os elementos, na
+   divisão que o HIG faz (materials.md, liquid-glass.md):
+   - fundo do app: degradês azuis suaves e fixos, o que o vidro refrata;
+   - conteúdo (cartões, painéis, máquinas): material padrão translúcido, sem
+     desfoque (o fundo é liso: desfocar não muda nada e pesaria no GPU com
+     dezenas de cartões);
+   - controles e camadas que flutuam (barras, botões, seletores, menus,
+     gaveta, chat): Liquid Glass, com desfoque, saturação e brilho de borda.
+   Reduzir transparência e aumentar contraste voltam ao opaco.
+   Contraste do texto mais fraco (--text-muted) no pior ponto do material:
+   5,1:1 no claro (#52667c sobre #e7eff7) e 4,9:1 no escuro (#7a8a9e sobre #111b26).
+   ========================================================================= */
+html.vidro{
+  --fundo-app:
+    radial-gradient(1100px 720px at 6% -6%, rgba(47,120,196,.24), transparent 62%),
+    radial-gradient(900px 640px at 102% 104%, rgba(12,56,104,.16), transparent 62%),
+    radial-gradient(760px 520px at 84% 16%, rgba(127,189,232,.24), transparent 60%),
+    #eaf0f6;
+  --mat-bg: rgba(255,255,255,.62);
+  --mat-borda: rgba(255,255,255,.78);
+  --mat-brilho: inset 0 1px 0 rgba(255,255,255,.9);
+  --mat-sombra: 0 1px 2px rgba(12,56,104,.05), 0 14px 34px -20px rgba(12,56,104,.3);
+  --mat-fundo2: rgba(255,255,255,.46);
+  --lg-bg: rgba(255,255,255,.56);
+  --lg-bg-forte: rgba(255,255,255,.72);
+  --lg-borda: rgba(255,255,255,.75);
+  --lg-reflexo: linear-gradient(180deg, rgba(255,255,255,.42), rgba(255,255,255,0) 58%);
+  --lg-brilho: inset 0 1px 0 rgba(255,255,255,.95), inset 0 -1px 0 rgba(255,255,255,.35), inset 0 0 0 .5px rgba(255,255,255,.55);
+  --lg-sombra: 0 10px 28px -14px rgba(12,56,104,.38), 0 1px 2px rgba(12,56,104,.07);
+  --lg-filtro: blur(22px) saturate(1.8);
+  --lg-lente: rgba(255,255,255,.82);
+  /* o que já era vidro (topo, gaveta, chat, período, conta, menus e dicas) usa estes */
+  --glass-bg: var(--lg-bg); --glass-bg-strong: var(--lg-bg-forte);
+  --glass-border: var(--lg-borda); --glass-highlight: rgba(255,255,255,.95);
+}
+@media (prefers-color-scheme: dark){
+  html.vidro:not([data-theme="light"]){
+    --fundo-app:
+      radial-gradient(1100px 720px at 6% -6%, rgba(47,125,196,.22), transparent 62%),
+      radial-gradient(900px 640px at 102% 104%, rgba(23,90,153,.22), transparent 62%),
+      radial-gradient(760px 520px at 84% 16%, rgba(79,156,224,.10), transparent 60%),
+      #07090c;
+    --mat-bg: rgba(18,23,31,.62); --mat-borda: rgba(160,190,225,.12);
+    --mat-brilho: inset 0 1px 0 rgba(255,255,255,.06);
+    --mat-sombra: 0 1px 2px rgba(0,0,0,.4), 0 16px 36px -20px rgba(0,0,0,.7);
+    --mat-fundo2: rgba(255,255,255,.04);
+    --lg-bg: rgba(24,30,40,.5); --lg-bg-forte: rgba(24,30,40,.7); --lg-borda: rgba(170,200,235,.18);
+    --lg-reflexo: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,0) 58%);
+    --lg-brilho: inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 0 .5px rgba(255,255,255,.06);
+    --lg-sombra: 0 12px 30px -14px rgba(0,0,0,.75), 0 1px 2px rgba(0,0,0,.4);
+    --lg-filtro: blur(22px) saturate(1.6);
+    --lg-lente: rgba(255,255,255,.12);
+    --glass-bg: var(--lg-bg); --glass-bg-strong: var(--lg-bg-forte);
+    --glass-border: var(--lg-borda); --glass-highlight: rgba(255,255,255,.14);
+  }
+}
+html.vidro[data-theme="dark"]{
+  --fundo-app:
+    radial-gradient(1100px 720px at 6% -6%, rgba(47,125,196,.22), transparent 62%),
+    radial-gradient(900px 640px at 102% 104%, rgba(23,90,153,.22), transparent 62%),
+    radial-gradient(760px 520px at 84% 16%, rgba(79,156,224,.10), transparent 60%),
+    #07090c;
+  --mat-bg: rgba(18,23,31,.62); --mat-borda: rgba(160,190,225,.12);
+  --mat-brilho: inset 0 1px 0 rgba(255,255,255,.06);
+  --mat-sombra: 0 1px 2px rgba(0,0,0,.4), 0 16px 36px -20px rgba(0,0,0,.7);
+  --mat-fundo2: rgba(255,255,255,.04);
+  --lg-bg: rgba(24,30,40,.5); --lg-bg-forte: rgba(24,30,40,.7); --lg-borda: rgba(170,200,235,.18);
+  --lg-reflexo: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,0) 58%);
+  --lg-brilho: inset 0 1px 0 rgba(255,255,255,.14), inset 0 0 0 .5px rgba(255,255,255,.06);
+  --lg-sombra: 0 12px 30px -14px rgba(0,0,0,.75), 0 1px 2px rgba(0,0,0,.4);
+  --lg-filtro: blur(22px) saturate(1.6);
+  --lg-lente: rgba(255,255,255,.12);
+  --glass-bg: var(--lg-bg); --glass-bg-strong: var(--lg-bg-forte);
+  --glass-border: var(--lg-borda); --glass-highlight: rgba(255,255,255,.14);
+}
+
+/* fundo do app */
+html.vidro body{ background: var(--fundo-app); background-attachment: fixed; }
+
+/* conteúdo: material padrão */
+html.vidro .kpi, html.vidro .panel, html.vidro .machine-card, html.vidro .agora-card{
+  background: var(--mat-bg); border-color: var(--mat-borda);
+  box-shadow: var(--mat-brilho), var(--mat-sombra);
+}
+html.vidro .proc-card{ background: var(--mat-fundo2); box-shadow: inset 0 0 0 1px var(--mat-borda); }
+
+/* controles: Liquid Glass (regular) */
+html.vidro .pill-select, html.vidro .icon-btn, html.vidro .status-chip, html.vidro .segmented,
+html.vidro .select-wrap select, html.vidro .mais-btn, html.vidro .rail-foot, html.vidro .conta-topo{
+  background: var(--lg-reflexo), var(--lg-bg);
+  -webkit-backdrop-filter: var(--lg-filtro); backdrop-filter: var(--lg-filtro);
+  border-color: var(--lg-borda);
+  box-shadow: var(--lg-brilho), var(--lg-sombra);
+}
+html.vidro .segmented{ border:1px solid var(--lg-borda); }
+html.vidro .segmented-thumb{ background: var(--lg-lente); box-shadow: var(--lg-brilho), 0 2px 8px -3px rgba(12,56,104,.3); }
+html.vidro .pill-select:hover, html.vidro .icon-btn:hover, html.vidro .select-wrap select:hover{ background: var(--lg-reflexo), var(--lg-bg-forte); }
+
+/* barras: topo e barra lateral (no celular, a barra de abas que flutua) */
+html.vidro .topbar{ background: var(--lg-reflexo), var(--lg-bg); -webkit-backdrop-filter: var(--lg-filtro); backdrop-filter: var(--lg-filtro);
+  border-bottom-color: var(--lg-borda); box-shadow: inset 0 -1px 0 rgba(255,255,255,.25); }
+html.vidro .rail{ background: var(--lg-reflexo), var(--lg-bg); -webkit-backdrop-filter: var(--lg-filtro); backdrop-filter: var(--lg-filtro);
+  border-right-color: var(--lg-borda); box-shadow: var(--lg-brilho); }
+html.vidro .rail-indicator{ background: var(--lg-lente); box-shadow: var(--lg-brilho), 0 3px 10px -4px rgba(12,56,104,.32); }
+html.vidro .rail-mark{ box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 6px 16px -8px rgba(15,94,166,.6); }
+/* "Qualidade dos dados" fica no cartão da conta no celular com o vidro (a barra flutuante
+   tem 7 abas, sem rolagem: tab-bars.md, "Avoid overflow tabs") */
+.conta-qualidade{ display:none; }
+@media (max-width: 768px){
+  html.vidro #qualidade-link{ display:none; }
+  html.vidro .conta-qualidade{ display:flex; }
+  html.vidro .rail-btn{ flex:1 1 0; min-width:0; }
+  html.vidro .rail{
+    left:10px; right:10px; bottom: calc(8px + env(safe-area-inset-bottom)); padding:5px;
+    border:1px solid var(--lg-borda); border-radius:28px;
+    box-shadow: var(--lg-brilho), 0 14px 34px -12px rgba(12,56,104,.42);
+  }
+  html.vidro .rail-btn{ min-height:48px; border-radius:22px; }
+  html.vidro .rail-indicator{ border-radius:22px; }
+}
+
+/* ação principal flutuante (assistente): vidro tingido na cor da ação */
+html.vidro .assistant-fab{
+  background: linear-gradient(180deg, rgba(255,255,255,.34), rgba(255,255,255,0) 55%), var(--accent);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.6), inset 0 -2px 6px rgba(0,0,0,.14), 0 12px 28px -8px rgba(15,94,166,.55);
+}
+
+/* camadas flutuantes que já eram vidro: o brilho de borda do Liquid Glass */
+html.vidro .drawer, html.vidro .assistant-panel, html.vidro .period-popup, html.vidro .conta-pop{
+  background: var(--lg-reflexo), var(--lg-bg-forte);
+  -webkit-backdrop-filter: blur(30px) saturate(1.8); backdrop-filter: blur(30px) saturate(1.8);
+}
+html.vidro .assistant-panel, html.vidro .period-popup, html.vidro .conta-pop{ box-shadow: var(--lg-brilho), var(--shadow-pop); }
+html.vidro .drawer{ box-shadow: var(--lg-brilho), -24px 0 60px -20px rgba(10,21,36,.35); }
+
+/* Reduzir transparência / Aumentar contraste: tudo opaco, sem desfoque */
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more){
+  html.vidro body{ background: var(--bg) !important; }
+  html.vidro .kpi, html.vidro .panel, html.vidro .machine-card, html.vidro .agora-card,
+  html.vidro .pill-select, html.vidro .icon-btn, html.vidro .status-chip, html.vidro .segmented,
+  html.vidro .select-wrap select, html.vidro .mais-btn, html.vidro .rail, html.vidro .topbar,
+  html.vidro .drawer, html.vidro .assistant-panel, html.vidro .period-popup, html.vidro .conta-pop{
+    background: var(--surface-1) !important; -webkit-backdrop-filter:none !important; backdrop-filter:none !important;
+  }
+}
 </style>
 </head>
 <body class="auth-pending">
@@ -1504,6 +1660,7 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
   </div>
   <dl class="conta-dados" id="conta-dados"></dl>
   <div class="conta-acoes">
+    <a class="conta-link conta-qualidade" href="./qualidade.html">Qualidade dos dados</a>
     <a class="conta-link" id="conta-admin" href="./admin.html" hidden>Administração de acessos</a>
     <button type="button" class="conta-sair" id="conta-sair">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
@@ -5241,7 +5398,24 @@ if(footerNote){
   let anoGrid = new Date().getFullYear();
   let pendDia = null, pendSemanaAncora = null, pendMes = null;
 
+  // mostra só o quadro do modo atual (o "Mês" abria com o calendário de dias, vazio)
+  function mostrarModo(){
+    document.querySelectorAll(".period-tabs button").forEach(b=> b.setAttribute("aria-pressed", String(b.dataset.modo===modo)));
+    document.getElementById("period-cal-wrap").hidden = (modo==="mes");
+    document.getElementById("period-mes-wrap").hidden = (modo!=="mes");
+  }
+  // abre com o período escolhido já marcado (mês inteiro ou mês até hoje)
+  function marcarAtual(){
+    const { de, ate } = periodoDaUrl();
+    const proxMes = new Date(de.getFullYear(), de.getMonth()+1, 1);
+    const hoje = new Date(); hoje.setHours(0,0,0,0);
+    if(de.getDate() === 1 && (ate.getTime() === proxMes.getTime() || ate.getTime() === addDays(hoje, 1).getTime())){
+      modo = "mes"; pendMes = { ano: de.getFullYear(), mes: de.getMonth() }; anoGrid = de.getFullYear();
+    }
+  }
   function abrir(){
+    marcarAtual();
+    mostrarModo();
     overlay.hidden = false;
     btn.setAttribute("aria-expanded","true");
     document.body.classList.add("no-scroll");
@@ -5262,9 +5436,7 @@ if(footerNote){
   document.querySelectorAll(".period-tabs button").forEach(tab=>{
     tab.addEventListener("click", ()=>{
       modo = tab.dataset.modo;
-      document.querySelectorAll(".period-tabs button").forEach(b=> b.setAttribute("aria-pressed", String(b===tab)));
-      document.getElementById("period-cal-wrap").hidden = (modo==="mes");
-      document.getElementById("period-mes-wrap").hidden = (modo!=="mes");
+      mostrarModo();
       renderTudo();
     });
   });
