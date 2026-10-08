@@ -2383,6 +2383,9 @@ const DIAS_SEMANA = ["dom","seg","ter","qua","qui","sex","sáb"];
    (00h às 06h) ainda é do dia anterior no banco. Até 07/10 a linha do tempo
    contava da meia-noite, e o turno da noite caía por cima da manhã. */
 const INICIO_DIA_PRODUCAO = 6;
+// Máquinas que não entram na linha do tempo: a R12 saiu da fábrica (08/10/2026).
+// Só nesta tela; o resto do painel segue a lista de máquinas do Supabase.
+const FORA_DA_LINHA_DO_TEMPO = new Set(["R12"]);
 const LINHA_TEMPO = { dias: [], dia: null, porDia: new Map(), cliente: null };
 function inicioDoDia(iso){ const d = dataLocal(iso); d.setHours(INICIO_DIA_PRODUCAO, 0, 0, 0); return d; }
 // dia de produção de um instante: antes das 06:00 ainda é o dia anterior
@@ -3895,6 +3898,7 @@ function renderGantt(){
   const sub = document.getElementById("gantt-panel-sub");
   const seletor = document.getElementById("tempo-dias");
   const HOURS = 24;
+  const maquinas = MAQUINAS.filter(m=> !FORA_DA_LINHA_DO_TEMPO.has(String(m.id).trim().toUpperCase()));
   const corSeg = s => s.cor || statusColor(s.st);
   // hora no eixo: 0 = 06:00 do dia de produção
   const rotuloHora = h => String((INICIO_DIA_PRODUCAO + h) % 24).padStart(2,"0") + ":00";
@@ -3907,7 +3911,7 @@ function renderGantt(){
     const quando = d => inicio && mesmoDiaQue(d, inicio) ? fmtHM(d) : fmtDMHM(d);
     montarGrafico(holder, (W, animar)=>{
       const rowH = 26, gap = 6, padL = W < 520 ? 70 : 96, padB = 26;
-      const H = MAQUINAS.length*(rowH+gap) + padB;
+      const H = maquinas.length*(rowH+gap) + padB;
       const plotW = W - padL - 4;
       const xDe = h => padL + (h/HOURS)*plotW;
       const passo = [2,3,4,6,12].find(s => plotW/HOURS*s >= 54) || 12;
@@ -3925,7 +3929,7 @@ function renderGantt(){
       }
       // virada do dia do calendário (o turno da noite ainda é deste dia de produção)
       grid += `<line x1="${xDe(meiaNoite)}" y1="0" x2="${xDe(meiaNoite)}" y2="${H-padB}" stroke="var(--border-strong)" stroke-width="1" stroke-dasharray="3 4"/>`;
-      const linhas = MAQUINAS.map((m,i)=>{
+      const linhas = maquinas.map((m,i)=>{
         const y = i*(rowH+gap);
         const segs = segsPorMaq[i].map((s,si)=>{
           const x = xDe(s.ini);
@@ -3946,12 +3950,12 @@ function renderGantt(){
       const comApont = segsPorMaq.filter(s=>s.length).length;
       const qual = iso ? `dia de produção ${fmtDM(dataLocal(iso))}` : "dia";
       holder.innerHTML = `<svg class="${animar ? "anima" : ""}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img"
-        aria-label="${esc(`Linha do tempo de apontamentos, ${qual}: ${comApont} de ${MAQUINAS.length} máquinas com apontamento`)}">
+        aria-label="${esc(`Linha do tempo de apontamentos, ${qual}: ${comApont} de ${maquinas.length} máquinas com apontamento`)}">
         <style>.gseg{ cursor:default; } .gseg:hover{ filter:brightness(1.15); }</style>
         ${grid}${linhas}${agora}
       </svg>`;
       holder.querySelectorAll(".gseg").forEach(r=>{
-        const m = MAQUINAS[+r.dataset.m];
+        const m = maquinas[+r.dataset.m];
         const s = segsPorMaq[+r.dataset.m][+r.dataset.s];
         // horário real do evento (o que vem do dia anterior aparece com a data)
         const horario = s.de ? `${quando(s.de)} → ${quando(s.ate)} · ${fmt1((s.ate - s.de)/3600000)} h`
@@ -3989,7 +3993,7 @@ function renderGantt(){
   // Pré-visualização (sem Supabase): segmentos sorteados.
   if(!USANDO_DADOS_REAIS){
     if(seletor) seletor.hidden = true;
-    desenhar(MAQUINAS.map(m=>{
+    desenhar(maquinas.map(m=>{
       const segs = [];
       let t = 0, guard = 0;
       while(t < HOURS && guard++ < 60){
@@ -4029,7 +4033,7 @@ function renderGantt(){
       return;
     }
     if(meu !== pedido) return;   // trocou de dia enquanto carregava
-    desenhar(MAQUINAS.map(m=> porMaquina.get(m.id) || []), iso);
+    desenhar(maquinas.map(m=> porMaquina.get(m.id) || []), iso);
   }
 
   if(!LINHA_TEMPO.dia || !LINHA_TEMPO.dias.includes(LINHA_TEMPO.dia)) LINHA_TEMPO.dia = diaPadraoLinhaTempo();
