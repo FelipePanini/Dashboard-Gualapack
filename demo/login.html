@@ -10,6 +10,11 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600;1,700&family=Archivo:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="./supabase-config.js"></script>
+<script src="./assets/ui.js"></script>
+<!-- three.js só pro logo 3D do fundo (assets/logo3d.js) -->
+<script type="importmap">{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.min.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }</script>
 <style>
 :root{
   color-scheme: light;
@@ -109,6 +114,12 @@ body{
 @keyframes drift-a{ 0%,100%{ transform:translate(0,0) scale(1);} 50%{ transform:translate(60px,50px) scale(1.08);} }
 @keyframes drift-b{ 0%,100%{ transform:translate(0,0) scale(1);} 50%{ transform:translate(-50px,-40px) scale(1.05);} }
 @media (prefers-reduced-motion: reduce){ .blob{ animation:none !important; } }
+/* Logo 3D (assets/logo3d.js): o G da marca em vidro, na camada de conteúdo; o
+   cartão de vidro passa por cima. Aparece devagar por cima das manchas de CSS,
+   que ficam como reserva sem WebGL. */
+.logo3d{ position:fixed; inset:0; width:100%; height:100%; z-index:0; pointer-events:none; opacity:0; transition: opacity 1.6s var(--ease); }
+body.com-3d .logo3d{ opacity:1; }
+body.com-3d .blob{ animation-play-state: paused; }
 
 .card{
   position:relative; z-index:1;
@@ -189,6 +200,7 @@ button.submit.loading .spinner{ display:inline-block; }
   <div class="blob blob-a"></div>
   <div class="blob blob-b"></div>
 </div>
+<canvas class="logo3d" id="logo3d" aria-hidden="true"></canvas>
 
 <div class="card">
   <div class="brand-word">Guala<span class="ink-accent">pack</span></div>
@@ -390,6 +402,12 @@ formRegister.addEventListener("submit", async (e)=>{
   const { data } = await client.auth.getSession();
   if(data.session) window.location.href = "./index.html";
 })();
+</script>
+<script type="module">
+// Logo 3D no fundo. Se o three.js ou o WebGL faltarem, fica o fundo simples.
+import("./assets/logo3d.js")
+  .then(m => m.iniciar(document.getElementById("logo3d")))
+  .catch(e => console.warn("Logo 3D indisponível; fica o fundo simples.", e));
 </script>
 </body>
 </html>

@@ -100,7 +100,7 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 
 | Caminho | O que é |
 |---|---|
-| [`demo/`](./demo/) | O site: `index.html` (painel), `login.html`, `admin.html` (convites), `qualidade.html` (validação publicada pelo hub), `upload.html` (upload manual, legado), `assets/ui.js` (menus e dicas no tema do painel). O nome `demo` ficou porque é o endereço já publicado. |
+| [`demo/`](./demo/) | O site: `index.html` (painel), `login.html`, `admin.html` (convites), `qualidade.html` (validação publicada pelo hub), `upload.html` (upload manual, legado), `assets/ui.js` (menus e dicas no tema do painel), `assets/logo3d.js` (o G em vidro 3D da tela de entrada). O nome `demo` ficou porque é o endereço já publicado. |
 | [`backend/sql/`](./backend/sql/) | Estrutura do banco: login e convites, tabelas dos dados, funções e views (as do fluxo anterior). |
 | [`backend/sync-drive/`](./backend/sync-drive/) | Fluxo anterior: a carga diária das planilhas do Drive (etapas 1 e 2). |
 | [`backend/functions/`](./backend/functions/) | Funções do Supabase: cadastro com convite e upload manual. A `assistente` (chat com o Claude, API paga) está sem uso desde 07/10/2026. |
@@ -204,6 +204,18 @@ vale daqui pra frente em `demo/index.html`:
   - Todo `title` (e `<title>` de SVG) vira a dica do painel, que aparece
     depois de 0,5 s. Na barra lateral, a dica fica à direita do botão.
   - Basta usar `<select>` e `title` normais.
+- **Tela de entrada com o G da marca em vidro 3D** (`demo/assets/logo3d.js`,
+  desde 08/10):
+  - É o G do ícone e da barra lateral (Playfair Display itálico, peso 700),
+    extrudado em vidro com three.js (CDN jsdelivr) sobre o fundo azul da
+    página.
+  - Fica na camada de conteúdo: o cartão de vidro do login passa por cima e
+    desfoca a parte de trás. Na tela larga ele fica à esquerda do cartão; no
+    celular, acima.
+  - Movimento lento: giro, flutuação e um leve acompanhar do mouse. Para com a
+    aba oculta, fica parado com "Reduzir movimento" e também em máquina lenta
+    (média acima de 45 ms por quadro).
+  - Sem WebGL ou sem o three.js, ficam as manchas de CSS de antes.
 - **Seta e cor no cartão só com comparação de verdade**: contra a meta
   (apara confirmada, 12%) ou contra o mês anterior da série real do hub. O
   resto é texto neutro. A apara apontada (por OP, por família de produto) não
