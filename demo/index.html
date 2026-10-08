@@ -2465,7 +2465,11 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
       //   disponibilidade (paradas) = TMR: produzindo ÷ horas sem FIM TURNO e INATIVIDADE
       //   OEE = os três multiplicados
       // Fábrica: disponibilidade = TMR geral (como o BI); qualidade e performance = média das
-      // máquinas, ponderada pelas horas produzindo. Sem o 007, fica sem qualidade e sem OEE.
+      // máquinas com o OEE completo, ponderada pelas horas produzindo. Sem o 007, fica sem
+      // qualidade e sem OEE.
+      // Horas produzindo sem metro apontado não é velocidade zero, é velocidade sem medida
+      // (a REVISORA 01 aponta horas e não metros: dava performance 0% e OEE 0%, e puxava a
+      // performance da fábrica de 76,5% para 64,7% em ago/2026). Fica sem performance.
       window.OEE = null;
       const qualOk = !bQualRes.error && Array.isArray(bQualRes.data);
       const qualPorMaq = new Map(qualOk ? bQualRes.data.map(r=>[chave(r.maquina), r]) : []);
@@ -2473,7 +2477,7 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
         const h = porMaq.get(chave(m.id)) || {};
         const tot = n(h.horas_totais), prod = n(h.horas_produzindo), ref = n(h.velocidade_ref_m_min);
         m.disp = tot > 0 ? 100 * prod / tot : null;
-        m.perf = prod > 0 && ref > 0 ? Math.min(100, 100 * (n(h.metros) / prod / 60) / ref) : null;
+        m.perf = prod > 0 && ref > 0 && n(h.metros) > 0 ? Math.min(100, 100 * (n(h.metros) / prod / 60) / ref) : null;
         const q = qualPorMaq.get(chave(m.id)), baseQ = q ? n(q.refugo_kg) + n(q.peso_ops_kg) : 0;
         m.qual = baseQ > 0 ? 100 - 100 * n(q.refugo_kg) / baseQ : null;
         m.refugoQual = q ? n(q.refugo_kg) : null;
@@ -2481,7 +2485,7 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
         m.horasProdExatas = prod;
       });
       if(qualOk){
-        const media = c => { const l = MAQUINAS.filter(m=>m[c] != null && m.horasProdExatas > 0), hp = l.reduce((a,m)=>a + m.horasProdExatas, 0);
+        const media = c => { const l = MAQUINAS.filter(m=>m.oee != null && m.horasProdExatas > 0), hp = l.reduce((a,m)=>a + m.horasProdExatas, 0);
                              return hp > 0 ? l.reduce((a,m)=>a + m[c] * m.horasProdExatas, 0) / hp : null; };
         const disp = window.HUB_TOTAIS ? window.HUB_TOTAIS.tmr : null, perf = media("perf"), qual = media("qual");
         window.OEE = { disp, perf, qual, oee: disp != null && perf != null && qual != null ? disp * perf * qual / 10000 : null };
@@ -2790,7 +2794,12 @@ function fatoresOee(m){
   const pior = validos.length ? validos.reduce((a,b)=> b[2] < a[2] ? b : a)[0] : null;
   return f.map(([nome, sub, v])=>({ nome, sub, v, pior: nome === pior }));
 }
-const statusLabel = { good:"Dentro da meta", warning:"Atenção", critical:"Crítico", none:"Sem apontamento" };
+// O que falta quando não há OEE: "qualidade", "velocidade" ou os dois.
+function faltaNoOee(m){
+  const nomes = { Qualidade:"qualidade", Performance:"velocidade", Disponibilidade:"horas" };
+  return fatoresOee(m).filter(f=>f.v == null).map(f=>nomes[f.nome]).join(" e ") || "dado";
+}
+const statusLabel ={ good:"Dentro da meta", warning:"Atenção", critical:"Crítico", none:"Sem apontamento" };
 const statusCor   = { good:"var(--good)", warning:"var(--warning)", critical:"var(--critical)", none:"var(--text-muted)" };
 
 // Linha de tendência de uma série REAL. Mês sem dado quebra a linha; sem ao
@@ -3342,7 +3351,7 @@ const ORDEM_ETAPAS = ["Impressão", "Laminação", "Corte / Refile", "Coating"];
     const st = statusOee(m);
     const fat = fatoresOee(m);
     const oeeTxt = m.oee != null ? `${Math.round(m.oee)}%` : "—";
-    const rotulo = st === "none" ? "sem apontamento no período" : m.oee != null ? "OEE" : "OEE · sem qualidade no período";
+    const rotulo = st === "none" ? "sem apontamento no período" : m.oee != null ? "OEE" : `OEE · sem ${faltaNoOee(m)} no período`;
     const pior = fat.find(f=>f.pior);
     const falado = st === "none" ? "sem apontamento no período"
       : `OEE ${m.oee != null ? Math.round(m.oee) + "%" : "sem dado"}; ` + fat.map(f=>`${f.nome} ${f.v != null ? Math.round(f.v) + "%" : "sem dado"}`).join(", ") +
@@ -4667,7 +4676,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
 
     const fatD = fatoresOee(m), piorD = fatD.find(f=>f.pior);
     const corFator = nome => piorD && piorD.nome === nome ? "var(--perda)" : "var(--series-3)";
-    const notaOee = st === "none" ? "sem apontamento no período" : m.oee == null ? "sem qualidade no período"
+    const notaOee = st === "none" ? "sem apontamento no período" : m.oee == null ? `sem ${faltaNoOee(m)} no período`
       : piorD ? `maior perda: ${piorD.nome.toLowerCase()} (${piorD.sub})` : "";
     bodyEl.innerHTML = `
       <div class="drawer-metrics">
