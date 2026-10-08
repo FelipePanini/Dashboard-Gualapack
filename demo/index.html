@@ -648,6 +648,14 @@ svg.anima .anel{ animation: anel 1s var(--ease-out) backwards .1s; }
 .msg.bot p{ margin:0 0 6px; } .msg.bot p:last-of-type{ margin-bottom:0; }
 .msg.bot ul{ margin:4px 0 6px; padding-left:18px; } .msg.bot li{ margin:2px 0; }
 .msg-fonte{ margin-top:8px; font-size:11.5px; color: var(--text-muted); }
+/* quem respondeu: bolinha neutra = assistente do painel; verde = a IA (pulsa enquanto pensa) */
+.live-dot.ia{ background: var(--good); }
+.live-dot.ia.pensando::after{
+  content:""; position:absolute; inset:-4px; border-radius:50%; border:2px solid var(--good);
+  opacity:0; animation: pulso 1.4s var(--ease-out) infinite;
+}
+.tag-ia{ display:inline-flex; align-items:center; gap:5px; font-weight:650; color: var(--good); }
+.tag-ia::before{ content:""; width:6px; height:6px; border-radius:50%; background: currentColor; }
 .typing{ display:flex; gap:4px; padding:4px 2px; }
 .typing span{ width:6px; height:6px; border-radius:50%; background: var(--text-muted); animation: digitando 1.2s var(--ease-out) infinite; }
 .typing span:nth-child(2){ animation-delay:.15s; } .typing span:nth-child(3){ animation-delay:.3s; }
@@ -1710,7 +1718,7 @@ html.vidro .drawer{ box-shadow: var(--lg-brilho), -24px 0 60px -20px rgba(10,21,
       </div>
       <div>
         <div class="assistant-title">Assistente de Produção</div>
-        <div class="assistant-status"><span class="live-dot"></span>Números do painel · IA grátis nas análises</div>
+        <div class="assistant-status" id="assistant-status"><span class="live-dot" id="assistant-dot" title="Respondido pelo assistente do painel"></span>Números do painel<span class="sr-only" id="assistant-fonte" aria-live="polite"></span></div>
       </div>
       <button class="assistant-close" id="assistant-close" aria-label="Fechar">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -5081,7 +5089,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     return { html: "Ainda não sei responder isso. Pergunte sobre apara, TMR, uma máquina (ex.: R18), o que está parado agora, entregas, fila, setup, WIP, carteira, laudos ou um mês (ex.: agosto).", sug: SUGESTOES, semResposta: true };
   }
 
-  // ---------- IA grátis (Groq, pela Edge Function "assistente")
+  // ---------- IA (Groq, plano gratuito, pela Edge Function "assistente")
   // pergunta de análise, longa ou que o local não entende vai para a IA
   const ANALISE = ["por que", "porque", "pq\\b", "explic", "analis", "o que fazer", "o que devo", "como melhorar", "melhorar",
     "sugest", "sugir", "recomend", "causa", "tendencia", "previs", "prever", "priori", "foco", "focar", "plano de acao", "acao"];
@@ -5139,6 +5147,16 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     return html + (lista ? "</ul>" : "");
   }
   const conversa = [];   // { papel: "usuario" | "assistente", texto }
+  // bolinha do cabeçalho: quem respondeu (cor + texto para leitor de tela e dica)
+  function marcarFonte(estado){
+    const dot = document.getElementById("assistant-dot"), aviso = document.getElementById("assistant-fonte");
+    if(!dot) return;
+    dot.classList.toggle("ia", estado !== "painel");
+    dot.classList.toggle("pensando", estado === "pensando");
+    const txt = estado === "pensando" ? "A IA está respondendo" : estado === "ia" ? "Respondido pela IA" : "Respondido pelo assistente do painel";
+    dot.title = txt;
+    if(aviso) aviso.textContent = estado === "painel" ? "" : ` · ${txt}`;
+  }
   async function perguntarIA(texto){
     const cfg = window.SUPABASE_CONFIG;
     const { data } = await window.gualapackAuth.auth.getSession();
@@ -5176,15 +5194,19 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     };
     const semDadosNoPainel = window.FALHA_CARGA || USANDO_DADOS_REAIS !== true;
     if(semDadosNoPainel || !vaiParaIA(norm(text), r)){
+      marcarFonte("painel");
       // resposta local: sai na hora; o "digitando" curto só marca a vez de responder
       setTimeout(()=> fim(r.html, r.sug, semHtml(r.html)), reduzMovimento() ? 0 : 280);
       return;
     }
+    marcarFonte("pensando");
     perguntarIA(text).then(j=>{
-      fim(`${textoIA(j.resposta)}<div class="msg-fonte">Resposta da IA (grátis) com os números do painel · pode errar: confira na tela</div>`, [], j.resposta);
+      marcarFonte("ia");
+      fim(`${textoIA(j.resposta)}<div class="msg-fonte"><span class="tag-ia">IA</span> com os números do painel · pode errar: confira na tela</div>`, [], j.resposta);
     }).catch(err=>{
       console.warn("assistente (IA):", err);
       const motivo = esc(err.mensagem || "A IA não respondeu agora.");
+      marcarFonte("painel");
       fim(r.semResposta ? `${motivo} ${r.html}` : `${r.html}<div class="msg-fonte">${motivo} Esta é a resposta rápida do painel.</div>`,
         r.sug, semHtml(r.html));
     });
@@ -5204,7 +5226,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       const rotulo = window.rotuloPeriodo ? window.rotuloPeriodo(de, ate) : "o período selecionado";
       addMsg("bot", `Olá! Respondo com os números do painel, do período escolhido no topo (<b>${esc(rotulo)}</b>). ` +
         `Pergunte sobre apara, TMR, uma máquina, o que está parado agora, entregas, fila, setup, WIP, carteira, laudos ou um mês. ` +
-        `Para análises ("por que a apara subiu?", "onde focar?"), uso uma IA grátis.`);
+        `Para análises ("por que a apara subiu?", "onde focar?"), uso uma IA: a bolinha do topo fica verde quando é ela que responde.`);
       addSuggestions(SUGESTOES.slice(0, 4));
     }
     input.focus({ preventScroll:true });

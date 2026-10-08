@@ -172,7 +172,7 @@ Deno.serve(async (req: Request) => {
   const mensagem = status === 401 || status === 403
     ? "A chave da Groq foi recusada. Confira o segredo GROQ_API_KEY no Supabase."
     : status === 429
-      ? "A cota grátis da IA acabou por agora. Tente mais tarde."
+      ? "A cota da IA acabou por agora. Tente mais tarde."
       : "A IA não respondeu agora. Tente de novo em alguns instantes.";
   return responder({ erro: status === 429 ? "cota" : "groq", mensagem }, 502);
 });
