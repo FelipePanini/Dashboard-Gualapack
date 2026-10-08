@@ -4742,7 +4742,8 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   // ("ago/26"); "dez" sozinho é número, não mês
   function mesPedido(q){
     for(let i = 0; i < 12; i++){
-      const m = q.match(new RegExp(`\\b(?:${MESES_LONGOS[i]}|${MESES_CURTOS[i]}(?=\\s*/\\s*\\d))(?:\\s*(?:de|/)\\s*(\\d{2,4}))?`));
+      // palavra inteira: "maior" não é "maio"
+      const m = q.match(new RegExp(`\\b(?:${MESES_LONGOS[i]}\\b|${MESES_CURTOS[i]}(?=\\s*/\\s*\\d))(?:\\s*(?:de|/)\\s*(\\d{2,4}))?`));
       if(m) return { mes: i, ano: m[1] ? Number(m[1].length === 2 ? "20" + m[1] : m[1]) : null };
     }
     return null;
@@ -5091,9 +5092,15 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
 
   // ---------- IA (Groq, plano gratuito, pela Edge Function "assistente")
   // pergunta de análise, longa ou que o local não entende vai para a IA
+  // O local só responde quando tem certeza: pergunta curta (até 6 palavras), que ele
+  // reconhece, e que não pede diagnóstico ou opinião. O resto vai para a IA, que lê o
+  // painel inteiro (em 08/10, "qual a nossa maior dor, olhando no dash" saiu como o
+  // resumo de maio no local).
   const ANALISE = ["por que", "porque", "pq\\b", "explic", "analis", "o que fazer", "o que devo", "como melhorar", "melhorar",
-    "sugest", "sugir", "recomend", "causa", "tendencia", "previs", "prever", "priori", "foco", "focar", "plano de acao", "acao"];
-  const vaiParaIA = (q, local) => local.semResposta || tem(q, ...ANALISE) || q.split(/\s+/).filter(Boolean).length > 9;
+    "sugest", "sugir", "recomend", "causa", "tendencia", "previs", "prever", "priori", "foco", "focar", "plano de acao", "acao",
+    "dor\\b", "dores", "problem", "gargalo", "critic", "preocup", "risco", "atencao", "oportunidade", "ganh", "perdendo",
+    "destaque", "principa", "o que (?:mais|esta) (?:pesa|pesando)", "diagnost", "avali", "opini", "acha\\b", "achas", "devemos", "dica"];
+  const vaiParaIA = (q, local) => local.semResposta || tem(q, ...ANALISE) || q.split(/\s+/).filter(Boolean).length > 6;
   const semHtml = s => String(s ?? "").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
   const v1 = v => v == null || !Number.isFinite(v) ? "—" : fmt1(v);
