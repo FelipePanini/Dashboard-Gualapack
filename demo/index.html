@@ -384,6 +384,9 @@ body.entrada .view.active > section:not(.kpi-row) ~ section:not(.kpi-row) ~ sect
 
 /* ---------- kpi row ---------- */
 .kpi-row{ display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:14px; margin-bottom:16px; }
+/* fileira com 5 cartões (Aparas): 5 lado a lado na tela larga, 3 + 2 na média */
+@media (min-width: 1280px){ .kpi-row.cinco{ grid-template-columns: repeat(5, minmax(0,1fr)); } }
+@media (min-width: 1081px) and (max-width: 1279px){ .kpi-row.cinco{ grid-template-columns: repeat(3, minmax(0,1fr)); } }
 .kpi{
   background: var(--surface-1); border:1px solid var(--border); border-radius:16px;
   padding: 18px 20px 14px; box-shadow: var(--shadow-card);
@@ -1129,7 +1132,7 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
 
       <!-- ============ APARAS & QUALIDADE ============ -->
       <div class="view" id="view-aparas">
-        <section class="kpi-row" id="aparas-kpis"></section>
+        <section class="kpi-row cinco" id="aparas-kpis"></section>
 
         <section class="grid-2 uneven equal-cols">
           <div class="panel">
@@ -1829,7 +1832,7 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
     const [hubMaqRes, hubParadasRes, hubGanttRes, hubMotivoRes, hubRefugoMaqRes, hubOpsRes, hubClasseRes, hubAparaRes,
            hubFontesRes, hubAparaPeriodoRes, hubMensalRes, hubPerdaMaqMotivoRes, listaRes, hubCodigosRes,
            bAgoraRes, bFilaRes, bWipRes, bCarteiraRes, bEntregasRes, bSetupRes, bLaudosRes, bMensalRes,
-           bDiasRes, bPlanoRes, bPlanoMesRes] = await Promise.all([
+           bDiasRes, bPlanoRes, bPlanoMesRes, bAparaAnoRes] = await Promise.all([
       // Horas por máquina/código publicadas pelo hub (Machine Card) e o resto
       // dos cartões (002_cartoes.sql).
       client.rpc("rpc_hub_maquinas", { p_de: pDe, p_ate: pAte }),
@@ -1867,6 +1870,8 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
       client.from("v_hub_eventos_dias").select("dia,eventos").order("dia", { ascending:false }),
       client.rpc("rpc_hub_plano", { p_de: pDe, p_ate: pAtePlano }),
       client.from("v_hub_plano_mensal").select("*"),
+      // apara confirmada acumulada de cada ano (bloco ACUMULADO da Conta Refugo)
+      client.from("v_hub_apara_ano").select("*"),
     ]);
     // Com o hub publicado (002), nenhuma consulta antiga é usada: todas têm
     // equivalente no hub. Elas somam centenas de milhares de linhas e, em
@@ -1885,7 +1890,7 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
     const passageiro = [hubParadasRes, hubGanttRes, hubMotivoRes, hubRefugoMaqRes, hubOpsRes, hubClasseRes, hubAparaRes,
                         hubFontesRes, hubAparaPeriodoRes, hubMensalRes, hubPerdaMaqMotivoRes, hubCodigosRes,
                         bAgoraRes, bFilaRes, bWipRes, bCarteiraRes, bEntregasRes, bSetupRes, bLaudosRes, bMensalRes,
-                        bDiasRes, bPlanoRes, bPlanoMesRes]
+                        bDiasRes, bPlanoRes, bPlanoMesRes, bAparaAnoRes]
       .map(r=>r.error).find(e=>e && e.code !== "PGRST202" && e.code !== "PGRST205");
     if(passageiro && tentativa === 1) throw passageiro;
     // período sem nenhum apontamento também é hub (vazio), não caminho antigo
@@ -2313,7 +2318,7 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
     const faltaNoSupabase = e => e && (e.code === "PGRST202" || e.code === "PGRST205");
     Object.entries({ agora:bAgoraRes, programacao:bFilaRes, wip:bWipRes, carteira:bCarteiraRes, entregas:bEntregasRes,
                      setup:bSetupRes, laudos:bLaudosRes, mensal:bMensalRes,
-                     eventos_dias:bDiasRes, plano:bPlanoRes, plano_mensal:bPlanoMesRes }).forEach(([parte, r])=>{
+                     eventos_dias:bDiasRes, plano:bPlanoRes, plano_mensal:bPlanoMesRes, apara_ano:bAparaAnoRes }).forEach(([parte, r])=>{
       window.BANCO.estado[parte] = !r.error ? "ok" : faltaNoSupabase(r.error) ? "faltando" : "erro";
       window.BANCO[parte] = !r.error && Array.isArray(r.data) ? r.data : [];
       if(r.error && !faltaNoSupabase(r.error)) console.error(`Falha ao carregar ${parte} do banco — essa parte fica sem dados:`, r.error);
@@ -2953,6 +2958,16 @@ const ultimoValido = arr => { for(let i=arr.length-1;i>=0;i--) if(arr[i]!=null) 
 // o último mês da série, como antes.
 const aparasMedia   = window.APARA_PERIODO ? window.APARA_PERIODO.apontado : ultimoValido(APARAS_MENSAL.apontado);
 const confirmMedia  = window.APARA_PERIODO ? window.APARA_PERIODO.confirmado : ultimoValido(APARAS_MENSAL.confirmado);
+// Apara confirmada acumulada do ano do período, como o bloco ACUMULADO da Conta
+// Refugo (YTD): scrap total ÷ (volume total + scrap total), JGR + ORF.
+const APARA_ANO = (()=>{
+  const linhas = bancoLinhas("apara_ano"), ano = periodoDaUrl().de.getFullYear();
+  const linha = a => linhas.find(x=>Number(x.ano) === a);
+  const r = linha(ano), ant = linha(ano - 1);
+  return { ano, valor: r ? Number(r.confirmado_pct) : null, ateMes: r ? rotuloMes(r.ate_mes) : null,
+           anterior: ant ? Number(ant.confirmado_pct) : null,
+           serie: linhas.map(x=>Number(x.confirmado_pct)) };
+})();
 // Máquina sem hora apontada no período entra como TMR 0% e derruba a
 // média de quem está rodando — a REB 03 (cadastrada e parada) e, desde que
 // a planilha passou a trazer só as rebobinadeiras, mais 10 outras. Média só
@@ -3351,6 +3366,10 @@ renderKpis(document.getElementById("aparas-kpis"), [
     nota:"acumulado do período", spark: serieMensal("perdaT") },
   { label:"Apara confirmada", value: confirmMedia, suffix:"%", decimals:1, comp: comparaMeta(confirmMedia),
     nota: confirmMedia == null ? "% JGR da Conta Refugo, só por mês" : "% JGR da Conta Refugo (balança)", spark: APARAS_MENSAL.confirmado.slice() },
+  { label:`Apara confirmada ${APARA_ANO.ano}`, value: APARA_ANO.valor, suffix:"%", decimals:2, comp: comparaMeta(APARA_ANO.valor),
+    nota: APARA_ANO.valor == null ? "acumulado do ano (YTD) · sem dados ainda"
+      : `acumulado jan–${APARA_ANO.ateMes} (YTD)` + (APARA_ANO.anterior != null ? ` · ${APARA_ANO.ano - 1}: ${fmtNum(APARA_ANO.anterior, 2)}%` : ""),
+    spark: APARA_ANO.serie },
   { label:"Apara apontada", value: aparasMedia, suffix:"%", decimals:1,
     nota:"apontada pelo operador · sem meta", spark: APARAS_MENSAL.apontado.slice() },
   { label:"Diferença conf. x apont.", value: diferencaMesmoMes(), suffix:" p.p.", decimals:1,
@@ -4595,6 +4614,10 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       if(ant) s += ` No mês anterior (${ant.rotulo}) foi ${pct1(ant.valor)}.`;
     }else{
       s += `A apara confirmada só existe por mês: escolha um mês no topo pra ver.`;
+    }
+    if(ok(APARA_ANO.valor)){
+      s += ` No acumulado de ${APARA_ANO.ano} (jan–${APARA_ANO.ateMes}): ${b(fmtNum(APARA_ANO.valor, 2) + "%")}` +
+           (ok(APARA_ANO.anterior) ? `; ${APARA_ANO.ano - 1} fechou em ${fmtNum(APARA_ANO.anterior, 2)}%` : "") + ".";
     }
     if(ok(aparasMedia)){
       const dif = ok(confirmMedia) ? confirmMedia - aparasMedia : null;

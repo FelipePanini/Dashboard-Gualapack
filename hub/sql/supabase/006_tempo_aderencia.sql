@@ -8,9 +8,12 @@
 --               06:00 do dia seguinte), um dia por publicação, só o que mudou
 --   plano_dia   planejado (Histórico Aderência Programação) x realizado
 --               (apontamentos, como a Produção Metros do BI) por máquina e dia
---   apara_mes.volume_jgr / scrap_jgr  as colunas da Refugo Aparas: a apara
---               confirmada do painel passa a ser a "% JGR" da planilha,
---               scrap_jgr ÷ (volume_jgr + scrap_jgr) (decisão de 08/10/2026)
+--   apara_mes.volume_jgr / scrap_jgr / volume_total  as colunas da Refugo
+--               Aparas (Conta Refugo): a apara confirmada de cada mês passa a
+--               ser a "% JGR" da planilha, scrap_jgr ÷ (volume_jgr +
+--               scrap_jgr); período de mais de um mês e o acumulado do ano
+--               seguem o bloco ACUMULADO (YTD) da planilha, scrap total ÷
+--               (volume total + scrap total) (decisões de 08/10/2026)
 -- Leitura só pra quem está logado (RLS), como as outras tabelas do hub.
 -- ============================================================================
 
@@ -34,6 +37,7 @@ create table if not exists trusted.plano_dia (
 
 alter table trusted.apara_mes add column if not exists volume_jgr numeric;
 alter table trusted.apara_mes add column if not exists scrap_jgr numeric;
+alter table trusted.apara_mes add column if not exists volume_total numeric;
 
 do $$ declare t text; begin
   foreach t in array array['evento_dia', 'plano_dia'] loop
@@ -233,10 +237,12 @@ revoke all on public.v_hub_plano_mensal from public, anon;
 grant select on public.v_hub_plano_mensal to authenticated;
 
 -- Apara apontada e confirmada no período (como no 003). Mudança: a
--- confirmada é a "% JGR" da Refugo Aparas, scrap JGR ÷ (volume JGR + scrap
--- JGR), somando os meses do período (o YTD da planilha faz igual). A VOLUME
--- JGR vai só até o último dia pesado. Mês sem a planilha (volume_jgr vazio):
--- a conta do BI, scrap total ÷ (peso bruto das REBs + scrap total).
+-- confirmada segue a Conta Refugo da Refugo Aparas.
+--   um mês:          a "% JGR", scrap JGR ÷ (volume JGR + scrap JGR)
+--   mais de um mês:  como o ACUMULADO (YTD) da planilha, scrap total ÷
+--                    (volume total + scrap total), JGR + ORF
+-- A VOLUME JGR vai só até o último dia pesado. Mês sem a planilha: a conta do
+-- BI, scrap total ÷ (peso bruto das REBs + scrap total).
 create or replace function public.rpc_hub_apara_periodo(p_de date default null, p_ate date default null)
 returns table(refugo numeric, peso_bruto_rebs numeric, scrap_total numeric,
               apontado_pct numeric, confirmado_pct numeric)
@@ -253,14 +259,19 @@ language sql stable security invoker set search_path = '' as $$
     where (p_de is null or dia >= p_de) and (p_ate is null or dia < p_ate)
     group by 1
   ), s as (
-    select sum(coalesce(m.scrap_jgr, m.scrap_total)) as scrap,
-           sum(coalesce(m.volume_jgr, pm.pb, 0)) as base
+    select count(m.scrap_total)                         as meses,
+           sum(coalesce(m.scrap_jgr, m.scrap_total))   as scrap_jgr,
+           sum(coalesce(m.volume_jgr, pm.pb, 0))       as base_jgr,
+           sum(m.scrap_total)                          as scrap_tot,
+           sum(coalesce(m.volume_total, pm.pb, 0))     as base_tot
     from trusted.apara_mes m left join pm using (mes)
     where (p_de is null or m.mes >= p_de) and (p_ate is null or m.mes < p_ate)
   )
-  select a.refugo, a.pb, s.scrap,
+  select a.refugo, a.pb,
+         case when s.meses > 1 then s.scrap_tot else s.scrap_jgr end,
          100 * a.refugo / nullif(a.refugo + a.pb, 0),
-         100 * s.scrap / nullif(s.base + s.scrap, 0)
+         case when s.meses > 1 then 100 * s.scrap_tot / nullif(s.base_tot + s.scrap_tot, 0)
+              else 100 * s.scrap_jgr / nullif(s.base_jgr + s.scrap_jgr, 0) end
   from a, s;
 $$;
 
@@ -274,6 +285,20 @@ create or replace view public.v_hub_apara_mensal with (security_invoker = true) 
   from trusted.apara_mes
   order by mes;
 grant select on public.v_hub_apara_mensal to authenticated;
+
+-- Acumulado de cada ano, como o bloco ACUMULADO da Conta Refugo (YTD 2025,
+-- YTD 2026): scrap total ÷ (volume total + scrap total). Conferido em
+-- 08/10/2026: 2025 = 13,46% (4.744.431,1 kg e 737.975,4 kg), 2026 = 14,28%.
+create or replace view public.v_hub_apara_ano with (security_invoker = true) as
+  select extract(year from mes)::integer as ano, max(mes) as ate_mes,
+         sum(volume_total) as producao, sum(scrap_total) as scrap,
+         100 * sum(scrap_total) / nullif(sum(volume_total) + sum(scrap_total), 0) as confirmado_pct
+  from trusted.apara_mes
+  where volume_total > 0
+  group by 1
+  order by 1;
+revoke all on public.v_hub_apara_ano from public, anon;
+grant select on public.v_hub_apara_ano to authenticated;
 
 -- Conferência: tem de devolver funcoes_ok = true.
 select count(*) = 3 as funcoes_ok

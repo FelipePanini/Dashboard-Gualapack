@@ -208,9 +208,13 @@ jeitos:
   Refugo, como o time usa: scrap JGR ÷ (volume JGR + scrap JGR). A VOLUME JGR
   é o peso bruto das REBs até o último dia pesado (out/2026: 62.392 kg de
   01 a 06/10), então o mês em andamento não divide o fardo de ontem pela
-  produção de hoje. Em jan–mar/2026 é diferente da medida do BI ("%
-  PerdaConfirm. TOTAL", que soma a ORF no scrap e usa o peso bruto do banco):
-  a página Qualidade dos dados segue conferindo a medida do BI.
+  produção de hoje. Período de mais de um mês e o cartão "Apara confirmada
+  {ano}" seguem o bloco ACUMULADO (YTD) da planilha: scrap total ÷ (volume
+  total + scrap total), JGR + ORF (`v_hub_apara_ano`; conferido: YTD 2025 =
+  13,46%, YTD 2026 = 14,28% em 08/10). Em jan–mar/2026 o % JGR é diferente da
+  medida do BI ("% PerdaConfirm. TOTAL", que soma a ORF no scrap e usa o peso
+  bruto do banco): a página Qualidade dos dados segue conferindo a medida do
+  BI.
 
   A aderência (006) é a da página Ad. Plan Mensal do BI: conferida em
   set/2026, planejado e realizado iguais nas 13 máquinas (20.431 km

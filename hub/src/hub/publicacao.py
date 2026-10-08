@@ -346,15 +346,20 @@ def apara_mes(con: duckdb.DuckDBPyConnection) -> list[dict]:
     A apara confirmada do painel é a "% JGR" da planilha, scrap_jgr ÷
     (volume_jgr + scrap_jgr): o número que importa pro time (decisão do dono
     em 08/10/2026). A VOLUME JGR vai só até o último dia pesado, então o mês
-    em andamento não divide o fardo de ontem pela produção de hoje."""
+    em andamento não divide o fardo de ontem pela produção de hoje.
+
+    volume_total (JGR + ORF) e scrap_total: o bloco ACUMULADO da planilha
+    (YTD), que soma os dois: é a conta de período com mais de um mês."""
     return [{"mes": r[0].isoformat(), "refugo": _num(r[1]), "peso_bruto_rebs": _num(r[2]),
-             "scrap_total": _num(r[3]), "volume_jgr": _num(r[4]), "scrap_jgr": _num(r[5])} for r in con.execute(
+             "scrap_total": _num(r[3]), "volume_jgr": _num(r[4]), "scrap_jgr": _num(r[5]),
+             "volume_total": _num(r[6])} for r in con.execute(
         """with b as (
              select date_trunc('month', dia)::date as mes, sum(refugo) as refugo,
                     sum(peso_bruto) filter (where maquina_real in ('REB 01', 'REB 04', 'REB 05', 'REB 09', 'REB 10'))
                       as pb_rebs
              from clean.base_prod group by 1)
-           select coalesce(b.mes, c.mes), b.refugo, b.pb_rebs, c.scrap_total, c.volume_jgr, c.scrap_jgr
+           select coalesce(b.mes, c.mes), b.refugo, b.pb_rebs, c.scrap_total, c.volume_jgr, c.scrap_jgr,
+                  c.volume_jgr + coalesce(c.volume_orf, 0)
            from b full join clean.apara_confirmada_mes c on c.mes = b.mes
            order by 1""").fetchall()]
 
