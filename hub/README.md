@@ -175,10 +175,28 @@ mudaram; o resto só roda se algo mudou no banco, na pasta ou na configuração,
 e ao menos uma vez por dia (o frescor depende da data de hoje). O registro
 fica em `logs/hub-AAAA-MM.log`.
 
+**Com o PC hibernado ou em espera** (desde 08/10/2026): a tarefa acorda o PC
+para rodar ("Ativar o computador para executar esta tarefa"), e o painel
+segue atualizando a cada 10 minutos à tarde, à noite e no fim de semana.
+Antes, o PC dormia por volta das 14h e o painel parava até a manhã seguinte
+(em 06/10, ficou 38 h sem atualizar).
+
+- Só acorda **na tomada**: o plano de energia não deixa despertador acordar
+  na bateria (na mochila, nunca acorda).
+- Acordado, o hub segura o PC até terminar (`src/hub/energia.py`) e espera a
+  rede voltar antes de ler o banco (até ~1,5 min). Depois o Windows volta a
+  dormir sozinho em ~2 minutos.
+- Precisa estar na rede da fábrica (ou na VPN) e com o usuário logado
+  (bloqueado vale; depois de reiniciar, só volta quando alguém entra).
+- A solução definitiva é um PC ou servidor da fábrica sempre ligado rodando
+  o hub; aí o notebook deixa de ser necessário.
+
 ```powershell
 schtasks /Query /TN "Gualapack Data Hub"     # ver
 schtasks /Run /TN "Gualapack Data Hub"       # rodar agora
 schtasks /Delete /TN "Gualapack Data Hub" /F # remover
+# parar de acordar o PC (volta a só rodar com o PC ligado):
+$t = Get-ScheduledTask "Gualapack Data Hub"; $t.Settings.WakeToRun = $false; Set-ScheduledTask "Gualapack Data Hub" -Settings $t.Settings
 ```
 
 ## Publicar no painel

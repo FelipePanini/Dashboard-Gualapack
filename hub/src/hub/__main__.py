@@ -15,7 +15,7 @@ import sys
 import time
 from datetime import date
 
-from hub import banco, coleta, config, db, espelho, execucao, extracoes, medicao, publicacao, relatorio, transformacao, validacao
+from hub import banco, coleta, config, db, energia, espelho, execucao, extracoes, medicao, publicacao, relatorio, transformacao, validacao
 from hub.caminhos import CONFIG, DADOS, LOGS, SQL
 from hub.origens import Origens, localizar
 
@@ -67,6 +67,15 @@ def algo_mudou(cfg: dict) -> str | None:
 
 def executar(gatilho: str = "manual", so_se_mudou: bool = False) -> int:
     cfg = config.carregar()
+    if gatilho == "agendado" and (cfg.get("banco") or {}).get("ativo"):
+        # O agendador pode ter acabado de acordar o PC (hibernado ou em espera):
+        # a rede leva uns segundos para voltar. Espera o banco antes de ler.
+        from hub import sqlserver
+        esperou = sqlserver.aguardar()
+        if esperou is None:
+            log.warning("banco: não respondeu depois de esperar ~1,5 min; sigo com o que já foi extraído")
+        elif esperou >= 1:
+            log.info("banco respondeu depois de %.0f s (rede voltando)", esperou)
     # Primeiro traz da pasta compartilhada o que mudou: a cópia nova faz o
     # "algo mudou" abaixo disparar a execução.
     copiados, avisos_espelho = espelho.espelhar(cfg)
@@ -149,6 +158,13 @@ def main() -> None:
                         help="só roda se algo mudou na pasta de entrada ou na configuração")
     args = parser.parse_args()
     _configurar_log()
+    # O PC fica acordado até o fim (acordado pelo agendador, o Windows voltaria a
+    # dormir em ~2 min, no meio da execução); depois volta a dormir sozinho.
+    with energia.manter_acordado():
+        _rodar(args)
+
+
+def _rodar(args) -> None:
     try:
         if args.comando == "relatorio":
             con = db.conectar()

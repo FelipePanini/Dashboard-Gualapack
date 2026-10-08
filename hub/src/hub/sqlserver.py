@@ -92,6 +92,24 @@ def conectar(timeout: int = 20):
     return con
 
 
+def aguardar(tentativas: int = 7, intervalo: float = 15, conectar_fn=None, dormir=time.sleep,
+             relogio=time.monotonic) -> float | None:
+    """Espera o banco responder. Logo depois que o agendador acorda o PC, a rede
+    leva alguns segundos para voltar e a leitura falharia à toa. Devolve os
+    segundos esperados (0 se respondeu de primeira), ou None se não respondeu
+    em nenhuma tentativa (o hub segue com o que já foi extraído)."""
+    conectar_fn = conectar_fn or (lambda: conectar(timeout=10))
+    inicio = relogio()
+    for i in range(tentativas):
+        try:
+            conectar_fn().close()
+            return relogio() - inicio
+        except Exception:  # noqa: BLE001 — sem rede ainda: tenta de novo
+            if i < tentativas - 1:
+                dormir(intervalo)
+    return None
+
+
 # -- só leitura -----------------------------------------------------------------------
 _PROIBIDAS = re.compile(
     r"\b(INSERT|UPDATE|DELETE|MERGE|UPSERT|EXEC|EXECUTE|CREATE|ALTER|DROP|TRUNCATE|GRANT|REVOKE|DENY|INTO|"
