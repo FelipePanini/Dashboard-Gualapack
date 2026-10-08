@@ -95,15 +95,18 @@ def test_publicar_manda_so_o_dia_que_mudou_e_aguenta_sem_o_006(tmp_path, monkeyp
     assert not [x for x in supa.enviados if x.get("conjunto") == "evento_dia"]
 
 
-def test_producao_da_apara_confirmada_so_no_mes_aberto():
+def test_apara_confirmada_leva_as_colunas_da_conta_refugo_em_todo_mes():
+    # o painel mostra a "% JGR" da planilha: scrap JGR ÷ (volume JGR + scrap JGR)
     con = duckdb.connect()
     con.execute("create schema clean")
-    hoje = date.today().replace(day=1)
     con.execute("""create table clean.base_prod as select * from (values
-        (date '2026-08-05', 'REB 05', 100.0, 1000.0), (cast(? as date), 'REB 05', 50.0, 900.0))
-        t(dia, maquina_real, refugo, peso_bruto)""", [hoje])
+        (date '2026-03-05', 'REB 05', 100.0, 1000.0), (date '2026-10-02', 'REB 05', 50.0, 900.0))
+        t(dia, maquina_real, refugo, peso_bruto)""")
     con.execute("""create table clean.apara_confirmada_mes as select * from (values
-        (date '2026-08-01', 1200.0, 150.0), (cast(? as date), 700.0, 80.0)) t(mes, volume_jgr, scrap_total)""", [hoje])
+        (date '2026-03-01', 345838.0, 57408.5, 64147.2), (date '2026-10-01', 62391.9, 11618.4, 11618.4))
+        t(mes, volume_jgr, scrap_jgr, scrap_total)""")
     linhas = {r["mes"]: r for r in publicacao.apara_mes(con)}
-    assert linhas["2026-08-01"]["producao_conf"] is None                # mês fechado: vale o peso bruto do banco
-    assert linhas[hoje.isoformat()]["producao_conf"] == 700.0           # mês aberto: a produção dos dias pesados
+    mar, out = linhas["2026-03-01"], linhas["2026-10-01"]
+    assert (mar["volume_jgr"], mar["scrap_jgr"], mar["scrap_total"]) == (345838.0, 57408.5, 64147.2)
+    assert round(100 * mar["scrap_jgr"] / (mar["volume_jgr"] + mar["scrap_jgr"]), 2) == 14.24   # % JGR de mar/2026
+    assert round(100 * out["scrap_jgr"] / (out["volume_jgr"] + out["scrap_jgr"]), 2) == 15.70   # % JGR de out/2026

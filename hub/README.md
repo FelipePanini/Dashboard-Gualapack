@@ -196,18 +196,21 @@ jeitos:
   | Velocidade | metros ÷ horas produzindo ÷ 60 (VelMédia) | apontamentos (tabela Horas) |
   | Paradas | horas por código, fora PRODUZINDO | apontamentos (tabela Horas) |
   | Apara apontada | refugo ÷ (refugo + peso bruto das REBs) | apontamentos (BASE_PROD) |
-  | Apara confirmada | scrap ÷ (peso bruto das REBs + scrap) | Refugo Aparas (planilha) + BASE_PROD |
+  | Apara confirmada | "% JGR" da Conta Refugo: scrap JGR ÷ (volume JGR + scrap JGR) | Refugo Aparas (planilha); sem o 006, a conta do BI com o peso bruto da BASE_PROD |
   | Aderência | realizado ÷ planejado, km lineares (Ad. Plan Mensal) | Histórico Aderência Programação (planilha, aba PROGRAMAÇÃO) + apontamentos sem WIP e sem revisão (`sql/clean/210_plano.sql`, 006) |
   | Perda por motivo / máquina, OPs | kg de perda apontada (código 40) | apontamentos |
   | Apara por classificação | apontado por grupo de produto (Aparas_Geral v3) | BASE_PROD |
   | Produtividade | m² ÷ horas produzindo | apontamentos + largura da estrutura |
 
   A apara de referência é a **confirmada**, com meta de 12% (decisão do dono
-  em 07/10/2026); a apontada fica como comparação, sem meta. No mês em
-  andamento, a confirmada divide pela produção dos dias já pesados (VOLUME
-  JGR da Refugo Aparas), não pela de até agora: o peso bruto do banco já tem
-  o dia de hoje, sem fardo pesado ainda (em 07/10 às 09h: 13,0% contra 13,9%
-  da planilha). Nos meses fechados, as duas produções são iguais.
+  em 07/10/2026); a apontada fica como comparação, sem meta. Desde 08/10
+  (006), o número da confirmada em cada mês é a coluna "% JGR" da Conta
+  Refugo, como o time usa: scrap JGR ÷ (volume JGR + scrap JGR). A VOLUME JGR
+  é o peso bruto das REBs até o último dia pesado (out/2026: 62.392 kg de
+  01 a 06/10), então o mês em andamento não divide o fardo de ontem pela
+  produção de hoje. Em jan–mar/2026 é diferente da medida do BI ("%
+  PerdaConfirm. TOTAL", que soma a ORF no scrap e usa o peso bruto do banco):
+  a página Qualidade dos dados segue conferindo a medida do BI.
 
   A aderência (006) é a da página Ad. Plan Mensal do BI: conferida em
   set/2026, planejado e realizado iguais nas 13 máquinas (20.431 km

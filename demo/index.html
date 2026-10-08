@@ -2121,7 +2121,8 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
     // (conferidas mês a mês na página Qualidade dos dados):
     //   TMR = produzindo ÷ horas sem FIM TURNO e sem INATIVIDADE (Machine Card)
     //   velocidade = metros ÷ horas produzindo ÷ 60
-    //   apontado = refugo ÷ (refugo + peso bruto das REBs); confirmado = scrap ÷ (peso bruto REBs + scrap)
+    //   apontado = refugo ÷ (refugo + peso bruto das REBs); confirmado = "% JGR" da Conta Refugo
+    //   (scrap JGR ÷ (volume JGR + scrap JGR); com o 006, desde 08/10/2026)
     //   aderência = produzido ÷ planejado
     // Sem o 002, a rpc_hub_maquinas do 001 não traz "metros": fica tudo como acima.
     const HUB2 = HUB_ATIVO;
@@ -3349,7 +3350,7 @@ renderKpis(document.getElementById("aparas-kpis"), [
   { label:"Refugo total", value: perdaTotalKg/1000, suffix:" t", decimals:1,
     nota:"acumulado do período", spark: serieMensal("perdaT") },
   { label:"Apara confirmada", value: confirmMedia, suffix:"%", decimals:1, comp: comparaMeta(confirmMedia),
-    nota: confirmMedia == null ? "medição por balança, só por mês" : "medição por balança", spark: APARAS_MENSAL.confirmado.slice() },
+    nota: confirmMedia == null ? "% JGR da Conta Refugo, só por mês" : "% JGR da Conta Refugo (balança)", spark: APARAS_MENSAL.confirmado.slice() },
   { label:"Apara apontada", value: aparasMedia, suffix:"%", decimals:1,
     nota:"apontada pelo operador · sem meta", spark: APARAS_MENSAL.apontado.slice() },
   { label:"Diferença conf. x apont.", value: diferencaMesmoMes(), suffix:" p.p.", decimals:1,

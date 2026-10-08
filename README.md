@@ -122,7 +122,7 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 | Linha do tempo | idem, evento a evento | um dia de produção por vez, das 06:00 às 06:00 do dia seguinte (o turno da noite ainda é do dia anterior); abre no último dia fechado, com os 7 dias mais recentes no seletor |
 | Perda por motivo e por máquina, OPs com mais refugo | idem, código 40 | kg apontados |
 | Apara apontada (comparação, sem meta), produção em kg | idem, consulta BASE_PROD | refugo ÷ (refugo + peso bruto das rebobinadeiras) |
-| Apara confirmada (a de referência; meta 12%) | planilhas Sequenciamento (fardos, acumulado) e Refugo Aparas | scrap ÷ (peso bruto das REBs + scrap); só por mês. No mês em andamento, a produção é a dos dias já pesados (VOLUME JGR da Refugo Aparas), não a de até agora |
+| Apara confirmada (a de referência; meta 12%) | Refugo Aparas (aba Conta Refugo) | a coluna "% JGR" da planilha, mês a mês: scrap JGR ÷ (volume JGR + scrap JGR). Período de vários meses: somas só de JGR (o YTD da planilha soma também a ORF de jan–mar/2026) |
 | Produtividade (m²/h) e velocidade | apontamentos, código 20, + `EstrProcessos` (largura) | m² = metros × largura; ÷ horas produzindo |
 | Aderência ao plano | planilha Histórico Aderência Programação (PCP, aba PROGRAMAÇÃO) + apontamentos | como a página Ad. Plan Mensal do BI: planejado = QtdPlanejada pelo dia de início planejado; realizado = QtdProduzida sem WIP e sem revisão (km = metros ÷ 1000). No mês em andamento, o planejado é o do mês inteiro e a % compara com o planejado até hoje |
 | Entregas no prazo | `View_usr_Entregas_Desempenho` (a consulta da Aderência Semanal) | Ótimo: faturado até a data do cliente; Bom: até a do PCP; Regular, Ruim e Péssimo: até 5, 10 e mais de 10 dias depois da do PCP |

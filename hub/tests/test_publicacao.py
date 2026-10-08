@@ -80,7 +80,7 @@ def _com_apontamentos_banco(con):
         (date '2026-08-05', 'R18',    'R18',    '41000', 'POUCH X', ['Simple Laminated'], 0.0,    30.0)
       ) t(dia, maquina, maquina_real, num_ordem, descricao, grupos, peso_bruto, refugo)""")
     con.execute("""create table clean.apara_confirmada_mes as select * from (values
-        (date '2026-08-01', 1000.0, 150.0)) t(mes, volume_jgr, scrap_total)""")
+        (date '2026-08-01', 1000.0, 140.0, 150.0)) t(mes, volume_jgr, scrap_jgr, scrap_total)""")
 
 
 def test_codigos_ultimo_dia_e_series(tmp_path):
@@ -104,7 +104,7 @@ def test_codigos_ultimo_dia_e_series(tmp_path):
 
     # série mensal de apara: refugo de todas as máquinas, peso bruto só das REBs
     assert pacote["apara_mes"] == [{"mes": "2026-08-01", "refugo": 80.0, "peso_bruto_rebs": 1000.0,
-                                    "scrap_total": 150.0, "producao_conf": None}]   # mês fechado
+                                    "scrap_total": 150.0, "volume_jgr": 1000.0, "scrap_jgr": 140.0}]
 
     assert set(publicacao.assinaturas(con, "horas_maquina_dia")) == {date(2026, 8, 1), date(2026, 9, 1)}
     assert publicacao.assinaturas(con, "perda_dia") == {}          # tabela que não existe: série fica de fora

@@ -8,9 +8,9 @@
 --               06:00 do dia seguinte), um dia por publicação, só o que mudou
 --   plano_dia   planejado (Histórico Aderência Programação) x realizado
 --               (apontamentos, como a Produção Metros do BI) por máquina e dia
---   apara_mes.producao_conf  no mês em andamento, a produção dos dias já
---               pesados (a da Refugo Aparas): a apara confirmada não divide o
---               fardo de ontem pela produção de hoje
+--   apara_mes.volume_jgr / scrap_jgr  as colunas da Refugo Aparas: a apara
+--               confirmada do painel passa a ser a "% JGR" da planilha,
+--               scrap_jgr ÷ (volume_jgr + scrap_jgr) (decisão de 08/10/2026)
 -- Leitura só pra quem está logado (RLS), como as outras tabelas do hub.
 -- ============================================================================
 
@@ -32,7 +32,8 @@ create table if not exists trusted.plano_dia (
   primary key (dia, maquina)
 );
 
-alter table trusted.apara_mes add column if not exists producao_conf numeric;
+alter table trusted.apara_mes add column if not exists volume_jgr numeric;
+alter table trusted.apara_mes add column if not exists scrap_jgr numeric;
 
 do $$ declare t text; begin
   foreach t in array array['evento_dia', 'plano_dia'] loop
@@ -231,9 +232,11 @@ create or replace view public.v_hub_plano_mensal with (security_invoker = true) 
 revoke all on public.v_hub_plano_mensal from public, anon;
 grant select on public.v_hub_plano_mensal to authenticated;
 
--- Apara apontada e confirmada no período (como no 003). Mudança: no mês em
--- andamento a confirmada divide pela produção dos dias já pesados
--- (producao_conf), não pela produção até agora.
+-- Apara apontada e confirmada no período (como no 003). Mudança: a
+-- confirmada é a "% JGR" da Refugo Aparas, scrap JGR ÷ (volume JGR + scrap
+-- JGR), somando os meses do período (o YTD da planilha faz igual). A VOLUME
+-- JGR vai só até o último dia pesado. Mês sem a planilha (volume_jgr vazio):
+-- a conta do BI, scrap total ÷ (peso bruto das REBs + scrap total).
 create or replace function public.rpc_hub_apara_periodo(p_de date default null, p_ate date default null)
 returns table(refugo numeric, peso_bruto_rebs numeric, scrap_total numeric,
               apontado_pct numeric, confirmado_pct numeric)
@@ -250,8 +253,8 @@ language sql stable security invoker set search_path = '' as $$
     where (p_de is null or dia >= p_de) and (p_ate is null or dia < p_ate)
     group by 1
   ), s as (
-    select sum(m.scrap_total) as scrap,
-           sum(coalesce(m.producao_conf, pm.pb, 0)) as base
+    select sum(coalesce(m.scrap_jgr, m.scrap_total)) as scrap,
+           sum(coalesce(m.volume_jgr, pm.pb, 0)) as base
     from trusted.apara_mes m left join pm using (mes)
     where (p_de is null or m.mes >= p_de) and (p_ate is null or m.mes < p_ate)
   )
@@ -261,12 +264,13 @@ language sql stable security invoker set search_path = '' as $$
   from a, s;
 $$;
 
--- Série mensal do gráfico de apara: a confirmada do mês em andamento com a
--- produção dos dias já pesados.
+-- Série mensal do gráfico de apara: a confirmada é a "% JGR" da planilha
+-- (scrap_total aqui é o scrap JGR, o da conta).
 create or replace view public.v_hub_apara_mensal with (security_invoker = true) as
-  select mes, refugo, peso_bruto_rebs, scrap_total,
-         100 * refugo / nullif(refugo + peso_bruto_rebs, 0)                                   as apontado_pct,
-         100 * scrap_total / nullif(coalesce(producao_conf, peso_bruto_rebs) + scrap_total, 0) as confirmado_pct
+  select mes, refugo, peso_bruto_rebs, coalesce(scrap_jgr, scrap_total) as scrap_total,
+         100 * refugo / nullif(refugo + peso_bruto_rebs, 0) as apontado_pct,
+         100 * coalesce(scrap_jgr, scrap_total)
+             / nullif(coalesce(volume_jgr, peso_bruto_rebs) + coalesce(scrap_jgr, scrap_total), 0) as confirmado_pct
   from trusted.apara_mes
   order by mes;
 grant select on public.v_hub_apara_mensal to authenticated;

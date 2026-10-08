@@ -342,21 +342,19 @@ def apara_mes(con: duckdb.DuckDBPyConnection) -> list[dict]:
     (BASE_PROD) e scrap da balança (Refugo Aparas). O painel faz as contas
     do BI com isso (v_hub_apara_mensal).
 
-    producao_conf: a produção que vai na conta da apara confirmada, a VOLUME
-    JGR da própria Refugo Aparas, que vai só até o último dia pesado. No mês
-    aberto o peso bruto do banco já tem o dia de hoje, sem fardo pesado ainda:
-    em 07/10 às 09h dava 13,0% contra 13,9% da planilha. Só no mês aberto: nos
-    fechados vale o peso bruto do banco, que é o do BI (em jan–mar/2026 a VOLUME
-    JGR da planilha é outra, 303 t contra 360 t em janeiro)."""
+    volume_jgr e scrap_jgr: as colunas da própria Refugo Aparas (Conta Refugo).
+    A apara confirmada do painel é a "% JGR" da planilha, scrap_jgr ÷
+    (volume_jgr + scrap_jgr): o número que importa pro time (decisão do dono
+    em 08/10/2026). A VOLUME JGR vai só até o último dia pesado, então o mês
+    em andamento não divide o fardo de ontem pela produção de hoje."""
     return [{"mes": r[0].isoformat(), "refugo": _num(r[1]), "peso_bruto_rebs": _num(r[2]),
-             "scrap_total": _num(r[3]), "producao_conf": _num(r[4])} for r in con.execute(
+             "scrap_total": _num(r[3]), "volume_jgr": _num(r[4]), "scrap_jgr": _num(r[5])} for r in con.execute(
         """with b as (
              select date_trunc('month', dia)::date as mes, sum(refugo) as refugo,
                     sum(peso_bruto) filter (where maquina_real in ('REB 01', 'REB 04', 'REB 05', 'REB 09', 'REB 10'))
                       as pb_rebs
              from clean.base_prod group by 1)
-           select coalesce(b.mes, c.mes), b.refugo, b.pb_rebs, c.scrap_total,
-                  case when c.mes = date_trunc('month', current_date) then c.volume_jgr end
+           select coalesce(b.mes, c.mes), b.refugo, b.pb_rebs, c.scrap_total, c.volume_jgr, c.scrap_jgr
            from b full join clean.apara_confirmada_mes c on c.mes = b.mes
            order by 1""").fetchall()]
 
