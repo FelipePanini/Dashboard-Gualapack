@@ -294,12 +294,20 @@ CONJUNTOS: dict[str, tuple[str, str]] = {
     "plano_dia": ("clean.plano_dia", """
         select dia, maquina, round(planejado, 3) as planejado, round(realizado, 3) as realizado
         from clean.plano_dia"""),
+    # --- 007_oee.sql ---
+    # qualidade (aparas) de cada máquina, para o OEE dos cartões
+    "qualidade_maquina_dia": ("clean.qualidade_maquina_dia", """
+        select dia, maquina, round(refugo_kg, 3) as refugo_kg, round(peso_ops_kg, 3) as peso_ops_kg, ops
+        from clean.qualidade_maquina_dia"""),
 }
-# Conjuntos que só existem a partir do 005_banco.sql: sem ele, o Supabase não
-# conhece o conjunto e eles ficam de fora, com um aviso (o resto publica normal).
-CONJUNTOS_005 = {"entrega_dia", "setup_dia", "laudo_dia", "faturamento_dia"}
-# ... e a partir do 006_tempo_aderencia.sql (o evento_dia vai um dia por vez)
-CONJUNTOS_006 = {"plano_dia", "evento_dia"}
+# Conjuntos que só existem a partir de um SQL do Supabase: sem ele, o Supabase
+# não conhece o conjunto e eles ficam de fora, com um aviso (o resto publica
+# normal). O evento_dia vai um dia por vez.
+SQL_DO_CONJUNTO = {
+    **{c: "005_banco.sql" for c in ("entrega_dia", "setup_dia", "laudo_dia", "faturamento_dia")},
+    **{c: "006_tempo_aderencia.sql" for c in ("plano_dia", "evento_dia")},
+    "qualidade_maquina_dia": "007_oee.sql",
+}
 
 # Fotos do estado atual: vão inteiras no pacote, a cada publicação (005_banco.sql).
 FOTOS: dict[str, tuple[str, str]] = {
@@ -412,7 +420,8 @@ def publicar(con: duckdb.DuckDBPyConnection, run_id: int, cfg: dict, republicar:
     if republicar:
         con.execute("delete from publicacao_mes")
     ja_foi = {(c, m): a for c, m, a in con.execute("select conjunto, mes, assinatura from publicacao_mes").fetchall()}
-    enviados, sem_005, sem_006 = {}, [], []
+    enviados: dict[str, int] = {}
+    faltando: dict[str, list[str]] = {}   # SQL do Supabase ainda não aplicado -> conjuntos que ficaram de fora
     for conjunto in CONJUNTOS:
         for mes, assinatura in sorted(assinaturas(con, conjunto).items()):
             if ja_foi.get((conjunto, mes)) == assinatura:
@@ -422,8 +431,8 @@ def publicar(con: duckdb.DuckDBPyConnection, run_id: int, cfg: dict, republicar:
                 resposta = enviar({"conjunto": conjunto, "de": mes.isoformat(), "ate": _fim_do_mes(mes).isoformat(),
                                    "linhas": linhas})
             except PublicacaoFalhou as e:
-                if conjunto in CONJUNTOS_005 | CONJUNTOS_006 and "conjunto desconhecido" in str(e):
-                    (sem_005 if conjunto in CONJUNTOS_005 else sem_006).append(conjunto)
+                if conjunto in SQL_DO_CONJUNTO and "conjunto desconhecido" in str(e):
+                    faltando.setdefault(SQL_DO_CONJUNTO[conjunto], []).append(conjunto)
                     break  # o Supabase ainda não tem o SQL: os outros meses deste conjunto também não entram
                 raise
             if resposta.get("linhas") != len(linhas):
@@ -446,7 +455,7 @@ def publicar(con: duckdb.DuckDBPyConnection, run_id: int, cfg: dict, republicar:
             resposta = enviar({"conjunto": "evento_dia", "de": dia.isoformat(), "ate": dia.isoformat(), "linhas": linhas})
         except PublicacaoFalhou as e:
             if "conjunto desconhecido" in str(e):
-                sem_006.append("evento_dia")
+                faltando.setdefault(SQL_DO_CONJUNTO["evento_dia"], []).append("evento_dia")
                 break
             raise
         if resposta.get("linhas") != len(linhas):
@@ -461,7 +470,6 @@ def publicar(con: duckdb.DuckDBPyConnection, run_id: int, cfg: dict, republicar:
     if dias_enviados:
         series = (series + ", " if series else "") + f"linha do tempo {dias_enviados} dia(s)"
     series = series or "nenhuma série mudou"
-    falta = (f"; sem o 005_banco.sql no Supabase, ficaram de fora: {', '.join(sem_005)}" if sem_005 else "")
-    falta += (f"; sem o 006_tempo_aderencia.sql no Supabase, ficaram de fora: {', '.join(sem_006)}" if sem_006 else "")
+    falta = "".join(f"; sem o {sql} no Supabase, ficaram de fora: {', '.join(cs)}" for sql, cs in sorted(faltando.items()))
     return (f"publicado: {len(pacote['validacao'])} validações, {len(pacote['fontes'])} fontes, "
             f"{len(pacote['avisos'])} avisos, {len(pacote.get('ultimo_dia', []))} eventos do último dia; {series}{falta}")

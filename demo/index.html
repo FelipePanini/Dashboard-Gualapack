@@ -66,6 +66,8 @@ body.auth-pending::after{
   --cls-fim-turno: #7d8794;
   --cls-sem-classe: #977a5e;
   --cls-parada: #b85f17;
+  /* maior perda do OEE: o mesmo laranja das paradas (nos temas escuros, o de lá) */
+  --perda: var(--cls-parada);
   /* classificação de entrega da Aderência Semanal: Ótimo → Péssimo (verde → vermelho) */
   --ent-1: #08703d;
   --ent-2: #4a8f2a;
@@ -513,6 +515,23 @@ button.legend-item:hover{ color: var(--text-primary); }
 .machine-oee .l{ font-size:12px; color: var(--text-muted); margin-top:5px; }
 .machine-card.st-none .machine-oee .v{ color: var(--text-muted); }
 .machine-spark{ flex:none; overflow:visible; }
+/* OEE: as três partes, na ordem do dono. Nome e % em cima, a barra inteira embaixo (o
+   nome não corta); a mais baixa (a maior perda) em laranja e em negrito */
+.oee-fatores{ display:flex; flex-direction:column; gap:10px; margin-top:14px; }
+.oee-f{ display:grid; grid-template-columns: minmax(0,1fr) auto; align-items:baseline; column-gap:8px; row-gap:5px; font-size:12px; color: var(--text-secondary); }
+.oee-f .oee-l{ grid-area: 1 / 1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.oee-f .oee-l small{ color: var(--text-muted); font-size:11px; margin-left:2px; }
+.oee-f .oee-v{ grid-area: 1 / 2; text-align:right; font-weight:600; color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.oee-t{ grid-area: 2 / 1 / 3 / 3; height:5px; border-radius:3px; background: var(--surface-sunken); overflow:hidden; }
+.oee-t > span{ display:block; height:100%; border-radius:3px; background: var(--series-3); transform-origin:left center; }
+.oee-f.pior .oee-l, .oee-f.pior .oee-v{ color: var(--text-primary); font-weight:650; }
+.oee-f.pior .oee-t > span{ background: var(--perda); }
+.machine-board.anima .oee-t > span{ animation: cresce-x .65s var(--ease-out) backwards; animation-delay: calc(var(--i, 0) * 28ms + .15s); }
+.machine-card.st-neutro::before{ background: var(--border-strong); }
+/* cartão estreito (celular, dois por linha): fica só o nome da parte, que não pode
+   cortar; o "aparas / velocidade / paradas" está no subtítulo do painel */
+.machine-card{ container-type: inline-size; }
+@container (max-width: 210px){ .oee-f .oee-l small{ display:none; } }
 .machine-foot{
   display:flex; align-items:center; gap:4px; margin-top:12px; font-size:12px; color: var(--text-muted);
   transition: color .25s var(--ease-out), gap .35s var(--spring);
@@ -713,18 +732,24 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
 .drawer-title{ font-size:24px; font-weight:700; margin:3px 0 0; letter-spacing:-0.02em; }
 .drawer-body{ flex:1; overflow-y:auto; padding:20px 22px 30px; overscroll-behavior:contain; }
 .drawer.open .drawer-body > *{ animation: entra-leve .45s var(--ease-out) backwards; animation-delay: calc(min(var(--i, 0), 12) * 22ms + .12s); }
-.drawer-metrics{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:10px; margin-bottom:6px; }
+.drawer-metrics{ display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:8px; margin-bottom:6px; }
 .drawer-metric{ background: var(--surface-1); border:1px solid var(--border); border-radius:12px; padding:12px 8px; text-align:center; }
 .drawer-metric .v{ font-size:21px; font-weight:700; letter-spacing:-0.02em; font-variant-numeric: tabular-nums; }
 .drawer-metric .l{ font-size:12px; color: var(--text-muted); margin-top:3px; }
+/* OEE na linha de cima, com a maior perda escrita; as três partes embaixo */
+.drawer-oee{ grid-column: 1 / -1; display:flex; align-items:center; gap:14px; padding:14px 16px; text-align:left; }
+.drawer-oee .v{ font-size:30px; }
+.drawer-oee .l{ margin-top:0; display:flex; flex-direction:column; gap:2px; font-size:13px; font-weight:650; color: var(--text-primary); }
+.drawer-oee .l span{ font-size:12px; font-weight:400; color: var(--text-muted); }
+.drawer-metric.pior .v{ color: var(--perda); }
 .drawer-section-title{ font-size:13px; font-weight:650; color: var(--text-secondary); margin:22px 0 10px; }
 .drawer-bars{ display:flex; flex-direction:column; gap:10px; }
 .drawer-bar-row{ display:flex; align-items:center; gap:10px; font-size:13px; }
-.drawer-bar-label{ width:80px; flex:none; color: var(--text-secondary); }
+.drawer-bar-label{ width:104px; flex:none; color: var(--text-secondary); }
 .drawer-bar-track{ flex:1; height:8px; border-radius:99px; background: var(--surface-sunken); overflow:hidden; }
 .drawer-bar-fill{ height:100%; border-radius:99px; transform-origin:left center; }
 .drawer.open .drawer-bar-fill{ animation: cresce-x .7s var(--ease-out) backwards .25s; }
-.drawer-bar-value{ width:76px; flex:none; text-align:right; white-space:nowrap; font-weight:600; font-variant-numeric: tabular-nums; }
+.drawer-bar-value{ width:auto; min-width:76px; flex:none; text-align:right; white-space:nowrap; font-weight:600; font-variant-numeric: tabular-nums; }
 .drawer-facas-item{ display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 0; border-bottom:1px solid var(--border); font-size:13px; }
 .drawer-facas-item:last-child{ border-bottom:none; }
 .drawer-facas-item span:last-child{ font-weight:600; font-variant-numeric: tabular-nums; white-space:nowrap; }
@@ -1281,7 +1306,7 @@ html.vidro .drawer{ box-shadow: var(--lg-brilho), -24px 0 60px -20px rgba(10,21,
           <div class="panel-head">
             <div>
               <h3 class="panel-title">Máquinas</h3>
-              <div class="panel-sub">TMR do período por recurso, na ordem da rota &middot; toque para ver o detalhe</div>
+              <div class="panel-sub">OEE do período por recurso = qualidade (aparas) &times; performance (velocidade) &times; disponibilidade (paradas) &middot; em laranja, a maior perda &middot; toque para ver o detalhe</div>
             </div>
             <div class="segmented" id="maq-filters" role="group" aria-label="Filtrar por etapa"></div>
           </div>
@@ -2008,7 +2033,7 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
     const [hubMaqRes, hubParadasRes, hubGanttRes, hubMotivoRes, hubRefugoMaqRes, hubOpsRes, hubClasseRes, hubAparaRes,
            hubFontesRes, hubAparaPeriodoRes, hubMensalRes, hubPerdaMaqMotivoRes, listaRes, hubCodigosRes,
            bAgoraRes, bFilaRes, bWipRes, bCarteiraRes, bEntregasRes, bSetupRes, bLaudosRes, bMensalRes,
-           bDiasRes, bPlanoRes, bPlanoMesRes, bAparaAnoRes] = await Promise.all([
+           bDiasRes, bPlanoRes, bPlanoMesRes, bAparaAnoRes, bQualRes] = await Promise.all([
       // Horas por máquina/código publicadas pelo hub (Machine Card) e o resto
       // dos cartões (002_cartoes.sql).
       client.rpc("rpc_hub_maquinas", { p_de: pDe, p_ate: pAte }),
@@ -2048,6 +2073,8 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
       client.from("v_hub_plano_mensal").select("*"),
       // apara confirmada acumulada de cada ano (bloco ACUMULADO da Conta Refugo)
       client.from("v_hub_apara_ano").select("*"),
+      // 007_oee.sql: qualidade (aparas) de cada máquina, para o OEE
+      client.rpc("rpc_hub_qualidade_maquina", { p_de: pDe, p_ate: pAte }),
     ]);
     // Com o hub publicado (002), nenhuma consulta antiga é usada: todas têm
     // equivalente no hub. Elas somam centenas de milhares de linhas e, em
@@ -2066,7 +2093,7 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
     const passageiro = [hubParadasRes, hubGanttRes, hubMotivoRes, hubRefugoMaqRes, hubOpsRes, hubClasseRes, hubAparaRes,
                         hubFontesRes, hubAparaPeriodoRes, hubMensalRes, hubPerdaMaqMotivoRes, hubCodigosRes,
                         bAgoraRes, bFilaRes, bWipRes, bCarteiraRes, bEntregasRes, bSetupRes, bLaudosRes, bMensalRes,
-                        bDiasRes, bPlanoRes, bPlanoMesRes, bAparaAnoRes]
+                        bDiasRes, bPlanoRes, bPlanoMesRes, bAparaAnoRes, bQualRes]
       .map(r=>r.error).find(e=>e && e.code !== "PGRST202" && e.code !== "PGRST205");
     if(passageiro && tentativa === 1) throw passageiro;
     // período sem nenhum apontamento também é hub (vazio), não caminho antigo
@@ -2393,8 +2420,8 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
           confirmado: r.confirmado_pct != null ? n(r.confirmado_pct) : null,
         };
       }
-      // Série mensal real (meses fechados) das linhas de tendência dos
-      // cartões e do "TMR — últimos 12 meses" do detalhe da máquina.
+      // Série mensal real (meses fechados) do
+      // "Disponibilidade (TMR) — últimos 12 meses" do detalhe da máquina.
       if(!hubMensalRes.error && (hubMensalRes.data||[]).length){
         const porMes = new Map(), porMaqMes = new Map();
         const zero = () => ({ tot:0, prod:0, metros:0, plan:0, prodz:0, m2:0, hm2:0, perda:0 });
@@ -2429,6 +2456,35 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
             tmr: meses.map(m => { const x = pm.get(m); return x ? razao(100*x.prod, x.tot) : null; }),
           }])),
         };
+      }
+      // OEE (decisão do dono em 08/10/2026), em %, por máquina:
+      //   qualidade (aparas)        = 100 − apara da máquina: refugo ÷ (refugo + peso final
+      //                               das OPs que passaram por ela) (007_oee.sql)
+      //   performance (velocidade)  = velocidade ÷ melhor mês da máquina nos 12 meses até o
+      //                               fim do período (o "melhor mês" do painel), até 100
+      //   disponibilidade (paradas) = TMR: produzindo ÷ horas sem FIM TURNO e INATIVIDADE
+      //   OEE = os três multiplicados
+      // Fábrica: disponibilidade = TMR geral (como o BI); qualidade e performance = média das
+      // máquinas, ponderada pelas horas produzindo. Sem o 007, fica sem qualidade e sem OEE.
+      window.OEE = null;
+      const qualOk = !bQualRes.error && Array.isArray(bQualRes.data);
+      const qualPorMaq = new Map(qualOk ? bQualRes.data.map(r=>[chave(r.maquina), r]) : []);
+      MAQUINAS.forEach(m=>{
+        const h = porMaq.get(chave(m.id)) || {};
+        const tot = n(h.horas_totais), prod = n(h.horas_produzindo), ref = n(h.velocidade_ref_m_min);
+        m.disp = tot > 0 ? 100 * prod / tot : null;
+        m.perf = prod > 0 && ref > 0 ? Math.min(100, 100 * (n(h.metros) / prod / 60) / ref) : null;
+        const q = qualPorMaq.get(chave(m.id)), baseQ = q ? n(q.refugo_kg) + n(q.peso_ops_kg) : 0;
+        m.qual = baseQ > 0 ? 100 - 100 * n(q.refugo_kg) / baseQ : null;
+        m.refugoQual = q ? n(q.refugo_kg) : null;
+        m.oee = m.disp != null && m.perf != null && m.qual != null ? m.disp * m.perf * m.qual / 10000 : null;
+        m.horasProdExatas = prod;
+      });
+      if(qualOk){
+        const media = c => { const l = MAQUINAS.filter(m=>m[c] != null && m.horasProdExatas > 0), hp = l.reduce((a,m)=>a + m.horasProdExatas, 0);
+                             return hp > 0 ? l.reduce((a,m)=>a + m[c] * m.horasProdExatas, 0) / hp : null; };
+        const disp = window.HUB_TOTAIS ? window.HUB_TOTAIS.tmr : null, perf = media("perf"), qual = media("qual");
+        window.OEE = { disp, perf, qual, oee: disp != null && perf != null && qual != null ? disp * perf * qual / 10000 : null };
       }
       // Aderência como a página Ad. Plan Mensal do BI (006): planejado da
       // Histórico Aderência Programação, realizado dos apontamentos sem WIP e
@@ -2494,7 +2550,8 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
     const faltaNoSupabase = e => e && (e.code === "PGRST202" || e.code === "PGRST205");
     Object.entries({ agora:bAgoraRes, programacao:bFilaRes, wip:bWipRes, carteira:bCarteiraRes, entregas:bEntregasRes,
                      setup:bSetupRes, laudos:bLaudosRes, mensal:bMensalRes,
-                     eventos_dias:bDiasRes, plano:bPlanoRes, plano_mensal:bPlanoMesRes, apara_ano:bAparaAnoRes }).forEach(([parte, r])=>{
+                     eventos_dias:bDiasRes, plano:bPlanoRes, plano_mensal:bPlanoMesRes, apara_ano:bAparaAnoRes,
+                     qualidade:bQualRes }).forEach(([parte, r])=>{
       window.BANCO.estado[parte] = !r.error ? "ok" : faltaNoSupabase(r.error) ? "faltando" : "erro";
       window.BANCO[parte] = !r.error && Array.isArray(r.data) ? r.data : [];
       if(r.error && !faltaNoSupabase(r.error)) console.error(`Falha ao carregar ${parte} do banco — essa parte fica sem dados:`, r.error);
@@ -2715,6 +2772,24 @@ function tmrStatus(v){
 // Máquina sem nenhuma hora apontada no período não é "Crítico" com 0%: não
 // há medição. Fica neutra ("Sem apontamento"). As faixas acima não mudam.
 const statusMaquina = m => m.horasTot > 0 ? tmrStatus(m.tmr) : "none";
+// Meta de OEE (%): a definir pelos gestores. Sem meta, os cartões ficam neutros (sem
+// "Crítico" em tudo); com ela, verde na meta, âmbar até 85% dela, vermelho abaixo.
+const META_OEE = null;
+function statusOee(m){
+  if(!(m.horasTot > 0)) return "none";
+  if(META_OEE == null || m.oee == null) return "neutro";
+  return m.oee >= META_OEE ? "good" : m.oee >= META_OEE * 0.85 ? "warning" : "critical";
+}
+// As três partes do OEE, na ordem do dono, com a maior perda (a mais baixa) marcada.
+// Sem o hub (m.disp/m.perf não calculados), vale o TMR e a velocidade ÷ melhor mês do cartão.
+function fatoresOee(m){
+  const disp = m.disp !== undefined ? m.disp : m.horasTot > 0 ? m.tmr : null;
+  const perf = m.perf !== undefined ? m.perf : m.vel != null && m.velRef > 0 ? Math.min(100, 100 * m.vel / m.velRef) : null;
+  const f = [["Qualidade", "aparas", m.qual ?? null], ["Performance", "velocidade", perf], ["Disponibilidade", "paradas", disp]];
+  const validos = f.filter(x=>x[2] != null);
+  const pior = validos.length ? validos.reduce((a,b)=> b[2] < a[2] ? b : a)[0] : null;
+  return f.map(([nome, sub, v])=>({ nome, sub, v, pior: nome === pior }));
+}
 const statusLabel = { good:"Dentro da meta", warning:"Atenção", critical:"Crítico", none:"Sem apontamento" };
 const statusCor   = { good:"var(--good)", warning:"var(--warning)", critical:"var(--critical)", none:"var(--text-muted)" };
 
@@ -3166,8 +3241,12 @@ const kpisGerais = [
   { label:"Apara confirmada", value:confirmMedia, suffix:"%", decimals:1, comp: comparaMeta(confirmMedia),
     nota: confirmMedia == null ? `só por mês · apontada ${fmtPct(aparasMedia)}` : `apontada ${fmtPct(aparasMedia)}`,
     spark: APARAS_MENSAL.confirmado.slice() },
-  { label:"TMR médio", value:tmrMedio, suffix:"%", decimals:1,
-    comp: comparaMesAnterior(tmrMedio, "tmr"), nota:"tempo de máquina rodando", spark: serieMensal("tmr") },
+  // OEE da fábrica (007); sem ele, o TMR médio como antes
+  window.OEE && window.OEE.oee != null
+    ? { label:"OEE", value: window.OEE.oee, suffix:"%", decimals:1,
+        nota:`qualidade ${fmtPct(window.OEE.qual)} · performance ${fmtPct(window.OEE.perf)} · disponibilidade ${fmtPct(window.OEE.disp)}` }
+    : { label:"TMR médio", value:tmrMedio, suffix:"%", decimals:1,
+        comp: comparaMesAnterior(tmrMedio, "tmr"), nota:"tempo de máquina rodando", spark: serieMensal("tmr") },
 ];
 if(produtividade != null){
   kpisGerais.push({ label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:0,
@@ -3258,38 +3337,36 @@ const ORDEM_ETAPAS = ["Impressão", "Laminação", "Corte / Refile", "Coating"];
     if(!thumb.classList.contains("pronto")) requestAnimationFrame(()=> thumb.classList.add("pronto"));
   }
 
+  // OEE em destaque e as três partes (qualidade, performance, disponibilidade)
   function cartao(m, i){
-    const w=96,h=36;
-    const trend = (serieMaquina(m.id) || []).slice(-7);   // últimos 7 meses fechados, reais
-    const path = sparkPath(trend, w, h);
-    const st = statusMaquina(m);
-    const cor = st === "none" ? "var(--text-muted)" : statusCor[st];
-    const area = path ? path + ` L${w-2},${h-2} L2,${h-2} Z` : "";
-    // id do gradiente sem espaço: "url(#mg-REB 05)" é referência inválida e
-    // o navegador pinta a área de preto (acontecia em toda REB e no Coating).
-    const gradId = String(m.id).replace(/[^A-Za-z0-9_-]+/g, "-");
-    const tmrTxt = st === "none" ? "—" : `${m.tmr}%`;
+    const st = statusOee(m);
+    const fat = fatoresOee(m);
+    const oeeTxt = m.oee != null ? `${Math.round(m.oee)}%` : "—";
+    const rotulo = st === "none" ? "sem apontamento no período" : m.oee != null ? "OEE" : "OEE · sem qualidade no período";
+    const pior = fat.find(f=>f.pior);
+    const falado = st === "none" ? "sem apontamento no período"
+      : `OEE ${m.oee != null ? Math.round(m.oee) + "%" : "sem dado"}; ` + fat.map(f=>`${f.nome} ${f.v != null ? Math.round(f.v) + "%" : "sem dado"}`).join(", ") +
+        (pior ? `; maior perda: ${pior.nome}` : "");
     return `
       <div class="machine-card st-${st}" style="--i:${i}" data-maq="${esc(m.id)}" tabindex="0" role="button"
-           aria-label="${esc(m.nome)}: ${st === "none" ? "sem apontamento no período" : `TMR ${m.tmr}%, ${statusLabel[st]}`}. Ver detalhe">
+           aria-label="${esc(m.nome)}: ${esc(falado)}. Ver detalhe">
         <div class="machine-top">
           <div style="min-width:0">
             <div class="machine-name">${esc(m.nome)}</div>
             <div class="machine-line">${esc(m.processo)}${m.rota!=="—" ? " · "+esc(m.rota) : ""}</div>
           </div>
-          <span class="status-pill status-${st}"><span class="dot" style="background:currentColor"></span>${statusLabel[st]}</span>
+          ${st !== "neutro" && st !== "none" ? `<span class="status-pill status-${st}"><span class="dot" style="background:currentColor"></span>${statusLabel[st]}</span>` : ""}
         </div>
         <div class="machine-hero">
-          <div class="machine-oee"><span class="v">${tmrTxt}</span><span class="l">${st === "none" ? "sem horas no período" : "TMR"}</span></div>
-          <svg class="machine-spark" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true">
-            <defs><linearGradient id="mg-${gradId}" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="0%" stop-color="${cor}" stop-opacity="0.28"/>
-              <stop offset="100%" stop-color="${cor}" stop-opacity="0"/>
-            </linearGradient></defs>
-            <path d="${area}" fill="url(#mg-${gradId})"/>
-            <path class="traco" pathLength="1" style="--d:${(0.15 + i*0.03).toFixed(2)}s" d="${path}" fill="none" stroke="${cor}" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
+          <div class="machine-oee"><span class="v">${st === "none" ? "—" : oeeTxt}</span><span class="l">${rotulo}</span></div>
         </div>
+        ${st === "none" ? "" : `<div class="oee-fatores" aria-hidden="true">${fat.map(f=>`
+          <div class="oee-f${f.pior ? " pior" : ""}"${f.pior ? ` title="Maior perda do OEE desta máquina"` : ""}>
+            <span class="oee-l">${f.nome} <small>${f.sub}</small></span>
+            <span class="oee-t"><span style="width:${f.v != null ? Math.max(2, f.v).toFixed(1) : 0}%"></span></span>
+            <span class="oee-v">${f.v != null ? Math.round(f.v) + "%" : "—"}</span>
+          </div>`).join("")}
+        </div>`}
         <div class="machine-foot">Ver detalhe <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"><path d="M9 6l6 6-6 6"/></svg></div>
       </div>`;
   }
@@ -4588,16 +4665,18 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
         return `<div class="drawer-facas-item"><span class="quebra-esq">${fmt(Number(r.posicao)||0)}. OP ${esc(r.num_ordem || "—")} · ${esc(limpaTexto(r.cliente) || "—")}</span><span>${ini ? fmtDMHM(ini) : "—"}</span></div>`;
       }).join("") : `<div class="empty-state">Nenhuma OP alocada nesta máquina.</div>`}`;
 
+    const fatD = fatoresOee(m), piorD = fatD.find(f=>f.pior);
+    const corFator = nome => piorD && piorD.nome === nome ? "var(--perda)" : "var(--series-3)";
+    const notaOee = st === "none" ? "sem apontamento no período" : m.oee == null ? "sem qualidade no período"
+      : piorD ? `maior perda: ${piorD.nome.toLowerCase()} (${piorD.sub})` : "";
     bodyEl.innerHTML = `
       <div class="drawer-metrics">
-        <div class="drawer-metric"><div class="v">${tmrTxt}</div><div class="l">TMR</div></div>
-        <div class="drawer-metric"><div class="v">${m.vel!=null ? m.vel : "—"}</div><div class="l">m/min</div></div>
-        <div class="drawer-metric" title="O BI não calcula apara por máquina; por máquina ele mostra o refugo em kg.">
-          <div class="v">${perdaMaq != null ? fmt(perdaMaq) : "—"}</div><div class="l">kg de refugo</div></div>
+        <div class="drawer-metric drawer-oee"><div class="v">${m.oee != null ? Math.round(m.oee) + "%" : "—"}</div><div class="l">OEE do período<span>${notaOee}</span></div></div>
+        ${fatD.map(f=>`<div class="drawer-metric${f.pior ? " pior" : ""}"><div class="v">${f.v != null ? Math.round(f.v) + "%" : "—"}</div><div class="l">${f.nome}</div></div>`).join("")}
       </div>
       ${secaoAgora}
 
-      <div class="drawer-section-title">TMR — últimos 12 meses</div>
+      <div class="drawer-section-title">Disponibilidade (TMR) — últimos 12 meses</div>
       ${path ? `<svg width="100%" viewBox="0 0 ${w} ${h}" style="display:block;overflow:visible" class="${reduzMovimento() ? "" : "anima"}" role="img" aria-label="TMR dos últimos 12 meses fechados">
         <defs><linearGradient id="dg" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="${cor}" stop-opacity="0.26"/><stop offset="100%" stop-color="${cor}" stop-opacity="0"/>
@@ -4606,12 +4685,13 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
         <path class="traco" pathLength="1" style="--d:.25s" d="${path}" fill="none" stroke="${cor}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
       </svg>` : `<div class="empty-state">Sem histórico mensal desta máquina.</div>`}
 
-      <div class="drawer-section-title">Indicadores do recurso</div>
+      <div class="drawer-section-title">De onde vem o OEE</div>
       <div class="drawer-bars">
         ${[
-           // [rótulo, largura da barra em %, cor, texto exibido]
-           ...(st !== "none" ? [["TMR", m.tmr, cor, m.tmr+"%"]] : []),
-           ...(m.vel!=null && m.velRef ? [["Velocidade", Math.min(100, Math.round(m.vel/m.velRef*100)), "var(--series-3)", `${m.vel} m/min`]] : []),
+           // [rótulo, largura da barra em %, cor, texto exibido]: a base de cada parte do OEE
+           ...(m.qual != null ? [["Qualidade", m.qual, corFator("Qualidade"), `${fmt(m.refugoQual)} kg de refugo`]] : []),
+           ...(m.perf != null ? [["Performance", m.perf, corFator("Performance"), `${m.vel} de ${m.velRef} m/min`]] : []),
+           ...(st !== "none" ? [["Disponibilidade", m.disp ?? m.tmr, corFator("Disponibilidade"), `${fmt(m.horasProd)} de ${fmt(m.horasTot)} h`]] : []),
           ].map(([label,val,c,txt])=>`
           <div class="drawer-bar-row">
             <div class="drawer-bar-label">${label}</div>
@@ -5114,7 +5194,8 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       (m.vel != null ? `, ${fmt(m.vel)} m/min${m.velRef ? ` (melhor mês ${fmt(m.velRef)})` : ""}` : "") +
       (kg ? `, refugo ${fmt(kg)} kg${mot ? ` (mais ${mot.nome}, ${fmt(mot.kg)} kg)` : ""}` : "") +
       (m.aderencia != null ? `, aderência ${fmt1(m.aderencia)}% (${fmt(m.realKm)} de ${fmt(plano)} km)` : "") +
-      (ag ? `, agora ${estadoAgora(ag).nome}` : "");
+      (ag ? `, agora ${estadoAgora(ag).nome}` : "") +
+      (m.oee != null ? `, OEE ${fmt1(m.oee)}% (qualidade ${fmt1(m.qual)}%, performance ${fmt1(m.perf)}%, disponibilidade ${fmt1(m.disp)}%)` : "");
   }
   // o que o painel mostra no período escolhido, em texto curto
   function contextoIA(){
@@ -5129,6 +5210,11 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     bloco("Entregas", rEntregas); bloco("Setup", rSetup); bloco("WIP", rWip);
     bloco("Carteira", ()=> rCarteira().replace(/Maiores clientes:[^.]*\./, ""));   // sem nome de cliente
     bloco("Laudos do CQ", rLaudos);
+    if(window.OEE && window.OEE.oee != null){
+      const o = window.OEE;
+      linhas.push(`[OEE da fábrica] ${fmt1(o.oee)}% = qualidade ${fmt1(o.qual)}% × performance ${fmt1(o.perf)}% × disponibilidade ${fmt1(o.disp)}%. ` +
+        "Qualidade = 100 − apara da máquina; performance = velocidade ÷ melhor mês da máquina; disponibilidade = TMR.");
+    }
     linhas.push("[Máquinas no período] " + MAQUINAS.map(linhaMaquinaIA).join(" | "));
     const S = window.SERIE_MENSAL;
     if(S && S.meses.length){

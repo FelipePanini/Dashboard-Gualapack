@@ -119,6 +119,7 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 |---|---|---|
 | Agora: o que cada máquina está fazendo | `View_usr_apontamentos_999999` (evento em andamento) + `CTREntradasMaquina` (OP aberta) | classe pela classificação oficial; velocidade real = metros ÷ horas produzindo da OP; programada e término previsto da OP |
 | TMR, horas, paradas | `View_usr_apontamentos_999999` | produzindo ÷ horas sem FIM TURNO e INATIVIDADE (BI Indicadores Produção) |
+| OEE dos cartões das máquinas (desde 08/10) | idem + consulta BASE_PROD | qualidade (aparas) × performance (velocidade) × disponibilidade (paradas), pedido da gerência. Qualidade = 100 − refugo apontado na máquina ÷ (esse refugo + peso final das OPs que passaram por ela, pesadas nas REBs; OP ainda sem peso fica de fora). Performance = velocidade ÷ melhor mês da máquina nos 12 meses até o fim do período, até 100%. Disponibilidade = TMR. Fábrica: TMR geral × qualidade e performance médias das máquinas, pesadas pelas horas produzindo. Não existe no BI: a conferência é a conta de cada parte |
 | Linha do tempo | idem, evento a evento | um dia de produção por vez, das 06:00 às 06:00 do dia seguinte (o turno da noite ainda é do dia anterior); abre no último dia fechado, com os 7 dias mais recentes no seletor |
 | Perda por motivo e por máquina, OPs com mais refugo | idem, código 40 | kg apontados |
 | Apara apontada (comparação, sem meta), produção em kg | idem, consulta BASE_PROD | refugo ÷ (refugo + peso bruto das rebobinadeiras) |
@@ -186,7 +187,8 @@ vale daqui pra frente em `demo/index.html`:
   mudar o token, conferindo o contraste.
 - **Uma cor, um significado.** Verde/âmbar/vermelho são status (vermelho só
   pra alerta). Paradas usam a cor da classificação oficial do código
-  (`--cls-*`), igual no Gantt, nas horas de parada e no Pareto.
+  (`--cls-*`), igual no Gantt, nas horas de parada e no Pareto. O laranja
+  das paradas (`--perda`) marca também a maior perda do OEE: laranja é perda.
 - **Vidro (blur) só na camada funcional**: barra do topo, barra de abas do
   celular, gaveta de detalhe, chat e seletor de período. Painéis e cartões
   são opacos. Com "Reduzir transparência" ou "Aumentar contraste" no sistema,
@@ -221,9 +223,20 @@ vale daqui pra frente em `demo/index.html`:
   (apara confirmada, 12%) ou contra o mês anterior da série real do hub. O
   resto é texto neutro. A apara apontada (por OP, por família de produto) não
   tem meta e aparece sem cor de status.
-- **Máquina sem apontamento no período** fica neutra ("Sem apontamento",
-  "—"), não "Crítico 0%". As faixas do TMR (75% e 62%) continuam as mesmas
-  até a meta ser definida.
+- **Cartões das máquinas mostram o OEE** (08/10, pedido da gerência):
+  - O número grande é o OEE do período. Embaixo, as três partes na ordem
+    pedida: qualidade (aparas), performance (velocidade) e disponibilidade
+    (paradas), cada uma com a barra inteira e o nome que não corta (no
+    cartão estreito do celular, sai só o "aparas / velocidade / paradas").
+  - A parte mais baixa, a maior perda, fica em negrito com a barra laranja.
+    Laranja (`--perda`) é o mesmo das paradas: no painel, laranja é perda.
+  - O detalhe da máquina abre com o OEE e a maior perda escrita, e mostra de
+    onde vem cada parte: kg de refugo, m/min contra o melhor mês, horas.
+  - Sem meta de OEE, os cartões ficam neutros (sem verde, âmbar ou
+    vermelho). Na visão geral, o cartão "OEE" ocupa o lugar do TMR médio.
+- **Máquina sem apontamento no período** fica neutra ("—", "sem
+  apontamento no período"), não "Crítico 0%". As faixas do TMR (75% e 62%)
+  continuam as mesmas até a meta ser definida.
 - **Movimento**: curto (até ~0,6 s), com curva de mola, nunca bloqueia o uso
   e some com "Reduzir movimento". Cada tela anima só na primeira vez que
   aparece; trocar de aba de novo não repete.
@@ -261,10 +274,15 @@ vale daqui pra frente em `demo/index.html`:
 
 ## Pendências e limitações conhecidas
 
-- **SQL do Supabase:** 6 arquivos, de `001` a `006_tempo_aderencia.sql`;
+- **Meta de OEE a definir.** Até os gestores darem a meta (`META_OEE` em
+  `demo/index.html`), os cartões ficam neutros e só a maior perda aparece
+  destacada. Com ela: verde na meta, âmbar até 85% dela, vermelho abaixo.
+- **SQL do Supabase:** 7 arquivos, de `001` a `007_oee.sql`;
   num Supabase novo, rodar em ordem (`hub/README.md`). Sem o 005, as telas do
   banco mostram "Sem dados". Sem o 006, a linha do tempo mostra só o dia mais
-  recente e a aderência fica na conta antiga (ADERÊNCIA DIÁRIA). O resto do
+  recente e a aderência fica na conta antiga (ADERÊNCIA DIÁRIA). Sem o 007, os
+  cartões das máquinas mostram performance e disponibilidade, sem qualidade e
+  sem OEE, e a visão geral volta ao TMR médio. O resto do
   painel funciona igual.
 - **Planejado da aderência ainda de planilha.** O banco guarda só a
   programação atual. Desde 05/10/2026 o hub guarda uma foto por dia da

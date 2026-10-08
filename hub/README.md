@@ -199,6 +199,7 @@ jeitos:
   | Apara confirmada | "% JGR" da Conta Refugo: scrap JGR ÷ (volume JGR + scrap JGR) | Refugo Aparas (planilha); sem o 006, a conta do BI com o peso bruto da BASE_PROD |
   | Aderência | realizado ÷ planejado, km lineares (Ad. Plan Mensal) | Histórico Aderência Programação (planilha, aba PROGRAMAÇÃO) + apontamentos sem WIP e sem revisão (`sql/clean/210_plano.sql`, 006) |
   | Perda por motivo / máquina, OPs | kg de perda apontada (código 40) | apontamentos |
+  | OEE (cartões das máquinas, 007) | qualidade × performance × disponibilidade. Qualidade = 100 − refugo da máquina ÷ (esse refugo + peso final das OPs que passaram por ela); performance = velocidade ÷ melhor mês, até 100; disponibilidade = TMR | apontamentos (BASE_PROD e tabela Horas; `sql/clean/230_qualidade_maquina.sql`) |
   | Apara por classificação | apontado por grupo de produto (Aparas_Geral v3) | BASE_PROD |
   | Produtividade | m² ÷ horas produzindo | apontamentos + largura da estrutura |
 
@@ -241,6 +242,14 @@ jeitos:
   evento que vem do dia anterior aparece nos dois dias, cortado na janela. O
   painel abre no último dia fechado e busca outro dia só quando ele é
   escolhido.
+- **A qualidade do OEE** (007): para cada máquina, o refugo que ela apontou
+  nas OPs que passaram por ela e o peso final dessas OPs (o peso bruto nas
+  REBs; OP ainda não pesada fica de fora). Cada par máquina × OP entra uma
+  vez, no último dia em que a máquina produziu a OP, então a soma de um
+  período não conta a mesma OP duas vezes. Em set/2026: de 90,7% (REB 01) a
+  99,6% (L03). A performance usa o melhor mês da máquina, e não a meta de
+  m/h da `View_usr_Acompanhamento_Prod`, porque essa meta dava mais de 100%
+  (R18 158%, HMC01 393%).
 - **Página Qualidade dos dados** (`demo/qualidade.html`, ícone de prancheta
   no menu): placar por status, cada indicador mês a mês e recorte a recorte,
   o que corrigir nas planilhas, as fontes e os avisos.
@@ -248,7 +257,8 @@ jeitos:
 Só sai do PC o que é agregado: horas e metros por máquina/dia/código, peso
 bruto e refugo por OP/dia (com a descrição do produto), perda por
 OP/dia/tipo, programado × produzido por OP/dia e planejado × realizado por
-máquina/dia, kg e m² por máquina/dia, os eventos dos últimos 14 dias
+máquina/dia, kg e m² por máquina/dia, refugo e peso final das OPs por
+máquina/dia (a qualidade do OEE), os eventos dos últimos 14 dias
 (máquina, código, início, fim, OP), valores por mês e
 recorte, o catálogo de indicadores, o estado de cada fonte (sem caminho de
 arquivo) e os avisos (com os caminhos apagados). Das telas do banco: a
@@ -300,8 +310,14 @@ Uma vez só, nesta ordem:
    resto e avisa o que ficou de fora. Precisa da fonte
    `aderencia.programacao` no `config/fontes.local.yaml` (a Histórico
    Aderência Programação, aba PROGRAMAÇÃO, só as 4 colunas usadas).
+10. No **SQL Editor** → rodar `sql/supabase/007_oee.sql` (a qualidade de cada
+    máquina, para o OEE dos cartões, e o `hub_publicar` versão 5, em que os
+    conjuntos por dia são uma lista: série nova = uma linha na lista). Tem de
+    mostrar `funcoes_ok = true`. A próxima rodada do hub publica a série. Sem
+    o 007, o hub publica o resto e avisa o que ficou de fora.
 
-Feitos: 1 a 3 em 25/09, 4 a 6 em 30/09, o 8 (que já faz o 7) em 07/10.
+Feitos: 1 a 3 em 25/09, 4 a 6 em 30/09, o 8 (que já faz o 7) em 07/10, o 9
+em 08/10.
 
 ### Conferência com o motor do BI (30/09)
 
