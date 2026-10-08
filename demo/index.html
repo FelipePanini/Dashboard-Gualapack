@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="pt-BR">
+<html lang="pt-BR" class="vidro">
 <head>
 <meta charset="UTF-8" />
 <title>Painel de Produção — Gualapack</title>
@@ -11,15 +11,6 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="./supabase-config.js"></script>
 <script src="./assets/ui.js"></script>
-<script>
-// Prévia do vidro (Liquid Glass): ?vidro=1 liga, ?vidro=0 desliga; fica lembrado neste
-// navegador. Roda antes da primeira pintura, pra não piscar.
-(function(){ try{
-  const p = new URLSearchParams(location.search).get("vidro");
-  if(p === "1" || p === "0") localStorage.setItem("gualapack-vidro", p);
-  if(localStorage.getItem("gualapack-vidro") === "1") document.documentElement.classList.add("vidro");
-}catch(e){} })();
-</script>
 <style>
 /* Some vazio até a sessão ser confirmada — evita mostrar dados antes do login.
    O indicador de carregamento fica visível mesmo assim (visibility pode ser
@@ -974,8 +965,8 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
 }
 
 /* =========================================================================
-   VIDRO (html.vidro; prévia com ?vidro=1): o vidro em todos os elementos, na
-   divisão que o HIG faz (materials.md, liquid-glass.md):
+   VIDRO (html.vidro, o padrão desde 08/10/2026, aprovado pelo dono): o vidro em
+   todos os elementos, na divisão que o HIG faz (materials.md, liquid-glass.md):
    - fundo do app: degradês azuis suaves e fixos, o que o vidro refrata;
    - conteúdo (cartões, painéis, máquinas): material padrão translúcido, sem
      desfoque (o fundo é liso: desfocar não muda nada e pesaria no GPU com

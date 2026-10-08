@@ -204,9 +204,8 @@ vale daqui pra frente em `demo/index.html`:
   - Todo `title` (e `<title>` de SVG) vira a dica do painel, que aparece
     depois de 0,5 s. Na barra lateral, a dica fica à direita do botão.
   - Basta usar `<select>` e `title` normais.
-- **Prévia do vidro em tudo** (08/10, `html.vidro`). Fica desligada para
-  todos até o dono aprovar. Para ver, abra o painel com `?vidro=1`; para
-  desligar, `?vidro=0`. A escolha fica lembrada no navegador.
+- **Vidro em tudo** (08/10, aprovado pelo dono; classe `vidro` no `<html>`
+  do painel).
   - O vidro segue a divisão do HIG (`liquid-glass.md`, `materials.md`):
     Liquid Glass de verdade (desfoque, saturação, brilho de borda) nos
     controles e no que flutua (barras, botões, seletores, menus, gaveta,
