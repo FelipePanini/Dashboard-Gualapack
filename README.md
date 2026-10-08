@@ -103,7 +103,7 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 | [`demo/`](./demo/) | O site: `index.html` (painel), `login.html`, `admin.html` (convites), `qualidade.html` (validação publicada pelo hub), `upload.html` (upload manual, legado), `assets/ui.js` (menus e dicas no tema do painel). O nome `demo` ficou porque é o endereço já publicado. |
 | [`backend/sql/`](./backend/sql/) | Estrutura do banco: login e convites, tabelas dos dados, funções e views (as do fluxo anterior). |
 | [`backend/sync-drive/`](./backend/sync-drive/) | Fluxo anterior: a carga diária das planilhas do Drive (etapas 1 e 2). |
-| [`backend/functions/`](./backend/functions/) | Funções do Supabase: cadastro com convite e upload manual. A `assistente` (chat com o Claude, API paga) está sem uso desde 07/10/2026. |
+| [`backend/functions/`](./backend/functions/) | Funções do Supabase: cadastro com convite, upload manual e a `assistente` (IA grátis da Groq para as perguntas de análise do chat; segredo `GROQ_API_KEY`). |
 | [`.github/workflows/`](./.github/workflows/) | Fluxo anterior: `build-database-central.yml` (etapa 1) e `sync-drive.yml` (etapa 2). |
 | [`docs/guias/`](./docs/guias/) | Passo a passo: configurar o Supabase, a carga automática, o upload manual. |
 | [`docs/mapeamento/`](./docs/mapeamento/) | Levantamentos: inventário das 220 abas, redundâncias, origem de cada número, validação contra as planilhas. |
@@ -240,12 +240,22 @@ vale daqui pra frente em `demo/index.html`:
   carteira exportam CSV (";" e vírgula decimal: abre direto no Excel).
 - **Leitura em páginas:** fila, WIP e carteira vêm inteiras mesmo acima do
   limite de 1.000 linhas por pedido do Supabase.
-- **Assistente sem IA** (botão redondo): responde na hora com os números que o
-  painel já carregou (apara, TMR, uma máquina, o que está parado agora,
-  entregas, fila, setup, WIP, carteira, laudos e um mês da série). Entende a
-  pergunta por palavras-chave; quando não entende, sugere o que sabe
-  responder. Nada sai da página e nada é cobrado (decisão de 07/10/2026: sem
-  API paga de IA).
+- **Assistente** (botão redondo), em duas camadas:
+  - **Local:** responde na hora as perguntas comuns, com os números que o
+    painel já carregou (apara, TMR, uma máquina, o que está parado agora,
+    entregas, fila, setup, WIP, carteira, laudos e um mês da série).
+  - **IA grátis** (desde 08/10/2026; decisão do dono: IA sem custo, nada de
+    API paga). Recebe as perguntas de análise ("por que", "o que fazer",
+    "onde focar"), as longas e as que o local não entende.
+    - Vai pela Edge Function `assistente` para a API da Groq, no plano
+      gratuito: modelo GPT-OSS 120B e, se a cota grátis dele acabar, Llama 3.3
+      70B e modelos menores.
+    - Vai junto o contexto: os mesmos números do painel no período escolhido,
+      sem nome de cliente nem descrição de produto (cerca de 6 mil
+      caracteres).
+    - A Groq não guarda as perguntas por padrão.
+    - Sem cota ou sem rede, vale a resposta local, com um aviso.
+    - Toda resposta da IA diz que é IA e pede para conferir na tela.
 
 ---
 

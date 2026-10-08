@@ -645,6 +645,9 @@ svg.anima .anel{ animation: anel 1s var(--ease-out) backwards .1s; }
 .assistant-input button:active{ transform: scale(.9); transition-duration:.1s; }
 .assistant-input button:disabled{ opacity:.5; cursor:default; }
 .assistant-input button svg{ width:16px; height:16px; }
+.msg.bot p{ margin:0 0 6px; } .msg.bot p:last-of-type{ margin-bottom:0; }
+.msg.bot ul{ margin:4px 0 6px; padding-left:18px; } .msg.bot li{ margin:2px 0; }
+.msg-fonte{ margin-top:8px; font-size:11.5px; color: var(--text-muted); }
 .typing{ display:flex; gap:4px; padding:4px 2px; }
 .typing span{ width:6px; height:6px; border-radius:50%; background: var(--text-muted); animation: digitando 1.2s var(--ease-out) infinite; }
 .typing span:nth-child(2){ animation-delay:.15s; } .typing span:nth-child(3){ animation-delay:.3s; }
@@ -1707,7 +1710,7 @@ html.vidro .drawer{ box-shadow: var(--lg-brilho), -24px 0 60px -20px rgba(10,21,
       </div>
       <div>
         <div class="assistant-title">Assistente de Produção</div>
-        <div class="assistant-status"><span class="live-dot"></span>Responde na hora · números do painel</div>
+        <div class="assistant-status"><span class="live-dot"></span>Números do painel · IA grátis nas análises</div>
       </div>
       <button class="assistant-close" id="assistant-close" aria-label="Fechar">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 6l12 12M18 6L6 18"/></svg>
@@ -4679,14 +4682,17 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   window.openMaquinaDrawer = open;
 })();
 
-/* ============ assistente (sem IA) ============
-   Responde na hora as perguntas comuns com os MESMOS números que o painel já
-   carregou: nada sai da página, nada é cobrado e nada é inventado. Entende a
-   pergunta por palavras-chave (apara, TMR, uma máquina, agora, entregas,
-   fila, setup, WIP, carteira, laudos, um mês) e, quando não entende, sugere o
-   que sabe responder. Decisão do dono em 07/10/2026: nada de API paga de IA
-   (a Edge Function "assistente", com o Claude, ficou sem uso). O botão abre e
-   fecha (o ícone vira um X), e o painel cresce a partir dele. */
+/* ============ assistente ============
+   Duas camadas:
+   - local: responde na hora as perguntas comuns com os MESMOS números que o
+     painel já carregou (apara, TMR, uma máquina, agora, entregas, fila, setup,
+     WIP, carteira, laudos, um mês), por palavras-chave;
+   - IA grátis (Groq, pela Edge Function "assistente"; decisão do dono em
+     08/10/2026, nada de API paga): perguntas de análise ("por que", "o que
+     fazer"...), longas ou que o local não entende. Vai junto o contexto: os
+     números que o painel mostra, sem nome de cliente nem descrição de produto.
+     Se a IA não responder (cota grátis do dia, rede), vale a resposta local.
+   O botão abre e fecha (o ícone vira um X), e o painel cresce a partir dele. */
 (function(){
   const fab = document.getElementById("assistant-fab");
   const panel = document.getElementById("assistant-panel");
@@ -5072,7 +5078,81 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     if(tem(q, "aderencia", "plano", "planejado", "realizado")) return { html: rAderencia(), sug: ["Fila de programação", "Entregas no prazo"] };
     if(tem(q, "produtividade", "m2", "velocidad")) return { html: rProdutividade(), sug: ["Qual máquina está mais lenta?"] };
     if(tem(q, "resumo", "como esta", "como estamos", "visao geral", "geral", "bom dia", "boa tarde", "boa noite", "ola", "oi\\b")) return { html: rResumo(), sug: SUGESTOES.slice(0, 3) };
-    return { html: "Ainda não sei responder isso. Pergunte sobre apara, TMR, uma máquina (ex.: R18), o que está parado agora, entregas, fila, setup, WIP, carteira, laudos ou um mês (ex.: agosto).", sug: SUGESTOES };
+    return { html: "Ainda não sei responder isso. Pergunte sobre apara, TMR, uma máquina (ex.: R18), o que está parado agora, entregas, fila, setup, WIP, carteira, laudos ou um mês (ex.: agosto).", sug: SUGESTOES, semResposta: true };
+  }
+
+  // ---------- IA grátis (Groq, pela Edge Function "assistente")
+  // pergunta de análise, longa ou que o local não entende vai para a IA
+  const ANALISE = ["por que", "porque", "pq\\b", "explic", "analis", "o que fazer", "o que devo", "como melhorar", "melhorar",
+    "sugest", "sugir", "recomend", "causa", "tendencia", "previs", "prever", "priori", "foco", "focar", "plano de acao", "acao"];
+  const vaiParaIA = (q, local) => local.semResposta || tem(q, ...ANALISE) || q.split(/\s+/).filter(Boolean).length > 9;
+  const semHtml = s => String(s ?? "").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
+  const v1 = v => v == null || !Number.isFinite(v) ? "—" : fmt1(v);
+  // uma linha por máquina, só números (o texto da máquina cita o cliente da próxima OP)
+  function linhaMaquinaIA(m){
+    const kg = window.PERDA_POR_MAQ ? window.PERDA_POR_MAQ.get(chaveMaq(m.id)) : null;
+    const mot = window.PERDA_MAQ_MOTIVO ? (window.PERDA_MAQ_MOTIVO.get(chaveMaq(m.id)) || [])[0] : null;
+    const ag = bancoLinhas("agora").find(r=>chaveMaq(r.maquina) === chaveMaq(m.id));
+    const plano = m.planHojeKm ?? m.planKm;
+    return `${m.id} (${m.processo}): ` + (m.horasTot > 0 ? `TMR ${m.tmr}% (${fmt(m.horasProd)} de ${fmt(m.horasTot)} h)` : "sem horas apontadas") +
+      (m.vel != null ? `, ${fmt(m.vel)} m/min${m.velRef ? ` (melhor mês ${fmt(m.velRef)})` : ""}` : "") +
+      (kg ? `, refugo ${fmt(kg)} kg${mot ? ` (mais ${mot.nome}, ${fmt(mot.kg)} kg)` : ""}` : "") +
+      (m.aderencia != null ? `, aderência ${fmt1(m.aderencia)}% (${fmt(m.realKm)} de ${fmt(plano)} km)` : "") +
+      (ag ? `, agora ${estadoAgora(ag).nome}` : "");
+  }
+  // o que o painel mostra no período escolhido, em texto curto
+  function contextoIA(){
+    const { de, ate } = periodoDaUrl();
+    const rot = window.rotuloPeriodo ? window.rotuloPeriodo(de, ate) : "";
+    const ultimo = new Date(ate); ultimo.setDate(ultimo.getDate() - 1);
+    const linhas = [`Período escolhido no painel: ${rot} (${fmtDM(de)}/${de.getFullYear()} a ${fmtDM(ultimo)}/${ultimo.getFullYear()}). Hoje: ${fmtDM(new Date())}/${new Date().getFullYear()}.`];
+    const bloco = (nome, f) => { try{ const s = semHtml(f()); if(s) linhas.push(`[${nome}] ${s}`); }catch(e){ /* parte sem dado: fica de fora */ } };
+    bloco("Resumo", rResumo); bloco("Apara", rApara); bloco("TMR", rTmr); bloco("Aderência", rAderencia);
+    bloco("Produtividade", rProdutividade); bloco("Refugo por motivo", rPerda); bloco("Paradas por motivo", rParadas);
+    bloco("Comparação com o mês anterior", rComparar); bloco("Agora no chão de fábrica", rAgora); bloco("Fila de programação", rFila);
+    bloco("Entregas", rEntregas); bloco("Setup", rSetup); bloco("WIP", rWip);
+    bloco("Carteira", ()=> rCarteira().replace(/Maiores clientes:[^.]*\./, ""));   // sem nome de cliente
+    bloco("Laudos do CQ", rLaudos);
+    linhas.push("[Máquinas no período] " + MAQUINAS.map(linhaMaquinaIA).join(" | "));
+    const S = window.SERIE_MENSAL;
+    if(S && S.meses.length){
+      linhas.push("[Mês a mês, meses fechados] " + S.meses.map((mes, i)=>
+        `${mes}: TMR ${v1(S.tmr[i])}%, aderência ${v1(S.ader[i])}%, refugo ${v1(S.perdaT[i])} t`).join("; "));
+    }
+    if(MESES.length){
+      linhas.push("[Apara mês a mês] " + MESES.map((mes, i)=>
+        `${mes}: confirmada ${v1(APARAS_MENSAL.confirmado[i])}%, apontada ${v1(APARAS_MENSAL.apontado[i])}%`).join("; "));
+    }
+    return linhas.join("\n").slice(0, 15000);
+  }
+  // resposta da IA: texto com **negrito** e listas "- " (tudo escapado antes)
+  function textoIA(s){
+    const linhas = esc(s).split(/\r?\n/).map(l=> l.replace(/\*\*(.+?)\*\*/g, "<b>$1</b>"));
+    let html = "", lista = false;
+    for(const l of linhas){
+      const item = l.match(/^\s*[-•*]\s+(.*)$/);
+      if(item){ if(!lista){ html += "<ul>"; lista = true; } html += `<li>${item[1]}</li>`; continue; }
+      if(lista){ html += "</ul>"; lista = false; }
+      if(l.trim()) html += `<p>${l}</p>`;
+    }
+    return html + (lista ? "</ul>" : "");
+  }
+  const conversa = [];   // { papel: "usuario" | "assistente", texto }
+  async function perguntarIA(texto){
+    const cfg = window.SUPABASE_CONFIG;
+    const { data } = await window.gualapackAuth.auth.getSession();
+    const token = data && data.session && data.session.access_token;
+    if(!cfg || !token) throw new Error("sem sessão");
+    const r = await fetch(`${cfg.url}/functions/v1/assistente`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}`, apikey: cfg.anonKey },
+      body: JSON.stringify({ pergunta: texto, historico: conversa.slice(-6), contexto: contextoIA() }),
+      signal: AbortSignal.timeout ? AbortSignal.timeout(30000) : undefined,
+    });
+    const j = await r.json().catch(()=> ({}));
+    if(!r.ok || !j.resposta) throw Object.assign(new Error(j.mensagem || `HTTP ${r.status}`), { mensagem: j.mensagem });
+    return j;
   }
 
   function ask(text){
@@ -5081,20 +5161,33 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     sendBtn.disabled = true;
     addMsg("user", esc(text));
     input.value = "";
-    // a resposta sai na hora; o "digitando" curto só marca a vez de responder
-    const typing = reduzMovimento() ? null : addMsg("bot", `<div class="typing" aria-label="Respondendo"><span></span><span></span><span></span></div>`);
-    const entregar = ()=>{
-      if(typing) typing.remove();
-      let r;
-      try{ r = responder(text); }
-      catch(err){ console.error("assistente:", err); r = { html: "Não consegui montar essa resposta. Tente perguntar de outro jeito.", sug: SUGESTOES.slice(0, 3) }; }
-      addMsg("bot", r.html);
-      addSuggestions(r.sug);
+    const typing = addMsg("bot", `<div class="typing" role="status" aria-label="Respondendo"><span></span><span></span><span></span></div>`);
+    let r;
+    try{ r = responder(text); }
+    catch(err){ console.error("assistente:", err); r = { html: "Não consegui montar essa resposta. Tente perguntar de outro jeito.", sug: SUGESTOES.slice(0, 3), semResposta: true }; }
+    const fim = (html, sug, textoPuro)=>{
+      typing.remove();
+      addMsg("bot", html);
+      addSuggestions(sug);
+      conversa.push({ papel: "usuario", texto: text }, { papel: "assistente", texto: textoPuro });
       esperando = false;
       sendBtn.disabled = false;
       input.focus({ preventScroll:true });
     };
-    if(typing) setTimeout(entregar, 280); else entregar();
+    const semDadosNoPainel = window.FALHA_CARGA || USANDO_DADOS_REAIS !== true;
+    if(semDadosNoPainel || !vaiParaIA(norm(text), r)){
+      // resposta local: sai na hora; o "digitando" curto só marca a vez de responder
+      setTimeout(()=> fim(r.html, r.sug, semHtml(r.html)), reduzMovimento() ? 0 : 280);
+      return;
+    }
+    perguntarIA(text).then(j=>{
+      fim(`${textoIA(j.resposta)}<div class="msg-fonte">Resposta da IA (grátis) com os números do painel · pode errar: confira na tela</div>`, [], j.resposta);
+    }).catch(err=>{
+      console.warn("assistente (IA):", err);
+      const motivo = esc(err.mensagem || "A IA não respondeu agora.");
+      fim(r.semResposta ? `${motivo} ${r.html}` : `${r.html}<div class="msg-fonte">${motivo} Esta é a resposta rápida do painel.</div>`,
+        r.sug, semHtml(r.html));
+    });
   }
 
   const aberto = () => panel.classList.contains("open");
@@ -5109,8 +5202,9 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       body.dataset.inited = "1";
       const { de, ate } = periodoDaUrl();
       const rotulo = window.rotuloPeriodo ? window.rotuloPeriodo(de, ate) : "o período selecionado";
-      addMsg("bot", `Olá! Respondo na hora com os números do painel, do período escolhido no topo (<b>${esc(rotulo)}</b>). ` +
-        `Pergunte sobre apara, TMR, uma máquina, o que está parado agora, entregas, fila, setup, WIP, carteira, laudos ou um mês.`);
+      addMsg("bot", `Olá! Respondo com os números do painel, do período escolhido no topo (<b>${esc(rotulo)}</b>). ` +
+        `Pergunte sobre apara, TMR, uma máquina, o que está parado agora, entregas, fila, setup, WIP, carteira, laudos ou um mês. ` +
+        `Para análises ("por que a apara subiu?", "onde focar?"), uso uma IA grátis.`);
       addSuggestions(SUGESTOES.slice(0, 4));
     }
     input.focus({ preventScroll:true });
