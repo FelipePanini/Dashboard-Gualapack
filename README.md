@@ -100,7 +100,7 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 
 | Caminho | O que é |
 |---|---|
-| [`demo/`](./demo/) | O site: `index.html` (painel), `login.html`, `admin.html` (convites), `qualidade.html` (validação publicada pelo hub), `upload.html` (upload manual, legado). O nome `demo` ficou porque é o endereço já publicado. |
+| [`demo/`](./demo/) | O site: `index.html` (painel), `login.html`, `admin.html` (convites), `qualidade.html` (validação publicada pelo hub), `upload.html` (upload manual, legado), `assets/ui.js` (menus e dicas no tema do painel). O nome `demo` ficou porque é o endereço já publicado. |
 | [`backend/sql/`](./backend/sql/) | Estrutura do banco: login e convites, tabelas dos dados, funções e views (as do fluxo anterior). |
 | [`backend/sync-drive/`](./backend/sync-drive/) | Fluxo anterior: a carga diária das planilhas do Drive (etapas 1 e 2). |
 | [`backend/functions/`](./backend/functions/) | Funções do Supabase: cadastro com convite e upload manual. A `assistente` (chat com o Claude, API paga) está sem uso desde 07/10/2026. |
@@ -194,6 +194,16 @@ vale daqui pra frente em `demo/index.html`:
 - **Gráficos desenhados na largura real do painel** (`montarGrafico`): 1
   unidade = 1 px, texto de 11 px pra cima, redesenho ao mudar de largura.
   Rótulo que não cabe ganha reticências, com o nome inteiro no `<title>`.
+- **Menus e dicas do painel, nunca os do navegador** (`demo/assets/ui.js`,
+  em index, qualidade e admin, desde 08/10):
+  - Todo `<select>` abre o menu pop-up do painel, com vidro, marca ✓ na
+    opção atual, nome e detalhe alinhados e separador entre grupos (opção
+    com `data-separador`). Funciona com mouse e teclado (Enter, setas, Esc,
+    digitar o começo do nome).
+  - No toque fica o seletor do sistema.
+  - Todo `title` (e `<title>` de SVG) vira a dica do painel, que aparece
+    depois de 0,5 s. Na barra lateral, a dica fica à direita do botão.
+  - Basta usar `<select>` e `title` normais.
 - **Seta e cor no cartão só com comparação de verdade**: contra a meta
   (apara confirmada, 12%) ou contra o mês anterior da série real do hub. O
   resto é texto neutro. A apara apontada (por OP, por família de produto) não

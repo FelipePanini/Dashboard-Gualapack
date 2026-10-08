@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,700&family=Public+Sans:wght@400..700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="./supabase-config.js"></script>
+<script src="./assets/ui.js"></script>
 <style>
 /* Some vazio até a sessão ser confirmada — evita mostrar dados antes do login.
    O indicador de carregamento fica visível mesmo assim (visibility pode ser
@@ -3839,9 +3840,11 @@ const CLASSES_ENTREGA = [
     return x[0] - y[0] || x[1] - y[1] || a.localeCompare(b, "pt-BR", { numeric:true });
   });
   const nomeFila = g => { const m = g.nome.match(/^(\d+)\s*-\s*PENDENCIA$/i); return m ? `Pendência ${m[1]}` : g.nome; };
-  sel.innerHTML = chaves.map(k=>{
+  // separador no menu entre a rota, os outros recursos e as filas de pendência
+  sel.innerHTML = chaves.map((k, i)=>{
     const g = porMaq.get(k);
-    return `<option value="${esc(k)}">${esc(nomeFila(g))} · ${fmt(g.ops.length)} ${g.ops.length === 1 ? "OP" : "OPs"}</option>`;
+    const novoGrupo = i > 0 && ordem(k)[0] !== ordem(chaves[i-1])[0];
+    return `<option value="${esc(k)}"${novoGrupo ? " data-separador" : ""}>${esc(nomeFila(g))} · ${fmt(g.ops.length)} ${g.ops.length === 1 ? "OP" : "OPs"}</option>`;
   }).join("");
   const hoje = new Date(); hoje.setHours(0,0,0,0);
   const pill = (classe, txt, titulo) => `<span class="status-pill status-${classe}"${titulo ? ` title="${esc(titulo)}"` : ""}><span class="dot" style="background:currentColor"></span>${esc(txt)}</span>`;
