@@ -10,7 +10,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600;1,700&family=Archivo:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="./supabase-config.js"></script>
-<script type="module" src="./assets/metal.js"></script>
 <style>
 :root{
   color-scheme: light;
@@ -127,22 +126,6 @@ body{
 @keyframes rise{ to{ opacity:1; transform:none; } }
 .brand-word{ font-family:"Playfair Display","Georgia",serif; font-style:italic; font-weight:700; font-size:26px; }
 .brand-word .ink-accent{ color:var(--accent); }
-/* ---------- metal líquido (assets/metal.js): marca e assistente ---------- */
-.metal-palco{ position:relative; }
-.metal-camada{ position:absolute; pointer-events:none; }
-/* o texto continua na página (leitor de tela); some da vista só com o metal desenhado */
-.brand-word.metal-ativo > span:not(.metal-camada){ color: transparent; }
-.metal-anel{
-  position:absolute; inset:-5px; border-radius:50%; pointer-events:none;
-  -webkit-mask: radial-gradient(circle closest-side, transparent calc(100% - 5px), #000 calc(100% - 4.5px));
-          mask: radial-gradient(circle closest-side, transparent calc(100% - 5px), #000 calc(100% - 4.5px));
-}
-/* contorno fino, como cromo gravado: o brilho branco do cromo some no fundo claro
-   e as faixas escuras somem no escuro */
-.brand-word.metal-ativo .metal-camada{ filter: drop-shadow(0 0 .45px rgba(10,21,36,.6)) drop-shadow(0 1px .6px rgba(10,21,36,.16)); }
-@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]) .brand-word.metal-ativo .metal-camada{ filter: drop-shadow(0 0 .6px rgba(220,235,255,.75)); } }
-:root[data-theme="dark"] .brand-word.metal-ativo .metal-camada{ filter: drop-shadow(0 0 .6px rgba(220,235,255,.75)); }
-
 .brand-region{ font-size:10px; letter-spacing:.16em; color:var(--text-muted); text-transform:uppercase; margin-top:2px; }
 h1{ font-family:"Archivo",sans-serif; font-size:19px; margin:20px 0 4px; letter-spacing:-0.01em; }
 .sub{ color:var(--text-muted); font-size:13px; margin-bottom:22px; line-height:1.5; }
@@ -208,7 +191,7 @@ button.submit.loading .spinner{ display:inline-block; }
 </div>
 
 <div class="card">
-  <div class="brand-word" data-metal="marca"><span>Guala</span><span class="ink-accent">pack</span></div>
+  <div class="brand-word">Guala<span class="ink-accent">pack</span></div>
   <div class="brand-region">Brasil &middot; Unidade Jaguariúna</div>
   <h1>Painel de Produção</h1>
   <div class="sub">Acesso restrito à equipe de Produção. O cadastro exige uma chave de convite válida.</div>
