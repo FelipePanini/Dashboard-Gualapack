@@ -17,6 +17,8 @@
 //      escolhe seu próprio role).
 //   5. Se a chave for inválida/expirada/esgotada, rejeita ANTES de criar
 //      qualquer usuário.
+//   Desde 09/10/2026, e-mail com "gualapack" no domínio dispensa a chave e
+//   entra como Visualizador (emailGualapack, abaixo).
 //
 // Deploy: pelo Dashboard (Edge Functions > Deploy a new function, cole este
 // arquivo) ou via CLI: supabase functions deploy register --no-verify-jwt
@@ -67,6 +69,17 @@ function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+// E-mail da Gualapack entra sem chave de convite (decisão do dono em 09/10/2026):
+// o domínio (o que vem depois do @) contém "gualapack" (gualapack.com,
+// gualapackgroup.com...). "gualapack@gmail.com" não conta. Entra como
+// Visualizador. Sem confirmação por e-mail, por escolha do dono, sabendo que
+// quem digitar um e-mail assim entra mesmo sem ser dono dele. Para voltar a
+// exigir a chave de todos, troque o retorno desta função por false.
+function emailGualapack(email: string): boolean {
+  const dominio = email.split("@")[1] ?? "";
+  return dominio.includes("gualapack");
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { status: 204, headers: CORS_HEADERS });
@@ -99,7 +112,7 @@ Deno.serve(async (req) => {
   const inviteKey = (body.inviteKey ?? "").trim();
 
   if (!isValidEmail(email)) {
-    return new Response(JSON.stringify({ error: "invalid_email" }), { status: 400, headers: JSON_HEADERS });
+    return new Response(JSON.stringify({ error: "invalid_email", message: "Confira o e-mail." }), { status: 400, headers: JSON_HEADERS });
   }
   if (password.length < 12) {
     return new Response(
@@ -108,28 +121,38 @@ Deno.serve(async (req) => {
     );
   }
   if (fullName.length < 2) {
-    return new Response(JSON.stringify({ error: "invalid_name" }), { status: 400, headers: JSON_HEADERS });
+    return new Response(JSON.stringify({ error: "invalid_name", message: "Informe o nome completo." }), { status: 400, headers: JSON_HEADERS });
   }
-  if (!inviteKey) {
-    return new Response(JSON.stringify({ error: "missing_invite_key" }), { status: 400, headers: JSON_HEADERS });
-  }
-
-  // Só cria usuário se a chave passar aqui. Nenhum efeito colateral antes disso.
-  const { data: inviteResult, error: inviteError } = await admin
-    .rpc("validate_and_consume_invite", { plain_key: inviteKey })
-    .single();
-
-  if (inviteError || !inviteResult?.valid) {
-    if (inviteError) {
-      // Erro de infraestrutura (ex: permissão faltando na função SQL) é
-      // diferente de "chave errada" — loga aqui pra aparecer nos Logs do
-      // Supabase, mas a resposta ao cliente continua genérica de propósito.
-      console.error("validate_and_consume_invite failed:", inviteError.message);
-    }
+  const daGualapack = emailGualapack(email);
+  if (!inviteKey && !daGualapack) {
     return new Response(
-      JSON.stringify({ error: "invalid_invite_key", message: "Chave de convite inválida, expirada ou já utilizada." }),
-      { status: 403, headers: JSON_HEADERS },
+      JSON.stringify({ error: "missing_invite_key", message: "Sem e-mail da Gualapack, o cadastro precisa de uma chave de convite." }),
+      { status: 400, headers: JSON_HEADERS },
     );
+  }
+
+  // Com chave, o perfil vem da chave (mesmo para e-mail da Gualapack); sem chave,
+  // só e-mail da Gualapack chega aqui, e entra como Visualizador.
+  let grantedRole = "viewer";
+  if (inviteKey) {
+    // Só cria usuário se a chave passar aqui. Nenhum efeito colateral antes disso.
+    const { data: inviteResult, error: inviteError } = await admin
+      .rpc("validate_and_consume_invite", { plain_key: inviteKey })
+      .single();
+
+    if (inviteError || !inviteResult?.valid) {
+      if (inviteError) {
+        // Erro de infraestrutura (ex: permissão faltando na função SQL) é
+        // diferente de "chave errada" — loga aqui pra aparecer nos Logs do
+        // Supabase, mas a resposta ao cliente continua genérica de propósito.
+        console.error("validate_and_consume_invite failed:", inviteError.message);
+      }
+      return new Response(
+        JSON.stringify({ error: "invalid_invite_key", message: "Chave de convite inválida, expirada ou já utilizada." }),
+        { status: 403, headers: JSON_HEADERS },
+      );
+    }
+    grantedRole = inviteResult.granted_role;
   }
 
   const { data: created, error: createError } = await admin.auth.admin.createUser({
@@ -153,7 +176,7 @@ Deno.serve(async (req) => {
   const { error: profileError } = await admin.from("profiles").insert({
     id: created.user.id,
     full_name: fullName,
-    role: inviteResult.granted_role,
+    role: grantedRole,
     area: "Produção",
   });
 

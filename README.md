@@ -7,7 +7,7 @@ laudos do CQ. Os números vêm direto do banco da fábrica (Metrics), só por
 leitura, com as regras dos BIs de Produção, conferidas mês a mês.
 
 **Painel:** https://felipepanini.github.io/Dashboard-Gualapack/demo/ (acesso
-com login; cadastro só com chave de convite).
+com login; cadastro direto com e-mail da Gualapack, os outros com chave de convite).
 
 > **O data hub ([`hub/`](./hub/README.md))** lê o banco a cada 10 minutos,
 > num PC da rede da fábrica, aplica as regras dos BIs, confere cada indicador
@@ -73,7 +73,12 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 4. **Login por convite, dados protegidos no banco.** A chave pública do
    Supabase fica no site, mas só lê o que as regras de acesso (RLS) permitem,
    e só pra quem está logado. O cadastro exige uma chave de convite, validada
-   no servidor.
+   no servidor. Desde 09/10/2026, e-mail com "gualapack" no domínio (depois
+   do @) entra sem chave, como Visualizador e sem confirmação por e-mail:
+   decisão do dono, ciente de que quem digitar um e-mail assim entra mesmo
+   sem ser dono dele. Para voltar a exigir a chave de todos, a função
+   `emailGualapack` em `backend/functions/register/index.ts` passa a
+   devolver `false`.
 
 5. **Resumo, não eventos, no Supabase.** O plano gratuito tem 500 MB, e
    vários anos de eventos de máquina estouraram esse limite uma vez. Por isso
@@ -120,7 +125,7 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 | Agora: o que cada máquina está fazendo | `View_usr_apontamentos_999999` (evento em andamento) + `CTREntradasMaquina` (OP aberta) | classe pela classificação oficial; velocidade real = metros ÷ horas produzindo da OP; programada e término previsto da OP |
 | TMR, horas, paradas | `View_usr_apontamentos_999999` | produzindo ÷ horas sem FIM TURNO e INATIVIDADE (BI Indicadores Produção) |
 | OEE dos cartões das máquinas (desde 08/10) | idem + consulta BASE_PROD | qualidade (aparas) × performance (velocidade) × disponibilidade (paradas), pedido da gerência. Qualidade = 100 − refugo apontado na máquina ÷ (esse refugo + peso final das OPs que passaram por ela, pesadas nas REBs; OP ainda sem peso fica de fora). Performance = velocidade ÷ melhor mês da máquina nos 12 meses até o fim do período, até 100%. Disponibilidade = TMR. Fábrica: TMR geral × qualidade e performance médias das máquinas, pesadas pelas horas produzindo. Não existe no BI: a conferência é a conta de cada parte |
-| Linha do tempo | idem, evento a evento | um dia de produção por vez, das 06:00 às 06:00 do dia seguinte (o turno da noite ainda é do dia anterior); abre no último dia fechado, com os 7 dias mais recentes no seletor |
+| Linha do tempo | idem, evento a evento | um dia de produção por vez, das 06:00 às 06:00 do dia seguinte (o turno da noite ainda é do dia anterior); abre em hoje (o dia de produção em andamento), com os 7 dias mais recentes no seletor e o filtro de setor |
 | Perda por motivo e por máquina, OPs com mais refugo | idem, código 40 | kg apontados |
 | Apara apontada (comparação, sem meta), produção em kg | idem, consulta BASE_PROD | refugo ÷ (refugo + peso bruto das rebobinadeiras) |
 | Apara confirmada (a de referência; meta 12%) | Refugo Aparas (aba Conta Refugo) | um mês: a coluna "% JGR" da planilha, scrap JGR ÷ (volume JGR + scrap JGR). Mais de um mês e o cartão do ano: o bloco ACUMULADO (YTD) da planilha, scrap total ÷ (volume total + scrap total), com a ORF de jan–mar/2026 (YTD 2025 = 13,46%, YTD 2026 = 14,28% em 08/10) |
@@ -275,7 +280,18 @@ vale daqui pra frente em `demo/index.html`:
   carteira exportam CSV (";" e vírgula decimal: abre direto no Excel).
 - **Leitura em páginas:** fila, WIP e carteira vêm inteiras mesmo acima do
   limite de 1.000 linhas por pedido do Supabase.
-- **Assistente** (botão redondo e a pesquisa do topo), em duas camadas:
+- **Paradas sem fim de turno** (09/10): o Pareto, as horas por classe, o
+  assistente e a IA não contam fim de turno (a máquina fora da programação;
+  os apontamentos de sábado e domingo inteiros dominavam o Pareto). O TMR já
+  não contava.
+- **Qualidade de 30 dias** nos cartões das máquinas (09/10): a qualidade só
+  fecha quando a OP é pesada nas REBs, dias depois. Máquina sem OP pesada no
+  período (ontem, hoje, uma semana) usa a qualidade dos últimos 30 dias até
+  o fim do período, e o cartão diz "OEE · qualidade de 30 dias". Máquina
+  com horas e nada produzido tem disponibilidade 0% e OEE 0%.
+- **Assistente** pela pesquisa do topo (o botão redondo saiu em 09/10; "Continuar
+  no assistente" abre o chat, e as perguntas feitas na pesquisa entram na mesma
+  conversa), em duas camadas:
   - **Local:** só a resposta cravada (09/10: "deixar apenas para perguntas
     que já tem resposta cravada"). Responde na hora quando entende todas as
     palavras da pergunta: OEE e suas partes, apara, TMR, uma máquina, o que

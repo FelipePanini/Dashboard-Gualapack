@@ -537,7 +537,7 @@ button.legend-item:hover{ color: var(--text-primary); }
 /* cartão estreito (celular, dois por linha): fica só o nome da parte, que não pode
    cortar; o "aparas / velocidade / paradas" está no subtítulo do painel */
 .machine-card{ container-type: inline-size; }
-@container (max-width: 210px){ .oee-f .oee-l small{ display:none; } }
+@container (max-width: 180px){ .oee-f .oee-l small{ display:none; } }
 .machine-foot{
   display:flex; align-items:center; gap:4px; margin-top:12px; font-size:12px; color: var(--text-muted);
   transition: color .25s var(--ease-out), gap .35s var(--spring);
@@ -598,19 +598,6 @@ svg.anima .anel{ animation: anel 1s var(--ease-out) backwards .1s; }
   position:fixed; right:24px; bottom:24px; z-index:40;
   display:flex; flex-direction:column; align-items:flex-end; gap:12px;
 }
-.assistant-fab{
-  width:56px; height:56px; border-radius:50%; position:relative;
-  background: var(--accent); color: var(--accent-ink); border:none; cursor:pointer;
-  display:flex; align-items:center; justify-content:center;
-  box-shadow: 0 10px 28px -8px rgba(15,94,166,0.6);
-  transition: transform .45s var(--spring), box-shadow .3s var(--ease-out);
-}
-.assistant-fab:hover{ transform: scale(1.05); box-shadow: 0 14px 32px -8px rgba(15,94,166,0.65); }
-.assistant-fab:active{ transform: scale(.92); transition-duration:.1s; }
-.assistant-fab svg{ width:24px; height:24px; position:absolute; transition: transform .45s var(--spring), opacity .2s var(--ease-out); }
-.assistant-fab .icone-fechar{ opacity:0; transform: rotate(-90deg) scale(.6); }
-.assistant-fab.aberto .icone-abrir{ opacity:0; transform: rotate(90deg) scale(.6); }
-.assistant-fab.aberto .icone-fechar{ opacity:1; transform:none; }
 .assistant-panel{
   width:380px; max-height:62vh;
   background: var(--glass-bg-strong);
@@ -618,7 +605,7 @@ svg.anima .anel{ animation: anel 1s var(--ease-out) backwards .1s; }
   border:1px solid var(--glass-border); border-radius:20px;
   box-shadow: var(--shadow-pop), inset 0 1px 0 var(--glass-highlight);
   display:flex; flex-direction:column; overflow:hidden;
-  transform-origin: calc(100% - 28px) calc(100% + 40px);
+  transform-origin: calc(100% - 24px) 100%;
   opacity:0; transform: scale(.4); pointer-events:none;
   transition: opacity .2s var(--ease-out), transform .5s var(--spring);
 }
@@ -1118,6 +1105,11 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
 .tempo-filtros[hidden]{ display:none; }
 .tempo-filtros-rotulo{ font-size:12.5px; font-weight:600; color: var(--text-secondary); }
 .grafico.altura-anima{ overflow:hidden; transition: height .5s var(--spring-suave); }
+/* linha do tempo: uma animação só, no gráfico inteiro (composta pela placa de vídeo) */
+.gantt-svg .gseg{ cursor:default; }
+.gantt-svg .gseg:hover{ filter:brightness(1.15); }
+.gantt-svg.anima{ animation: gantt-entra .5s var(--ease-out) backwards; will-change: opacity, transform; }
+@keyframes gantt-entra{ from{ opacity:0; transform: translateY(8px); } }
 
 /* =========================================================================
    PESQUISA (09/10/2026): um lugar só para achar máquina, tela ou perguntar
@@ -1350,10 +1342,21 @@ html.vidro .rail-mark{ box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 6px 16p
   html.vidro .rail-indicator{ border-radius:22px; }
 }
 
-/* ação principal flutuante (assistente): vidro tingido na cor da ação */
-html.vidro .assistant-fab{
-  background: linear-gradient(180deg, rgba(255,255,255,.34), rgba(255,255,255,0) 55%), var(--accent);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,.6), inset 0 -2px 6px rgba(0,0,0,.14), 0 12px 28px -8px rgba(15,94,166,.55);
+/* Avatar do usuário: no vidro também fica tingido na cor do painel (09/10). Com o
+   vidro branco dos botões, no tema claro o círculo sumia no fundo claro; no escuro
+   o anel o destacava. Agora os dois temas têm o mesmo círculo azul com anel. */
+html.vidro .rail-foot, html.vidro .conta-topo{
+  background:
+    linear-gradient(180deg, rgba(255,255,255,.38) 0%, transparent 52%),
+    linear-gradient(135deg, color-mix(in srgb, var(--av) 16%, var(--surface-1)), color-mix(in srgb, var(--av) 34%, var(--surface-1)));
+  border-color: color-mix(in srgb, var(--av) 48%, transparent);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--av) 16%, transparent), 0 3px 8px -3px color-mix(in srgb, var(--av) 45%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.45);
+  -webkit-backdrop-filter:none; backdrop-filter:none;
+}
+html.vidro .rail-foot:hover, html.vidro .conta-topo:hover, html.vidro .rail-foot[aria-expanded="true"], html.vidro .conta-topo[aria-expanded="true"]{
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--av) 28%, transparent), 0 3px 8px -3px color-mix(in srgb, var(--av) 45%, transparent),
+              inset 0 1px 0 rgba(255,255,255,.45);
 }
 
 /* camadas flutuantes que já eram vidro: o brilho de borda do Liquid Glass */
@@ -1831,7 +1834,7 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
           <div class="panel-head">
             <div>
               <h3 class="panel-title">Pareto de paradas</h3>
-              <div class="panel-sub">Horas acumuladas por motivo &middot; linha mostra o % acumulado</div>
+              <div class="panel-sub">Horas acumuladas por motivo, sem fim de turno &middot; linha mostra o % acumulado</div>
             </div>
           </div>
           <div class="grafico" id="pareto-chart"></div>
@@ -2034,10 +2037,8 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
       </button>
     </div>
   </div>
-  <button class="assistant-fab" id="assistant-fab" aria-label="Abrir assistente" aria-expanded="false" aria-controls="assistant-panel">
-    <svg class="icone-abrir" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2a5 5 0 0 1 5 5v2a5 5 0 0 1-10 0V7a5 5 0 0 1 5-5Z"/><path d="M8 21h8M12 17v4"/></svg>
-    <svg class="icone-fechar" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"/></svg>
-  </button>
+  <!-- Sem botão redondo desde 09/10: o assistente se abre pela pesquisa do topo
+       ("Continuar no assistente"); a pesquisa é a porta de entrada. -->
 </div>
 
 <script>
@@ -2310,7 +2311,7 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
     const [hubMaqRes, hubParadasRes, hubGanttRes, hubMotivoRes, hubRefugoMaqRes, hubOpsRes, hubClasseRes, hubAparaRes,
            hubFontesRes, hubAparaPeriodoRes, hubMensalRes, hubPerdaMaqMotivoRes, listaRes, hubCodigosRes,
            bAgoraRes, bFilaRes, bWipRes, bCarteiraRes, bEntregasRes, bSetupRes, bLaudosRes, bMensalRes,
-           bDiasRes, bPlanoRes, bPlanoMesRes, bAparaAnoRes, bQualRes, hubExecRes] = await Promise.all([
+           bDiasRes, bPlanoRes, bPlanoMesRes, bAparaAnoRes, bQualRes, hubExecRes, bQual30Res] = await Promise.all([
       // Horas por máquina/código publicadas pelo hub (Machine Card) e o resto
       // dos cartões (002_cartoes.sql).
       client.rpc("rpc_hub_maquinas", { p_de: pDe, p_ate: pAte }),
@@ -2354,6 +2355,9 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
       client.rpc("rpc_hub_qualidade_maquina", { p_de: pDe, p_ate: pAte }),
       // a última rodada do hub: a hora do "Atualizado" no selo do topo
       client.from("v_hub_execucao").select("publicada_em,terminada_em"),
+      // qualidade dos últimos 30 dias até o fim do período: vale quando a máquina não
+      // tem OP pesada no período (ontem, hoje, uma semana)
+      client.rpc("rpc_hub_qualidade_maquina", { p_de: pAte ? isoDate(new Date(periodoAte.getTime() - 30*86400000)) : null, p_ate: pAte }),
     ]);
     window.HUB_EXECUCAO = !hubExecRes.error && (hubExecRes.data||[]).length ? hubExecRes.data[0] : null;
     // Com o hub publicado (002), nenhuma consulta antiga é usada: todas têm
@@ -2373,7 +2377,7 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
     const passageiro = [hubParadasRes, hubGanttRes, hubMotivoRes, hubRefugoMaqRes, hubOpsRes, hubClasseRes, hubAparaRes,
                         hubFontesRes, hubAparaPeriodoRes, hubMensalRes, hubPerdaMaqMotivoRes, hubCodigosRes,
                         bAgoraRes, bFilaRes, bWipRes, bCarteiraRes, bEntregasRes, bSetupRes, bLaudosRes, bMensalRes,
-                        bDiasRes, bPlanoRes, bPlanoMesRes, bAparaAnoRes, bQualRes]
+                        bDiasRes, bPlanoRes, bPlanoMesRes, bAparaAnoRes, bQualRes, bQual30Res]
       .map(r=>r.error).find(e=>e && e.code !== "PGRST202" && e.code !== "PGRST205");
     if(passageiro && tentativa === 1) throw passageiro;
     // período sem nenhum apontamento também é hub (vazio), não caminho antigo
@@ -2503,11 +2507,14 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
       : null;
     // Paradas e linha do tempo seguem a mesma fonte das horas acima.
     const paradas = HUB_HORAS && !hubParadasRes.error ? hubParadasRes.data : downtimeRes.data;
+    // Fim de turno não é parada (09/10): é a máquina fora da programação, e os
+    // apontamentos longos do fim de semana (sábado e domingo inteiros) dominavam o
+    // Pareto e as horas por classe. O TMR já não contava essas horas.
     PARADAS_TODAS = (paradas||[]).map(r=>{
       const c = classeDoCodigo(r.cod_apont);
       return { nome: prettyCodigo(r.cod_desc).replace(/^\d+\s*-\s*/, ""), horas: Number(r.horas)||0, cod: r.cod_apont,
                classe: c.chave, classeNome: c.nome, cor: c.cor };
-    });
+    }).filter(p=> p.classe !== "FIM TURNO");
     DOWNTIME = PARADAS_TODAS.slice(0,8);
 
     // Série mensal: junta fardos (apontado) e o fechamento oficial do Power
@@ -2758,15 +2765,24 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
       window.OEE = null;
       const qualOk = !bQualRes.error && Array.isArray(bQualRes.data);
       const qualPorMaq = new Map(qualOk ? bQualRes.data.map(r=>[chave(r.maquina), r]) : []);
+      // A qualidade só fecha quando a OP é pesada nas REBs, dias depois: num período curto
+      // (ontem, hoje, uma semana) a máquina ainda não tem OP pesada e ficava com "—". Nesse
+      // caso vale a qualidade dos últimos 30 dias até o fim do período, e o cartão diz isso.
+      const qual30Ok = !bQual30Res.error && Array.isArray(bQual30Res.data);
+      const qual30PorMaq = new Map(qual30Ok ? bQual30Res.data.map(r=>[chave(r.maquina), r]) : []);
+      const base = q => q ? n(q.refugo_kg) + n(q.peso_ops_kg) : 0;
       MAQUINAS.forEach(m=>{
         const h = porMaq.get(chave(m.id)) || {};
         const tot = n(h.horas_totais), prod = n(h.horas_produzindo), ref = n(h.velocidade_ref_m_min);
         m.disp = tot > 0 ? 100 * prod / tot : null;
         m.perf = prod > 0 && ref > 0 && n(h.metros) > 0 ? Math.min(100, 100 * (n(h.metros) / prod / 60) / ref) : null;
-        const q = qualPorMaq.get(chave(m.id)), baseQ = q ? n(q.refugo_kg) + n(q.peso_ops_kg) : 0;
+        const doPeriodo = qualPorMaq.get(chave(m.id)), de30 = qual30PorMaq.get(chave(m.id));
+        m.qualJanela = !(base(doPeriodo) > 0) && base(de30) > 0 && m.disp != null;
+        const q = m.qualJanela ? de30 : doPeriodo, baseQ = base(q);
         m.qual = baseQ > 0 ? 100 - 100 * n(q.refugo_kg) / baseQ : null;
         m.refugoQual = q ? n(q.refugo_kg) : null;
-        m.oee = m.disp != null && m.perf != null && m.qual != null ? m.disp * m.perf * m.qual / 10000 : null;
+        // máquina com horas e nada produzido: disponibilidade 0% e OEE 0% (a velocidade não importa)
+        m.oee = m.disp === 0 ? 0 : m.disp != null && m.perf != null && m.qual != null ? m.disp * m.perf * m.qual / 10000 : null;
         m.horasProdExatas = prod;
       });
       if(qualOk){
@@ -2944,10 +2960,12 @@ function eventosDoDia(iso){
   }
   return LINHA_TEMPO.porDia.get(iso);
 }
-// Dia que abre: o último dia de produção já fechado (o de ontem, depois das 06:00).
+// Dia que abre: hoje, o dia de produção em andamento (pedido de 09/10); sem
+// evento de hoje publicado ainda, o dia mais recente.
 function diaPadraoLinhaTempo(){
-  const fechados = LINHA_TEMPO.dias.filter(iso => inicioDoDia(iso).getTime() + 24*3600000 <= Date.now());
-  return fechados.length ? fechados[fechados.length-1] : LINHA_TEMPO.dias[LINHA_TEMPO.dias.length-1] || null;
+  const hoje = diaDeProducao(new Date());
+  if(LINHA_TEMPO.dias.includes(hoje)) return hoje;
+  return LINHA_TEMPO.dias[LINHA_TEMPO.dias.length-1] || null;
 }
 function rotuloDiaProducao(iso){
   const hoje = diaDeProducao(new Date());
@@ -3074,7 +3092,7 @@ function statusOee(m){
 function fatoresOee(m){
   const disp = m.disp !== undefined ? m.disp : m.horasTot > 0 ? m.tmr : null;
   const perf = m.perf !== undefined ? m.perf : m.vel != null && m.velRef > 0 ? Math.min(100, 100 * m.vel / m.velRef) : null;
-  const f = [["Qualidade", "aparas", m.qual ?? null], ["Performance", "velocidade", perf], ["Disponibilidade", "paradas", disp]];
+  const f = [["Qualidade", m.qualJanela ? "aparas · 30 dias" : "aparas", m.qual ?? null], ["Performance", "velocidade", perf], ["Disponibilidade", "paradas", disp]];
   const validos = f.filter(x=>x[2] != null);
   const pior = validos.length ? validos.reduce((a,b)=> b[2] < a[2] ? b : a)[0] : null;
   return f.map(([nome, sub, v])=>({ nome, sub, v, pior: nome === pior }));
@@ -3188,19 +3206,30 @@ function quebrarTexto(txt, maxPx, linhas = 2, px = 12){
    gráfico aparece, não a cada redimensionamento.
    ------------------------------------------------------------------------- */
 const _graficos = new WeakMap();
-function montarGrafico(holder, desenhar){
+// Largura do conteúdo de um painel de largura inteira, medida mesmo com a tela escondida.
+function larguraPainelCheio(){
+  const c = document.querySelector(".content"), p = document.querySelector(".view .panel");
+  if(!c || !p || !c.clientWidth) return 0;
+  const cs = getComputedStyle(c), ps = getComputedStyle(p), px = v => parseFloat(v) || 0;
+  return Math.round(c.clientWidth - px(cs.paddingLeft) - px(cs.paddingRight) - px(ps.paddingLeft) - px(ps.paddingRight)
+    - px(ps.borderLeftWidth) - px(ps.borderRightWidth));
+}
+function montarGrafico(holder, desenhar, opcoes = {}){
   if(!holder) return;
   const antigo = _graficos.get(holder);
   if(antigo) antigo.ro.disconnect();
   const est = { w: Math.round(holder.clientWidth), animou: false, ro: null, quadro: 0 };
   // escondido (outra tela): desenha numa largura provável, sem animar, só
-  // pra o conteúdo existir; ao aparecer, redesenha na largura de verdade
-  const provavel = Math.max(280, Math.round((document.querySelector(".content")?.clientWidth || 1000) * 0.45));
+  // pra o conteúdo existir; ao aparecer, redesenha se a largura de verdade for
+  // outra. Gráfico de largura inteira (opcoes.cheia, a linha do tempo) mede a
+  // largura certa já escondido: ao entrar na tela não precisa redesenhar (09/10:
+  // a linha do tempo travava ao entrar, redesenhando centenas de segmentos).
+  const provavel = (opcoes.cheia && larguraPainelCheio()) || Math.max(280, Math.round((document.querySelector(".content")?.clientWidth || 1000) * 0.45));
   if(est.w > 0){ est.animou = !reduzMovimento(); desenhar(est.w, est.animou); }
-  else desenhar(provavel, false);
+  else{ desenhar(provavel, false); est.w = provavel; }
   est.ro = new ResizeObserver(entradas=>{
     const w = Math.round(entradas[0].contentRect.width);
-    if(w === 0){ est.w = 0; return; }
+    if(w === 0) return;   // escondido: guarda a largura desenhada
     if(Math.abs(w - est.w) < 2) return;
     est.w = w;
     cancelAnimationFrame(est.quadro);
@@ -3556,8 +3585,12 @@ function renderOeeFabrica(){
   if(!sec) return;
   if(!comOeeFabrica){ sec.hidden = true; sec.innerHTML = ""; return; }
   const o = window.OEE;
+  // máquinas sem OP pesada no período entram com a qualidade dos últimos 30 dias
+  const comOee30 = MAQUINAS.filter(m=>m.oee != null), janela = comOee30.filter(m=>m.qualJanela).length;
+  const subQual = !janela ? "aparas" : janela === comOee30.length ? "aparas · 30 dias" : "aparas · parte em 30 dias";
+  const CURTO_PARTE = { qual:"aparas", perf:"velocidade", disp:"paradas" };
   const partes = [
-    { k:"qual", nome:"Qualidade", sub:"aparas", v:o.qual },
+    { k:"qual", nome:"Qualidade", sub:subQual, v:o.qual },
     { k:"perf", nome:"Performance", sub:"velocidade", v:o.perf },
     { k:"disp", nome:"Disponibilidade", sub:"paradas", v:o.disp },
   ];
@@ -3569,7 +3602,7 @@ function renderOeeFabrica(){
   const meta = META_OEE != null ? ` · meta de ${fmtNum(META_OEE, 0)}%` : "";
   const seta = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`;
   sec.innerHTML = `
-    <div class="oee-card oee-hero" role="group" aria-label="${esc(`OEE da fábrica no período: ${fmt1(o.oee)}%. Maior perda: ${pior.nome.toLowerCase()} (${pior.sub}).`)}">
+    <div class="oee-card oee-hero" role="group" aria-label="${esc(`OEE da fábrica no período: ${fmt1(o.oee)}%. Maior perda: ${pior.nome.toLowerCase()} (${CURTO_PARTE[pior.k]}).`)}">
       <div class="oee-anel" aria-hidden="true">
         <svg viewBox="0 0 108 108"><circle class="trilho" cx="54" cy="54" r="${R}" fill="none" stroke-width="11"/>
           <circle class="arco" cx="54" cy="54" r="${R}" fill="none" stroke-width="11" stroke-dasharray="${C.toFixed(2)}"
@@ -3579,7 +3612,7 @@ function renderOeeFabrica(){
       <div class="oee-hero-txt">
         <div class="oee-hero-titulo">OEE da fábrica</div>
         <div class="oee-hero-formula">qualidade × performance × disponibilidade, no período${meta}</div>
-        <div class="oee-hero-perda">Maior perda: ${esc(pior.nome.toLowerCase())} (${esc(pior.sub)})</div>
+        <div class="oee-hero-perda">Maior perda: ${esc(pior.nome.toLowerCase())} (${CURTO_PARTE[pior.k]})</div>
       </div>
     </div>
     ${partes.map((p,i)=>`
@@ -3710,7 +3743,7 @@ const ORDEM_ETAPAS = ["Impressão", "Laminação", "Corte / Refile", "Coating"];
     const st = statusOee(m);
     const fat = fatoresOee(m);
     const oeeTxt = m.oee != null ? `${Math.round(m.oee)}%` : "—";
-    const rotulo = st === "none" ? "sem apontamento no período" : m.oee != null ? "OEE" : `OEE · sem ${faltaNoOee(m)} no período`;
+    const rotulo = st === "none" ? "sem apontamento no período" : m.oee != null ? (m.qualJanela ? "OEE · qualidade de 30 dias" : "OEE") : `OEE · sem ${faltaNoOee(m)} no período`;
     const pior = fat.find(f=>f.pior);
     const falado = st === "none" ? "sem apontamento no período"
       : `OEE ${m.oee != null ? Math.round(m.oee) + "%" : "sem dado"}; ` + fat.map(f=>`${f.nome} ${f.v != null ? Math.round(f.v) + "%" : "sem dado"}`).join(", ") +
@@ -4208,7 +4241,7 @@ const STATUS_LAUDO = [
       return { label:c.nome, value:h, display: fmt(h)+" h", color:c.cor,
         tip:`<b>${esc(c.nome)}</b><br>${fmt1(h)} h · ${fmt1(h/totParadas*100)}% das horas sem produzir` };
     });
-    if(subDt) subDt.textContent = "Classificação oficial do código de apontamento · horas no período";
+    if(subDt) subDt.textContent = "Classificação oficial do código de apontamento · horas no período, sem fim de turno";
     hBarChart(holderDt, linhas, { labelW:140, valueW:64, rowH:28, aria:"Horas de parada por classificação", vazio:"Sem paradas apontadas no período." });
   }else{
     if(subDt) subDt.textContent = "Maiores códigos de parada no período";
@@ -4615,7 +4648,7 @@ function renderGantt(){
         const segs = segsPorMaq[i].map((s,si)=>{
           const x = xDe(s.ini);
           const w = Math.max(1.5, ((s.fim-s.ini)/HOURS)*plotW);
-          return `<rect class="gseg barra-h" style="--i:${i}" data-m="${i}" data-s="${si}" x="${x.toFixed(1)}" y="${y+4}" width="${w.toFixed(1)}" height="${rowH-8}" rx="3" fill="${corSeg(s)}"/>`;
+          return `<rect class="gseg" data-m="${i}" data-s="${si}" x="${x.toFixed(1)}" y="${y+4}" width="${w.toFixed(1)}" height="${rowH-8}" rx="3" fill="${corSeg(s)}"/>`;
         }).join("");
         return `<g>
           <text x="0" y="${y+rowH/2+4}" font-size="12" font-weight="600" fill="var(--text-secondary)">${esc(cortarTexto(m.nome, padL-10, 12, 600))}</text>
@@ -4630,24 +4663,29 @@ function renderGantt(){
       })() : "";
       const comApont = segsPorMaq.filter(s=>s.length).length;
       const qual = iso ? `dia de produção ${fmtDM(dataLocal(iso))}` : "dia";
-      holder.innerHTML = `<svg class="${animar ? "anima" : ""}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img"
+      // Centenas de segmentos num dia: uma animação só para o gráfico inteiro (opacidade e
+      // deslocamento, que a placa de vídeo faz sozinha) e um ouvinte só para a dica. Antes,
+      // cada segmento tinha a sua animação e os seus ouvintes, e a tela travava ao entrar.
+      holder.innerHTML = `<svg class="gantt-svg${animar ? " anima" : ""}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img"
         aria-label="${esc(`Linha do tempo de apontamentos, ${qual}: ${comApont} de ${maqs.length} máquinas com apontamento`)}">
-        <style>.gseg{ cursor:default; } .gseg:hover{ filter:brightness(1.15); }</style>
         ${grid}${linhas}${agora}
       </svg>`;
-      holder.querySelectorAll(".gseg").forEach(r=>{
+      const svgEl = holder.querySelector("svg");
+      svgEl.addEventListener("mousemove", e=>{
+        const r = e.target.closest && e.target.closest(".gseg");
+        if(!r){ clearTip(holder); return; }
         const m = maqs[+r.dataset.m];
         const s = segsPorMaq[+r.dataset.m][+r.dataset.s];
         // horário real do evento (o que vem do dia anterior aparece com a data)
         const horario = s.de ? `${quando(s.de)} → ${quando(s.ate)} · ${fmt1((s.ate - s.de)/3600000)} h`
                              : `${hh(s.ini)} → ${hh(s.fim)} · ${fmt1(s.fim-s.ini)} h`;
-        r.addEventListener("mousemove", e=> attachTip(holder,
+        attachTip(holder,
           `<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br><span style="display:inline-flex;align-items:center;gap:6px;"><span style="width:8px;height:8px;border-radius:2px;background:${corSeg(s)};display:inline-block;"></span>${esc(s.nome)}</span>` +
           (s.classeNome && s.classeNome !== s.nome ? ` <span style="color:var(--text-muted)">· ${esc(s.classeNome)}</span>` : "") +
-          `<br>${horario}` + (s.op ? `<br>OP ${esc(s.op)}` : ""), e));
-        r.addEventListener("mouseleave", ()=> clearTip(holder));
+          `<br>${horario}` + (s.op ? `<br>OP ${esc(s.op)}` : ""), e);
       });
-    });
+      svgEl.addEventListener("mouseleave", ()=> clearTip(holder));
+    }, { cheia:true });
     holder.classList.remove("carregando");
 
     if(legend){
@@ -5136,7 +5174,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       <div class="drawer-bars">
         ${[
            // [rótulo, largura da barra em %, cor, texto exibido]: a base de cada parte do OEE
-           ...(m.qual != null ? [["Qualidade", m.qual, corFator("Qualidade"), `${fmt(m.refugoQual)} kg de refugo`]] : []),
+           ...(m.qual != null ? [["Qualidade", m.qual, corFator("Qualidade"), `${fmt(m.refugoQual)} kg de refugo${m.qualJanela ? " · 30 dias" : ""}`]] : []),
            ...(m.perf != null ? [["Performance", m.perf, corFator("Performance"), `${m.vel} de ${m.velRef} m/min`]] : []),
            ...(st !== "none" ? [["Disponibilidade", m.disp ?? m.tmr, corFator("Disponibilidade"), `${fmt(m.horasProd)} de ${fmt(m.horasTot)} h`]] : []),
           ].map(([label,val,c,txt])=>`
@@ -5227,9 +5265,8 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
      fazer"...), longas ou que o local não entende. Vai junto o contexto: os
      números que o painel mostra, sem nome de cliente nem descrição de produto.
      Se a IA não responder (cota grátis do dia, rede), vale a resposta local.
-   O botão abre e fecha (o ícone vira um X), e o painel cresce a partir dele. */
+   Abre pela pesquisa do topo ("Continuar no assistente"); o botão redondo saiu em 09/10. */
 (function(){
-  const fab = document.getElementById("assistant-fab");
   const panel = document.getElementById("assistant-panel");
   const closeBtn = document.getElementById("assistant-close");
   const body = document.getElementById("assistant-body");
@@ -5700,7 +5737,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       (kg ? `, refugo ${fmt(kg)} kg${mot ? ` (mais ${mot.nome}, ${fmt(mot.kg)} kg)` : ""}` : "") +
       (m.aderencia != null ? `, aderência ${fmt1(m.aderencia)}% (${fmt(m.realKm)} de ${fmt(plano)} km)` : "") +
       (ag ? `, agora ${estadoAgora(ag).nome}` : "") +
-      (m.oee != null ? `, OEE ${fmt1(m.oee)}% (qualidade ${fmt1(m.qual)}%, performance ${fmt1(m.perf)}%, disponibilidade ${fmt1(m.disp)}%)` : "");
+      (m.oee != null ? `, OEE ${fmt1(m.oee)}% (qualidade ${fmt1(m.qual)}%${m.qualJanela ? " nos últimos 30 dias" : ""}, performance ${fmt1(m.perf)}%, disponibilidade ${fmt1(m.disp)}%)` : "");
   }
   // o que o painel mostra no período escolhido, em texto curto
   function contextoIA(){
@@ -5814,9 +5851,6 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   function abrir(){
     clearTimeout(timerFecha);
     panel.hidden = false;
-    fab.classList.add("aberto");
-    fab.setAttribute("aria-expanded", "true");
-    fab.setAttribute("aria-label", "Fechar assistente");
     requestAnimationFrame(()=> requestAnimationFrame(()=> panel.classList.add("open")));
     if(!body.dataset.inited){
       body.dataset.inited = "1";
@@ -5832,13 +5866,10 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   function fechar(){
     if(!aberto()) return;
     panel.classList.remove("open");
-    fab.classList.remove("aberto");
-    fab.setAttribute("aria-expanded", "false");
-    fab.setAttribute("aria-label", "Abrir assistente");
     timerFecha = setTimeout(()=>{ if(!aberto()) panel.hidden = true; }, 360);
-    fab.focus({ preventScroll:true });
+    // o foco volta para a pesquisa, de onde o assistente foi aberto (sem reabrir a lista)
+    if(window.focarPesquisa) window.focarPesquisa();
   }
-  fab.addEventListener("click", ()=> aberto() ? fechar() : abrir());
   closeBtn.addEventListener("click", fechar);
   document.addEventListener("keydown", e=>{ if(e.key==="Escape" && aberto()) fechar(); });
   sendBtn.addEventListener("click", ()=>{ if(input.value.trim()) ask(input.value.trim()); });
@@ -5850,12 +5881,18 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     vaiParaIA: texto => vaiParaIA(norm(texto), responder(texto)),
     perguntarIA,
     textoIA,
+    abrir,
+    fechar,
+    // a pergunta feita na pesquisa entra na mesma conversa: a próxima ("e a R20?") tem contexto
+    lembrar(pergunta, textoPuro){ conversa.push({ papel:"usuario", texto: pergunta }, { papel:"assistente", texto: textoPuro }); },
     // leva para o painel do assistente uma pergunta feita na pesquisa, para continuar a conversa
     continuar(pergunta, html, textoPuro, daIA){
       abrir();
       addMsg("user", esc(pergunta));
       addMsg("bot", html);
-      conversa.push({ papel:"usuario", texto: pergunta }, { papel:"assistente", texto: textoPuro });
+      // a pesquisa já guardou a pergunta na conversa; aqui só se for nova
+      const ult = conversa[conversa.length - 2];
+      if(!ult || ult.texto !== pergunta) conversa.push({ papel:"usuario", texto: pergunta }, { papel:"assistente", texto: textoPuro });
       marcarFonte(daIA ? "ia" : "painel");
     },
   };
@@ -6028,6 +6065,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       </div>`);
       cont.querySelectorAll(".busca-ia-texto > *").forEach((el, i)=> el.style.setProperty("--k", i));
       ultima = { q, html: html + FONTE_IA, texto: j.resposta, ia:true };
+      A.lembrar(q, j.resposta);   // a próxima pergunta (na pesquisa ou no chat) continua desta
     }catch(err){
       clearInterval(etapas);
       if(meu !== pedido) return;
@@ -6097,7 +6135,11 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     btnLimpar.hidden = !input.value;
   }
 
-  input.addEventListener("focus", abrir);
+  // o assistente, ao fechar, devolve o foco para cá sem reabrir a lista
+  let semAbrir = false;
+  window.focarPesquisa = ()=>{ semAbrir = true; input.focus({ preventScroll:true }); semAbrir = false; };
+  input.addEventListener("focus", ()=>{ if(!semAbrir) abrir(); });
+  input.addEventListener("click", ()=>{ if(!aberto) abrir(); });
   campo.addEventListener("click", e=>{ if(e.target === campo || e.target.closest(".busca-lupa")) input.focus(); });
   input.addEventListener("input", ()=>{
     mudouTexto();
@@ -6145,11 +6187,11 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   document.addEventListener("pointerdown", e=>{ if(aberto && !raiz.contains(e.target)) fechar(); });
   // Ctrl/⌘+K em qualquer lugar; "/" quando não se está digitando em outro campo
   document.addEventListener("keydown", e=>{
-    if((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "k"){ e.preventDefault(); input.focus(); input.select(); return; }
+    if((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "k"){ e.preventDefault(); input.focus(); input.select(); abrir(); return; }
     if(e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey){
       const t = document.activeElement;
       if(t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
-      e.preventDefault(); input.focus();
+      e.preventDefault(); input.focus(); abrir();
     }
   });
   window.matchMedia("(max-width: 768px)").addEventListener("change", ()=>{ if(aberto){ if(compacto()) entrarCheia(); else sairCheia(); } });
@@ -6590,8 +6632,6 @@ function mostrarFalhaCarga(err){
   window.FALHA_CARGA = err;
   USANDO_DADOS_REAIS = false;
   document.querySelector(".content").classList.add("sem-dados");
-  const fab = document.getElementById("assistant-fab");
-  if(fab) fab.style.display = "none";   // o CSS do botão passa por cima do "hidden"
   // o selo de status ("Sem dados", vermelho) é atualizado pelo boot()
   const titulo = document.getElementById("view-title");
   if(titulo) titulo.textContent = "Painel de Produção";

@@ -7,7 +7,7 @@ Tudo que roda fora do navegador. Visão geral e decisões no
 |---|---|---|
 | [`sql/`](./sql/) | `schema.sql` (login, perfis, convites) → `schema_data.sql` (tabelas dos dados) → `schema_views.sql` (funções e views que o painel lê). Rodar nessa ordem. | Supabase, SQL Editor |
 | [`sync-drive/`](./sync-drive/) | A carga diária: `build-database-central.js` (etapa 1), `sync.js` (etapa 2), `lib.js` (regras de arquivo/aba/coluna), `lib.test.js`. `bases-catalog.js` + `collect-bases.js` montam as abas de inventário do arquivo central. | GitHub Actions |
-| [`functions/register/`](./functions/register/) | Cadastro com chave de convite (publicada no Supabase como `super-action`). | Supabase Edge Functions |
+| [`functions/register/`](./functions/register/) | Cadastro: com chave de convite, ou direto com e-mail que tenha "gualapack" no domínio (Visualizador; desde 09/10/2026). Publicada no Supabase como `super-action`. | Supabase Edge Functions |
 | [`functions/ingest/`](./functions/ingest/) | Upload manual — **legado**, ver [docs/guias/upload-manual.md](../docs/guias/upload-manual.md). | Supabase Edge Functions |
 
 ## Rodar a carga no seu computador

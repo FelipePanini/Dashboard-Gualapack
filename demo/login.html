@@ -145,6 +145,8 @@ input{
 }
 input:focus{ outline:none; border-color:var(--accent); box-shadow:0 0 0 3px var(--accent-soft); }
 .hint{ font-size:11px; color:var(--text-muted); }
+.field[hidden], .hint[hidden]{ display:none; }
+#reg-gualapack{ font-size:12.5px; color: var(--text-secondary, var(--text-muted)); margin: -2px 0 12px; }
 button.submit{
   margin-top:6px;
   background: linear-gradient(155deg, var(--series-3), var(--accent) 65%, var(--series-1));
@@ -194,7 +196,7 @@ button.submit.loading .spinner{ display:inline-block; }
   <div class="brand-word">Guala<span class="ink-accent">pack</span></div>
   <div class="brand-region">Brasil &middot; Unidade Jaguariúna</div>
   <h1>Painel de Produção</h1>
-  <div class="sub">Acesso restrito à equipe de Produção. O cadastro exige uma chave de convite válida.</div>
+  <div class="sub">Acesso restrito à equipe da Gualapack. Com e-mail da Gualapack, o cadastro é direto; os outros precisam de uma chave de convite.</div>
 
   <div class="tabs">
     <button class="tab active" id="tab-login" type="button">Entrar</button>
@@ -231,11 +233,12 @@ button.submit.loading .spinner{ display:inline-block; }
       <input id="reg-password" type="password" autocomplete="new-password" required minlength="12" />
       <span class="hint">Mínimo de 12 caracteres.</span>
     </div>
-    <div class="field">
+    <div class="field" id="reg-invite-campo">
       <label for="reg-invite">Chave de convite</label>
       <input id="reg-invite" type="text" autocomplete="off" required />
-      <span class="hint">Fornecida pelo seu gestor de Produção. Sem ela não é possível se cadastrar.</span>
+      <span class="hint">Fornecida pelo seu gestor de Produção. Com e-mail da Gualapack, não precisa.</span>
     </div>
+    <div class="hint" id="reg-gualapack" role="status" hidden>E-mail da Gualapack: o cadastro não precisa de chave de convite.</div>
     <button class="submit" type="submit">
       <span class="spinner"></span><span class="label">Criar conta</span>
     </button>
@@ -344,6 +347,21 @@ formLogin.addEventListener("submit", async (e)=>{
   window.location.href = "./index.html";
 });
 
+// E-mail com "gualapack" no domínio (depois do @) dispensa a chave de convite
+// (09/10/2026). A regra de verdade está na função register, no servidor.
+const regEmail = document.getElementById("reg-email");
+const regInvite = document.getElementById("reg-invite");
+const regInviteCampo = document.getElementById("reg-invite-campo");
+const regGualapack = document.getElementById("reg-gualapack");
+const emailGualapack = s => (String(s).trim().toLowerCase().split("@")[1] || "").includes("gualapack");
+function atualizaChave(){
+  const g = emailGualapack(regEmail.value);
+  regInviteCampo.hidden = g;
+  regInvite.required = !g;
+  regGualapack.hidden = !g;
+}
+regEmail.addEventListener("input", atualizaChave);
+
 formRegister.addEventListener("submit", async (e)=>{
   e.preventDefault();
   clearMsg();
@@ -353,7 +371,7 @@ formRegister.addEventListener("submit", async (e)=>{
   const fullName = document.getElementById("reg-name").value.trim();
   const email = document.getElementById("reg-email").value.trim();
   const password = document.getElementById("reg-password").value;
-  const inviteKey = document.getElementById("reg-invite").value.trim();
+  const inviteKey = emailGualapack(email) ? "" : document.getElementById("reg-invite").value.trim();
 
   try{
     const res = await fetch(cfg.registerFunctionUrl, {
