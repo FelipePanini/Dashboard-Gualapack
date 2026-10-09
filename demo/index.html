@@ -399,6 +399,12 @@ body.entrada .view.active .kpi:nth-child(4){ animation-delay: .19s; }
 body.entrada .view.active > section:not(.kpi-row){ animation: entra .6s var(--ease-out) backwards; animation-delay: .22s; }
 body.entrada .view.active > section:not(.kpi-row) ~ section:not(.kpi-row){ animation-delay: .3s; }
 body.entrada .view.active > section:not(.kpi-row) ~ section:not(.kpi-row) ~ section:not(.kpi-row){ animation-delay: .38s; }
+/* os cartões do OEE entram um a um, como os outros cartões (a seção em si não desliza) */
+body.entrada .view.active > section.oee-sec{ animation:none; }
+body.entrada .view.active .oee-card{ animation: entra .55s var(--ease-out) backwards; }
+body.entrada .view.active .oee-card:nth-child(2){ animation-delay: .05s; }
+body.entrada .view.active .oee-card:nth-child(3){ animation-delay: .1s; }
+body.entrada .view.active .oee-card:nth-child(4){ animation-delay: .15s; }
 /* troca de tela sem View Transitions (navegador antigo) */
 .view.entrando{ animation: entra .4s var(--ease-out) backwards; }
 
@@ -999,6 +1005,228 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
 @media (max-width: 380px){
   .kpi-row{ grid-template-columns: minmax(0,1fr); }
 }
+/* com o OEE em cartões próprios, a fileira de cartões fica com três */
+.kpi-row.tres{ grid-template-columns: repeat(3, minmax(0,1fr)); }
+@media (max-width: 1080px){ .kpi-row.tres{ grid-template-columns: repeat(2, minmax(0,1fr)); } }
+@media (max-width: 380px){ .kpi-row.tres{ grid-template-columns: minmax(0,1fr); } }
+
+/* =========================================================================
+   OEE DA FÁBRICA (09/10/2026, pedido da gerência: "separar em cards"): o
+   cartão do OEE com o anel e as três partes, cada uma no seu cartão. Cada
+   parte é um botão: ordena as máquinas por ela, da menor para a maior.
+   Um momento de movimento só: o anel enche, as barras crescem e a maior
+   perda aparece por último.
+   ========================================================================= */
+.oee-sec{ display:grid; grid-template-columns: minmax(0,1.35fr) repeat(3, minmax(0,1fr)); gap:14px; margin-bottom:14px; }
+.oee-sec[hidden]{ display:none; }
+.oee-card{
+  position:relative; min-width:0; display:flex; flex-direction:column;
+  background: var(--surface-1); border:1px solid var(--border); border-radius:16px;
+  padding:18px 20px 16px; box-shadow: var(--shadow-card);
+}
+.oee-hero{ flex-direction:row; align-items:center; gap:18px; }
+.oee-anel{ position:relative; flex:none; width:108px; height:108px; }
+.oee-anel svg{ display:block; width:100%; height:100%; transform: rotate(-90deg); overflow:visible; }
+.oee-anel .trilho{ stroke: var(--surface-sunken); }
+.oee-anel .arco{ stroke: var(--series-3); stroke-linecap:round; }
+.oee-sec.anima .oee-anel .arco{ animation: anel 1.3s var(--ease-out) .1s backwards; }
+.oee-anel-num{ position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; font-variant-numeric: tabular-nums; }
+.oee-anel-num b{ font-size:27px; font-weight:700; letter-spacing:-0.025em; line-height:1; white-space:nowrap; }
+.oee-anel-num b small{ font-size:.5em; font-weight:600; color: var(--text-secondary); margin-left:1px; letter-spacing:0; }
+.oee-anel-num > span{ font-size:11px; font-weight:700; letter-spacing:.08em; color: var(--text-muted); margin-top:4px; }
+.oee-hero-txt{ min-width:0; display:flex; flex-direction:column; gap:4px; }
+.oee-hero-titulo{ font-size:13px; font-weight:600; color: var(--text-secondary); }
+.oee-hero-formula{ font-size:12.5px; color: var(--text-muted); line-height:1.4; }
+.oee-hero-perda{ display:inline-flex; align-items:center; gap:7px; margin-top:8px; font-size:13px; font-weight:600; color: var(--text-primary); }
+.oee-hero-perda::before{ content:""; width:8px; height:8px; border-radius:50%; background: var(--perda); flex:none; }
+.oee-sec.anima .oee-hero-perda{ animation: entra-leve .5s var(--ease-out) .95s backwards; }
+
+.oee-fator{ font:inherit; color:inherit; text-align:left; cursor:pointer; -webkit-tap-highlight-color: transparent;
+  transition: transform .45s var(--spring), box-shadow .3s var(--ease-out), border-color .2s var(--ease-out); }
+.oee-fator:hover{ transform: translateY(-2px); box-shadow: var(--shadow-hover); border-color: var(--border-strong); }
+.oee-fator:active{ transform: scale(.97); transition-duration:.12s; }
+.oee-fator:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+.oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--shadow-card); }
+.oee-fator-topo{ display:flex; align-items:center; justify-content:space-between; gap:8px; min-height:20px; }
+.oee-fator-nome{ font-size:13px; font-weight:600; color: var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.oee-fator-nome small{ font-size:12px; font-weight:400; color: var(--text-muted); margin-left:5px; }
+.oee-fator-chip{ display:inline-flex; align-items:center; gap:5px; flex:none; font-size:11.5px; font-weight:650; color: var(--text-primary);
+  padding:2px 8px 2px 7px; border-radius:99px; background: var(--surface-sunken); }
+.oee-fator-chip::before{ content:""; width:7px; height:7px; border-radius:50%; background: var(--perda); }
+.oee-sec.anima .oee-fator-chip{ animation: chip-entra .55s var(--spring) 1s backwards; }
+@keyframes chip-entra{ from{ opacity:0; transform: scale(.6); } }
+.oee-fator-valor{ display:block; font-size:30px; font-weight:700; letter-spacing:-0.025em; margin-top:10px; line-height:1; font-variant-numeric: tabular-nums; white-space:nowrap; }
+.oee-fator-valor small{ font-size:.5em; font-weight:600; color: var(--text-secondary); margin-left:2px; letter-spacing:0; }
+.oee-fator-barra{ display:block; height:6px; border-radius:3px; background: var(--surface-sunken); overflow:hidden; margin-top:12px; }
+.oee-fator-barra > span{ display:block; height:100%; border-radius:3px; background: var(--series-3); transform-origin:left center; }
+.oee-fator.pior .oee-fator-barra > span{ background: var(--perda); }
+.oee-sec.anima .oee-fator-barra > span{ animation: cresce-x .9s var(--ease-out) backwards; animation-delay: calc(.25s + var(--i, 0) * .09s); }
+.oee-fator-menor{ display:flex; align-items:center; justify-content:space-between; gap:8px; margin-top:10px; font-size:12.5px; color: var(--text-muted); }
+.oee-fator-menor b{ color: var(--text-primary); font-weight:600; }
+.oee-fator-ver{ display:inline-flex; align-items:center; gap:2px; flex:none; color: var(--accent); font-weight:600; white-space:nowrap;
+  opacity:0; transform: translateX(-4px); transition: opacity .2s var(--ease-out), transform .35s var(--spring); }
+.oee-fator:hover .oee-fator-ver, .oee-fator:focus-visible .oee-fator-ver, .oee-fator[aria-pressed="true"] .oee-fator-ver{ opacity:1; transform:none; }
+@media (hover: none){ .oee-fator-ver{ opacity:1; transform:none; } }
+@media (max-width: 1080px){
+  .oee-sec{ grid-template-columns: repeat(3, minmax(0,1fr)); }
+  .oee-hero{ grid-column: 1 / -1; }
+}
+@media (max-width: 600px){
+  .oee-sec{ grid-template-columns: minmax(0,1fr); gap:10px; }
+  .oee-card{ padding:14px 16px 13px; border-radius:14px; }
+  .oee-anel{ width:94px; height:94px; }
+  .oee-anel-num b{ font-size:23px; }
+  .oee-fator{ display:grid; grid-template-columns: minmax(0,1fr) auto; column-gap:14px; align-items:center; }
+  .oee-fator-topo{ grid-column:1; grid-row:1; }
+  .oee-fator-valor{ grid-column:2; grid-row:1 / span 2; margin-top:0; font-size:26px; }
+  .oee-fator-barra{ grid-column:1; grid-row:2; margin-top:9px; }
+  .oee-fator-menor{ grid-column:1 / -1; grid-row:3; margin-top:9px; }
+}
+
+/* máquinas ordenadas por uma parte do OEE: a parte em foco fica forte, as outras recuam */
+.foco-barra{ display:flex; align-items:center; justify-content:space-between; gap:6px 12px; flex-wrap:wrap; margin:-4px 0 14px;
+  padding:8px 8px 8px 14px; border-radius:12px; background: var(--accent-soft); color: var(--text-primary); font-size:13px; }
+.foco-barra[hidden]{ display:none; }
+.foco-barra b{ font-weight:650; }
+.foco-barra button{ font:inherit; font-size:12.5px; font-weight:600; color: var(--accent); background:transparent; border:0; cursor:pointer;
+  min-height:32px; padding:6px 10px; border-radius:8px; transition: background .2s var(--ease-out); }
+.foco-barra button:hover{ background: var(--surface-1); }
+.foco-barra.entra{ animation: entra-leve .4s var(--ease-out); }
+.view .panel{ scroll-margin-top: 84px; }
+/* recuam as barras; o texto fica no cinza que passa no contraste (4,5:1), não some */
+.machine-board .oee-t, .machine-board .oee-l, .machine-board .oee-v{ transition: opacity .35s var(--ease-out), color .3s var(--ease-out); }
+.machine-board.focando .oee-f:not(.foco) .oee-t{ opacity:.3; }
+.machine-board.focando .oee-f:not(.foco) .oee-l, .machine-board.focando .oee-f:not(.foco) .oee-v{ color: var(--text-muted); font-weight:400; }
+.machine-board.focando .oee-f.foco .oee-l, .machine-board.focando .oee-f.foco .oee-v{ color: var(--text-primary); font-weight:650; }
+
+/* "Hoje" e o seletor de período numa cápsula só */
+.periodo-grupo{ display:inline-flex; align-items:center; gap:2px; padding:3px; border-radius:999px; flex:none;
+  background: var(--surface-1); border:1px solid var(--border); }
+.periodo-grupo .pill-select{ border:0; background:transparent; min-height:30px; padding:5px 12px; box-shadow:none; }
+.periodo-grupo .pill-select:hover{ background: var(--surface-sunken); }
+.periodo-hoje{ font:inherit; font-size:13px; font-weight:600; color: var(--text-secondary); background:transparent; border:0; cursor:pointer;
+  min-height:30px; padding:5px 12px; border-radius:999px;
+  transition: background .3s var(--ease-out), color .2s var(--ease-out), box-shadow .3s var(--ease-out), transform .3s var(--spring); }
+.periodo-hoje:hover{ color: var(--text-primary); background: var(--surface-sunken); }
+.periodo-hoje:active{ transform: scale(.93); transition-duration:.1s; }
+.periodo-hoje[aria-pressed="true"]{ color: var(--text-primary); background: var(--thumb); box-shadow: 0 1px 2px rgba(10,21,36,.14), 0 3px 10px -4px rgba(10,21,36,.2); }
+/* no toque, a cápsula fica com 44 px de altura (accessibility.md: 44 x 44 pt no celular) */
+@media (max-width: 768px){ .periodo-grupo .pill-select, .periodo-hoje{ min-height:36px; padding:6px 11px; } }
+
+/* linha do tempo: filtro por setor */
+.tempo-filtros{ display:flex; align-items:center; gap:10px; flex-wrap:wrap; margin:0 0 12px; }
+.tempo-filtros[hidden]{ display:none; }
+.tempo-filtros-rotulo{ font-size:12.5px; font-weight:600; color: var(--text-secondary); }
+.grafico.altura-anima{ overflow:hidden; transition: height .5s var(--spring-suave); }
+
+/* =========================================================================
+   PESQUISA (09/10/2026): um lugar só para achar máquina, tela ou perguntar
+   (searching.md › Best practices). Busca enquanto digita, com sugestões e as
+   pesquisas recentes, que dá para limpar. Pergunta com resposta direta nos
+   números sai na hora; o resto vai para a IA. O popover desce com mola e muda
+   de altura sem pular (popovers.md: "Provide a smooth transition when
+   changing the size of a popover"); no celular vira tela inteira, como a
+   busca do iPhone (popovers.md: "Avoid displaying popovers in compact views").
+   ========================================================================= */
+.busca{ position:relative; flex:1 1 280px; max-width:440px; margin:0 auto; z-index:25; transition: max-width .55s var(--spring); }
+.busca[hidden]{ display:none; }
+.busca.aberta{ max-width:580px; }
+.busca-campo{ position:relative; display:flex; align-items:center; gap:9px; height:40px; padding:0 7px 0 14px; border-radius:999px;
+  background: var(--surface-1); border:1px solid var(--border); color: var(--text-muted); cursor:text;
+  transition: border-color .2s var(--ease-out), box-shadow .35s var(--ease-out); }
+.busca-campo:hover{ border-color: var(--border-strong); }
+.busca.aberta .busca-campo{ border-color: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); }
+.busca-lupa{ flex:none; transition: transform .55s var(--spring), color .2s var(--ease-out); }
+.busca.aberta .busca-lupa{ color: var(--accent); transform: rotate(-14deg) scale(1.08); }
+.busca-campo input{ flex:1; min-width:0; height:100%; border:0; outline:0; background:transparent; font:inherit; font-size:14px; color: var(--text-primary); }
+.busca-campo input::placeholder{ color: var(--text-muted); opacity:1; }
+.busca-atalho{ flex:none; font-family:inherit; font-size:11px; font-weight:600; line-height:1; color: var(--text-muted);
+  padding:4px 7px; border-radius:7px; border:1px solid var(--border); background: var(--surface-sunken); transition: opacity .2s var(--ease-out); }
+.busca.aberta .busca-atalho, .busca.com-texto .busca-atalho{ display:none; }
+.busca-limpar{ flex:none; display:grid; place-items:center; width:28px; height:28px; border-radius:50%; border:0; cursor:pointer;
+  color: var(--text-secondary); background: var(--surface-sunken); transition: transform .3s var(--spring), background .2s var(--ease-out); }
+.busca-limpar[hidden]{ display:none; }
+.busca-limpar:hover{ background: var(--border); }
+.busca-limpar:active{ transform: scale(.86); }
+.busca-cancelar{ display:none; }
+.busca-pop{ position:absolute; top:calc(100% + 8px); left:50%; width:max(100%, 540px); max-width:calc(100vw - 32px);
+  transform: translateX(-50%); transform-origin:50% 0;
+  background: var(--glass-bg-strong); border:1px solid var(--glass-border); border-radius:20px; box-shadow: var(--shadow-pop);
+  -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6);
+  overflow:hidden; transition: height .42s var(--spring-suave); }
+.busca-pop[hidden]{ display:none; }
+.busca-pop.abrindo{ animation: busca-abre .6s var(--spring) both; }
+.busca-pop.fechando{ animation: busca-fecha .18s var(--ease-out) both; pointer-events:none; }
+@keyframes busca-abre{ from{ opacity:0; transform: translateX(-50%) translateY(-12px) scale(.94); filter: blur(10px); } }
+@keyframes busca-fecha{ to{ opacity:0; transform: translateX(-50%) translateY(-6px) scale(.97); } }
+.busca-conteudo{ max-height:min(66vh, 580px); overflow-y:auto; overscroll-behavior:contain; padding:8px; }
+.busca-secao + .busca-secao, .busca-resposta + .busca-secao{ margin-top:6px; padding-top:6px; border-top:1px solid var(--border); }
+.busca-secao-titulo{ display:flex; align-items:center; justify-content:space-between; gap:8px;
+  font-size:11.5px; font-weight:650; letter-spacing:.02em; color: var(--text-muted); padding:6px 10px 4px; }
+.busca-secao-titulo button{ font:inherit; font-size:11.5px; font-weight:600; color: var(--accent); background:none; border:0; cursor:pointer; padding:4px 6px; border-radius:6px; }
+.busca-item{ display:flex; align-items:center; gap:11px; width:100%; min-height:44px; padding:6px 10px; border:0; border-radius:12px;
+  background:transparent; color: var(--text-primary); font:inherit; font-size:13.5px; text-align:left; cursor:pointer;
+  transition: background .15s var(--ease-out); }
+.busca-item[aria-selected="true"]{ background: var(--accent-soft); }
+.busca-item .ic{ flex:none; display:grid; place-items:center; width:30px; height:30px; border-radius:9px;
+  background: var(--surface-sunken); color: var(--text-secondary); font-size:11px; font-weight:700; letter-spacing:-.01em; }
+.busca-item .tx{ flex:1; min-width:0; }
+.busca-item .tx span, .busca-item .tx small{ display:block; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.busca-item .tx small{ font-size:12px; color: var(--text-muted); }
+.busca-item mark{ background:transparent; color:inherit; font-weight:700; }
+.busca-item .dir{ flex:none; font-size:12.5px; font-weight:600; color: var(--text-secondary); font-variant-numeric: tabular-nums; }
+.busca-item .enter{ flex:none; font-size:11px; color: var(--text-muted); opacity:0; transition: opacity .15s var(--ease-out); }
+.busca-item[aria-selected="true"] .enter{ opacity:1; }
+.busca-item.ia .ic{ color: var(--good); background: var(--good-bg); }
+.busca-item .ic svg{ width:15px; height:15px; }
+@media (hover: none){ .busca-item .enter{ display:none; } }
+.busca-lista.entra .busca-item, .busca-lista.entra .busca-secao-titulo, .busca-resposta.entra{
+  animation: item-entra .4s var(--ease-out) backwards; animation-delay: calc(var(--k, 0) * 24ms + 70ms); }
+@keyframes item-entra{ from{ opacity:0; transform: translateY(6px); } }
+.busca-resposta{ margin:2px 2px 6px; padding:12px 14px 11px; border-radius:14px; background: var(--surface-sunken);
+  font-size:13.5px; line-height:1.55; color: var(--text-primary); }
+.busca-resposta-fonte{ display:flex; align-items:center; gap:6px; margin-top:8px; font-size:11.5px; color: var(--text-muted); }
+/* IA respondendo: dizer o que está acontecendo (generative-ai.md: "Consider giving specific, reassuring feedback") */
+.busca-ia{ padding:4px 6px 2px; }
+.busca-ia-pergunta{ font-size:14px; font-weight:650; color: var(--text-primary); padding:6px 6px 10px; }
+.busca-ia-status{ display:flex; align-items:center; gap:8px; font-size:12.5px; color: var(--text-secondary); padding:0 6px 12px; }
+.busca-ia-status i{ width:8px; height:8px; border-radius:50%; background: var(--good); animation: pulso-ia 1.1s var(--ease-out) infinite; }
+@keyframes pulso-ia{ 50%{ transform: scale(.5); opacity:.45; } }
+.busca-ia-linhas{ display:grid; gap:9px; padding:0 6px 14px; }
+.busca-ia-linha{ height:10px; border-radius:5px; background: linear-gradient(90deg, var(--surface-sunken) 25%, var(--accent-soft) 50%, var(--surface-sunken) 75%);
+  background-size:300% 100%; animation: brilho-passa 1.6s linear infinite; }
+@keyframes brilho-passa{ from{ background-position: 100% 0; } to{ background-position: -200% 0; } }
+.busca-ia-texto{ padding:0 6px; font-size:13.5px; line-height:1.55; color: var(--text-primary); }
+.busca-ia-texto p{ margin:0 0 8px; }
+.busca-ia-texto ul{ margin:0 0 8px; padding-left:18px; }
+.busca-ia-texto li{ margin:2px 0; }
+.busca-ia-texto > *{ animation: item-entra .5s var(--ease-out) backwards; animation-delay: calc(var(--k, 0) * 80ms); }
+.busca-ia .msg-fonte{ padding:0 6px; }
+.busca-acoes{ display:flex; gap:8px; flex-wrap:wrap; padding:10px 6px 6px; }
+.busca-acoes button{ font:inherit; font-size:12.5px; font-weight:600; min-height:34px; padding:6px 13px; border-radius:999px; cursor:pointer;
+  border:1px solid var(--border); background: var(--surface-1); color: var(--text-primary); transition: transform .25s var(--spring), border-color .2s var(--ease-out); }
+.busca-acoes button:hover{ border-color: var(--border-strong); }
+.busca-acoes button:active{ transform: scale(.95); transition-duration:.1s; }
+.busca-vazio{ padding:14px 12px; font-size:13px; color: var(--text-muted); }
+body.busca-cheia .rail, body.busca-cheia .assistant{ visibility:hidden; }
+@media (max-width: 768px){
+  .busca{ order:3; flex:1 1 100%; max-width:none; margin:2px 0 0; }
+  .busca.aberta{ max-width:none; }
+  .busca-campo{ height:44px; }
+  .busca-atalho{ display:none; }
+  .busca.cheia{ position:fixed; inset:0; z-index:70; margin:0; display:flex; flex-wrap:wrap; align-content:flex-start; gap:10px;
+    padding: calc(12px + env(safe-area-inset-top)) 14px 0; }
+  .busca.cheia::before{ content:""; position:fixed; inset:0; z-index:-1; background: var(--glass-bg-strong);
+    -webkit-backdrop-filter: blur(30px) saturate(1.6); backdrop-filter: blur(30px) saturate(1.6); animation: surge .3s var(--ease-out); }
+  .busca.cheia .busca-campo{ flex:1 1 0; }
+  .busca.cheia .busca-cancelar{ display:block; flex:none; font:inherit; font-size:15px; font-weight:500; color: var(--accent);
+    background:none; border:0; padding:0 4px; min-height:44px; cursor:pointer; animation: surge .3s var(--ease-out); }
+  .busca.cheia .busca-pop{ position:static; flex:1 1 100%; width:auto; max-width:none; transform:none; border:0; border-radius:0;
+    background:transparent; box-shadow:none; -webkit-backdrop-filter:none; backdrop-filter:none; transition:none; height:auto !important; }
+  .busca.cheia .busca-pop.abrindo{ animation: busca-abre-cel .45s var(--ease-out) both; }
+  @keyframes busca-abre-cel{ from{ opacity:0; transform: translateY(10px); } }
+  .busca.cheia .busca-conteudo{ max-height: calc(100dvh - 76px - env(safe-area-inset-top)); padding:0 0 calc(24px + env(safe-area-inset-bottom)); }
+}
 
 /* =========================================================================
    VIDRO (html.vidro, o padrão desde 08/10/2026, aprovado pelo dono): o vidro em
@@ -1135,6 +1363,21 @@ html.vidro .drawer, html.vidro .assistant-panel, html.vidro .period-popup, html.
 }
 html.vidro .assistant-panel, html.vidro .period-popup, html.vidro .conta-pop{ box-shadow: var(--lg-brilho), var(--shadow-pop); }
 html.vidro .drawer{ box-shadow: var(--lg-brilho), -24px 0 60px -20px rgba(10,21,36,.35); }
+/* pesquisa e "Hoje + período" são controles: Liquid Glass. Os cartões do OEE são
+   conteúdo: o material padrão, como os outros cartões (liquid-glass.md, "Layer discipline") */
+html.vidro .busca-campo, html.vidro .periodo-grupo{
+  background: var(--lg-reflexo), var(--lg-bg); -webkit-backdrop-filter: var(--lg-filtro); backdrop-filter: var(--lg-filtro);
+  border-color: var(--lg-borda); box-shadow: var(--lg-brilho), var(--lg-sombra);
+}
+html.vidro .busca.aberta .busca-campo{ border-color: var(--accent); box-shadow: var(--lg-brilho), 0 0 0 4px var(--accent-soft), var(--lg-sombra); }
+html.vidro .periodo-grupo .pill-select{ background:transparent; border:0; box-shadow:none; -webkit-backdrop-filter:none; backdrop-filter:none; }
+html.vidro .periodo-grupo .pill-select:hover, html.vidro .periodo-hoje:hover{ background: var(--lg-bg-forte); }
+html.vidro .periodo-hoje[aria-pressed="true"]{ background: var(--lg-lente); box-shadow: var(--lg-brilho), 0 2px 8px -3px rgba(12,56,104,.3); }
+html.vidro .busca-pop{ background: var(--lg-reflexo), var(--lg-bg-forte); border-color: var(--lg-borda); box-shadow: var(--lg-brilho), var(--shadow-pop);
+  -webkit-backdrop-filter: blur(30px) saturate(1.8); backdrop-filter: blur(30px) saturate(1.8); }
+html.vidro .oee-card{ background: var(--mat-bg); border-color: var(--mat-borda); box-shadow: var(--mat-brilho), var(--mat-sombra); }
+html.vidro .oee-fator:hover{ box-shadow: var(--mat-brilho), var(--shadow-hover); }
+html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent), var(--mat-brilho), var(--mat-sombra); }
 
 /* Reduzir transparência / Aumentar contraste: tudo opaco, sem desfoque */
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more){
@@ -1142,9 +1385,14 @@ html.vidro .drawer{ box-shadow: var(--lg-brilho), -24px 0 60px -20px rgba(10,21,
   html.vidro .kpi, html.vidro .panel, html.vidro .machine-card, html.vidro .agora-card,
   html.vidro .pill-select, html.vidro .icon-btn, html.vidro .status-chip, html.vidro .segmented,
   html.vidro .select-wrap select, html.vidro .mais-btn, html.vidro .rail, html.vidro .topbar,
-  html.vidro .drawer, html.vidro .assistant-panel, html.vidro .period-popup, html.vidro .conta-pop{
+  html.vidro .drawer, html.vidro .assistant-panel, html.vidro .period-popup, html.vidro .conta-pop,
+  html.vidro .busca-campo, html.vidro .periodo-grupo, html.vidro .busca-pop, html.vidro .oee-card{
     background: var(--surface-1) !important; -webkit-backdrop-filter:none !important; backdrop-filter:none !important;
   }
+}
+@media (prefers-reduced-transparency: reduce), (prefers-contrast: more){
+  .busca-pop{ background: var(--surface-1); -webkit-backdrop-filter:none; backdrop-filter:none; }
+  .busca.cheia::before{ background: var(--bg); -webkit-backdrop-filter:none; backdrop-filter:none; }
 }
 </style>
 </head>
@@ -1252,9 +1500,13 @@ html.vidro .drawer{ box-shadow: var(--lg-brilho), -24px 0 60px -20px rgba(10,21,
         </div>
       </div>
       <div class="topbar-right">
-        <button class="pill-select" id="period-btn" type="button" aria-haspopup="dialog" aria-expanded="false">
-          <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" style="margin-right:5px; vertical-align:-2px;"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3v3.2M16 3v3.2"/></svg><span id="period-label">Este mês</span>
-        </button>
+        <!-- "Hoje" e o seletor de período numa cápsula só -->
+        <div class="periodo-grupo" role="group" aria-label="Período">
+          <button class="periodo-hoje" id="hoje-btn" type="button" aria-pressed="false" title="Ver só o dia de hoje">Hoje</button>
+          <button class="pill-select" id="period-btn" type="button" aria-haspopup="dialog" aria-expanded="false">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.8" style="margin-right:5px; vertical-align:-2px;"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3v3.2M16 3v3.2"/></svg><span id="period-label">Este mês</span>
+          </button>
+        </div>
         <button class="icon-btn theme-toggle" id="theme-toggle" type="button" title="Trocar tema" aria-label="Trocar tema">
           <svg id="theme-icon-sun" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4.5"/><path d="M12 2.5v2.5M12 19v2.5M4.2 4.2l1.8 1.8M18 18l1.8 1.8M2.5 12H5M19 12h2.5M4.2 19.8L6 18M18 6l1.8-1.8"/></svg>
           <svg id="theme-icon-moon" viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" hidden><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 0 0 10.5 10.5Z"/></svg>
@@ -1272,11 +1524,31 @@ html.vidro .drawer{ box-shadow: var(--lg-brilho), -24px 0 60px -20px rgba(10,21,
       <!-- Título da tela atual + o selo único de status dos dados -->
       <div class="page-head">
         <h2 class="view-title" id="view-title">Visão geral</h2>
+        <!-- Pesquisa: máquinas, telas e perguntas. O que tem resposta direta nos números
+             sai na hora; o resto vai para a IA. Aparece depois que os dados carregam. -->
+        <div class="busca" id="busca" hidden>
+          <div class="busca-campo">
+            <svg class="busca-lupa" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/></svg>
+            <input id="busca-input" type="text" role="combobox" aria-expanded="false" aria-controls="busca-lista" aria-autocomplete="list"
+                   autocomplete="off" spellcheck="false" maxlength="300" enterkeyhint="search"
+                   placeholder="Pesquisar máquina, tela ou perguntar" aria-label="Pesquisar máquina, tela ou fazer uma pergunta" />
+            <button type="button" class="busca-limpar" id="busca-limpar" aria-label="Limpar a pesquisa" hidden>
+              <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg>
+            </button>
+            <kbd class="busca-atalho" id="busca-atalho" aria-hidden="true">Ctrl K</kbd>
+          </div>
+          <button type="button" class="busca-cancelar" id="busca-cancelar">Cancelar</button>
+          <div class="busca-pop" id="busca-pop" hidden>
+            <div class="busca-conteudo" id="busca-conteudo"></div>
+          </div>
+        </div>
         <span class="status-chip" id="data-source-tag" role="status"><span class="live-dot" id="live-dot"></span><span id="live-label">Carregando…</span></span>
       </div>
 
       <!-- ============ VISÃO GERAL ============ -->
       <div class="view active" id="view-overview">
+        <!-- OEE da fábrica: o OEE e as três partes, cada uma no seu cartão (pedido da gerência) -->
+        <section class="oee-sec" id="oee-sec" aria-label="OEE da fábrica" hidden></section>
         <section class="kpi-row" id="kpi-row"></section>
 
         <section class="grid-2">
@@ -1310,6 +1582,7 @@ html.vidro .drawer{ box-shadow: var(--lg-brilho), -24px 0 60px -20px rgba(10,21,
             </div>
             <div class="segmented" id="maq-filters" role="group" aria-label="Filtrar por etapa"></div>
           </div>
+          <div class="foco-barra" id="foco-barra" role="status" hidden></div>
           <div class="machine-board" id="machine-grid"></div>
         </section>
       </div>
@@ -1545,6 +1818,10 @@ html.vidro .drawer{ box-shadow: var(--lg-brilho), -24px 0 60px -20px rgba(10,21,
               <div class="panel-sub" id="gantt-panel-sub">Ocupação das máquinas no dia de produção, das 06:00 às 06:00 &middot; passe o mouse para ver o motivo e a OP</div>
             </div>
             <div class="segmented" id="tempo-dias" role="group" aria-label="Dia de produção" hidden></div>
+          </div>
+          <div class="tempo-filtros" id="tempo-filtros" hidden>
+            <span class="tempo-filtros-rotulo" id="tempo-setor-rotulo">Setor</span>
+            <div class="segmented" id="tempo-setor" role="group" aria-labelledby="tempo-setor-rotulo"></div>
           </div>
           <div class="legend gantt-legenda" id="status-legend"></div>
           <div class="grafico" id="gantt-chart"></div>
@@ -2033,7 +2310,7 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
     const [hubMaqRes, hubParadasRes, hubGanttRes, hubMotivoRes, hubRefugoMaqRes, hubOpsRes, hubClasseRes, hubAparaRes,
            hubFontesRes, hubAparaPeriodoRes, hubMensalRes, hubPerdaMaqMotivoRes, listaRes, hubCodigosRes,
            bAgoraRes, bFilaRes, bWipRes, bCarteiraRes, bEntregasRes, bSetupRes, bLaudosRes, bMensalRes,
-           bDiasRes, bPlanoRes, bPlanoMesRes, bAparaAnoRes, bQualRes] = await Promise.all([
+           bDiasRes, bPlanoRes, bPlanoMesRes, bAparaAnoRes, bQualRes, hubExecRes] = await Promise.all([
       // Horas por máquina/código publicadas pelo hub (Machine Card) e o resto
       // dos cartões (002_cartoes.sql).
       client.rpc("rpc_hub_maquinas", { p_de: pDe, p_ate: pAte }),
@@ -2075,7 +2352,10 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
       client.from("v_hub_apara_ano").select("*"),
       // 007_oee.sql: qualidade (aparas) de cada máquina, para o OEE
       client.rpc("rpc_hub_qualidade_maquina", { p_de: pDe, p_ate: pAte }),
+      // a última rodada do hub: a hora do "Atualizado" no selo do topo
+      client.from("v_hub_execucao").select("publicada_em,terminada_em"),
     ]);
+    window.HUB_EXECUCAO = !hubExecRes.error && (hubExecRes.data||[]).length ? hubExecRes.data[0] : null;
     // Com o hub publicado (002), nenhuma consulta antiga é usada: todas têm
     // equivalente no hub. Elas somam centenas de milhares de linhas e, em
     // 30/09, estouraram o tempo do banco (statement timeout) e derrubaram o
@@ -2338,6 +2618,7 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
     window.PERDA_POR_MAQ = null;
     window.APARA_PERIODO = null;
     window.SERIE_MENSAL = null;
+    window.APARAS_SERIE = null;
     window.PERDA_MAQ_MOTIVO = null;
     if(HUB2){
       const n = v => Number(v)||0;
@@ -2398,7 +2679,11 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
         window.PERDA_POR_MAQ = new Map((hubRefugoMaqRes.data||[]).map(r=>[chave(r.maquina), n(r.kg)]));
       }
       if(!hubAparaRes.error){
-        const serie = (hubAparaRes.data||[]).filter(r=>r.apontado_pct!=null || r.confirmado_pct!=null).slice(-12);
+        const todos = (hubAparaRes.data||[]).filter(r=>r.apontado_pct!=null || r.confirmado_pct!=null);
+        // a série inteira: o gráfico da visão geral mostra o ano, de janeiro até o último mês
+        window.APARAS_SERIE = todos.map(r=>({ mes: String(r.mes).slice(0,7),
+          apontado: r.apontado_pct!=null ? n(r.apontado_pct) : null, confirmado: r.confirmado_pct!=null ? n(r.confirmado_pct) : null }));
+        const serie = todos.slice(-12);
         if(serie.length >= 2){
           MESES = serie.map(r=>fmtMes(String(r.mes).slice(0,10)));
           APARAS_MENSAL = {
@@ -3245,17 +3530,17 @@ const aderMedia     = window.HUB_TOTAIS ? window.HUB_TOTAIS.aderencia
 const produtividade = PRODUTIVIDADE; // m²/h — null quando nenhuma base carregada traz essa métrica
 const perdaTotalKg  = TIPOS_PERDA.reduce((a,t)=>a+t.kg,0);
 
+// O OEE da fábrica tem cartões próprios (pedido da gerência em 09/10: "separar em cards"):
+// o OEE com o anel e as três partes. Sem o OEE (sem o 007, ou período sem qualidade), os
+// cartões somem e o TMR médio volta para a fileira de baixo, como antes.
+const comOeeFabrica = !!(window.OEE && window.OEE.oee != null);
 const kpisGerais = [
   // A confirmada é mensal: período sem dia 1º (um dia, uma semana) fica sem ela, como no BI.
   { label:"Apara confirmada", value:confirmMedia, suffix:"%", decimals:1, comp: comparaMeta(confirmMedia),
     nota: confirmMedia == null ? `só por mês · apontada ${fmtPct(aparasMedia)}` : `apontada ${fmtPct(aparasMedia)}`,
     spark: APARAS_MENSAL.confirmado.slice() },
-  // OEE da fábrica (007); sem ele, o TMR médio como antes
-  window.OEE && window.OEE.oee != null
-    ? { label:"OEE", value: window.OEE.oee, suffix:"%", decimals:1,
-        nota:`qualidade ${fmtPct(window.OEE.qual)} · performance ${fmtPct(window.OEE.perf)} · disponibilidade ${fmtPct(window.OEE.disp)}` }
-    : { label:"TMR médio", value:tmrMedio, suffix:"%", decimals:1,
-        comp: comparaMesAnterior(tmrMedio, "tmr"), nota:"tempo de máquina rodando", spark: serieMensal("tmr") },
+  ...(comOeeFabrica ? [] : [{ label:"TMR médio", value:tmrMedio, suffix:"%", decimals:1,
+        comp: comparaMesAnterior(tmrMedio, "tmr"), nota:"tempo de máquina rodando", spark: serieMensal("tmr") }]),
 ];
 if(produtividade != null){
   kpisGerais.push({ label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:0,
@@ -3264,6 +3549,62 @@ if(produtividade != null){
 kpisGerais.push({ label:"Aderência ao plano", value:aderMedia, suffix:"%", decimals:1,
     comp: comparaMesAnterior(aderMedia, "ader"), nota:"km realizados ÷ planejados", spark: serieMensal("ader") });
 renderKpis(document.getElementById("kpi-row"), kpisGerais);
+document.getElementById("kpi-row").classList.toggle("tres", kpisGerais.length === 3);
+
+function renderOeeFabrica(){
+  const sec = document.getElementById("oee-sec");
+  if(!sec) return;
+  if(!comOeeFabrica){ sec.hidden = true; sec.innerHTML = ""; return; }
+  const o = window.OEE;
+  const partes = [
+    { k:"qual", nome:"Qualidade", sub:"aparas", v:o.qual },
+    { k:"perf", nome:"Performance", sub:"velocidade", v:o.perf },
+    { k:"disp", nome:"Disponibilidade", sub:"paradas", v:o.disp },
+  ];
+  const pior = partes.reduce((a,b)=> b.v < a.v ? b : a);
+  // a máquina mais baixa em cada parte (entre as que têm o OEE completo): diz onde agir
+  const comOee = MAQUINAS.filter(m=>m.oee != null);
+  partes.forEach(p=>{ p.menor = comOee.filter(m=>m[p.k] != null).sort((a,b)=>a[p.k] - b[p.k])[0] || null; });
+  const R = 44, C = 2 * Math.PI * R, frac = Math.max(0, Math.min(1, o.oee / 100));
+  const meta = META_OEE != null ? ` · meta de ${fmtNum(META_OEE, 0)}%` : "";
+  const seta = `<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg>`;
+  sec.innerHTML = `
+    <div class="oee-card oee-hero" role="group" aria-label="${esc(`OEE da fábrica no período: ${fmt1(o.oee)}%. Maior perda: ${pior.nome.toLowerCase()} (${pior.sub}).`)}">
+      <div class="oee-anel" aria-hidden="true">
+        <svg viewBox="0 0 108 108"><circle class="trilho" cx="54" cy="54" r="${R}" fill="none" stroke-width="11"/>
+          <circle class="arco" cx="54" cy="54" r="${R}" fill="none" stroke-width="11" stroke-dasharray="${C.toFixed(2)}"
+            stroke-dashoffset="${(C * (1 - frac)).toFixed(2)}" style="--c:${C.toFixed(2)}"/></svg>
+        <div class="oee-anel-num"><b><span class="kpi-num">${fmt1(o.oee)}</span><small>%</small></b><span>OEE</span></div>
+      </div>
+      <div class="oee-hero-txt">
+        <div class="oee-hero-titulo">OEE da fábrica</div>
+        <div class="oee-hero-formula">qualidade × performance × disponibilidade, no período${meta}</div>
+        <div class="oee-hero-perda">Maior perda: ${esc(pior.nome.toLowerCase())} (${esc(pior.sub)})</div>
+      </div>
+    </div>
+    ${partes.map((p,i)=>`
+    <button type="button" class="oee-card oee-fator${p === pior ? " pior" : ""}" data-k="${p.k}" aria-pressed="false" style="--i:${i}"
+      title="Ordenar as máquinas por ${p.nome.toLowerCase()}"
+      aria-label="${esc(`${p.nome} (${p.sub}): ${fmt1(p.v)}%` + (p.menor ? `. Menor: ${p.menor.nome}, ${Math.round(p.menor[p.k])}%` : "") +
+        (p === pior ? ". É a maior perda do OEE" : "") + `. Ordenar as máquinas por ${p.nome.toLowerCase()}`)}">
+      <span class="oee-fator-topo"><span class="oee-fator-nome">${p.nome}<small>${p.sub}</small></span>${p === pior ? `<span class="oee-fator-chip">Maior perda</span>` : ""}</span>
+      <span class="oee-fator-valor"><span class="kpi-num">${fmt1(p.v)}</span><small>%</small></span>
+      <span class="oee-fator-barra"><span style="width:${Math.max(1, Math.min(100, p.v)).toFixed(1)}%"></span></span>
+      <span class="oee-fator-menor"><span>${p.menor ? `Menor: <b>${esc(p.menor.nome)}</b> ${Math.round(p.menor[p.k])}%` : "&nbsp;"}</span><span class="oee-fator-ver" aria-hidden="true">Ordenar ${seta}</span></span>
+    </button>`).join("")}`;
+  sec.hidden = false;
+  // um momento só de movimento: o anel enche, as barras crescem e a maior perda chega por último
+  if(!reduzMovimento() && sec.closest(".view.active")){
+    sec.classList.add("anima");
+    const nums = sec.querySelectorAll(".kpi-num");
+    animateCount(nums[0], o.oee, 1, 120);
+    partes.forEach((p,i)=> animateCount(nums[i+1], p.v, 1, 240 + i*90));
+  }
+  sec.querySelectorAll(".oee-fator").forEach(b=> b.addEventListener("click", ()=>{
+    if(window.focarMaquinas) window.focarMaquinas(b.getAttribute("aria-pressed") === "true" ? null : b.dataset.k, true);
+  }));
+}
+renderOeeFabrica();
 
 /* Gráfico principal: apara confirmada x apontada (a meta de 12% é da confirmada) */
 (function(){
@@ -3278,18 +3619,32 @@ renderKpis(document.getElementById("kpi-row"), kpisGerais);
     { id:"apontado",   name:"Apontado (operador)", short:"Apont.", color:"var(--series-4)", dashed:true },
   ];
 
+  // O ano do período escolhido, de janeiro até o último mês com dado (09/10/2026: "deixando
+  // de jan até out"). Ano com menos de dois meses (em janeiro) volta aos últimos 12 meses.
+  function janelaDoAno(){
+    const s = window.APARAS_SERIE;
+    if(!s || !s.length) return null;
+    const { ate } = periodoDaUrl();
+    const ultimo = new Date(ate); ultimo.setDate(ultimo.getDate() - 1);
+    const ano = String(ultimo.getFullYear());
+    const doAno = s.filter(r=>r.mes.startsWith(ano));
+    return doAno.length >= 2 ? { ano, linhas: doAno } : null;
+  }
   function render(){
-    const labels = MESES.slice(-janela);
+    const j = janelaDoAno();
+    const labels = j ? j.linhas.map(r=>MESES_CURTOS[Number(r.mes.slice(5,7)) - 1]) : MESES.slice(-janela);
     const series = defs.filter(d=>visible.has(d.id)).map(d=>({
-      ...d, data: APARAS_MENSAL[d.id].slice(-janela)
+      ...d, data: j ? j.linhas.map(r=>r[d.id]) : APARAS_MENSAL[d.id].slice(-janela)
     }));
     if(!series.length) return;
+    const quando = j ? `${labels[0]}–${labels.at(-1)} de ${j.ano}` : "últimos 12 meses";
+    if(sub) sub.innerHTML = `% sobre peso bruto REBs &middot; ${esc(quando)} &middot; meta de ${esc(fmtMeta())} na confirmada`;
     // Escala automática: estava fixa em 3–9% e os valores reais chegam a
     // 26%, então a maior parte da série ficava fora do eixo.
     multiLineChart(holder, labels, series, {
       idPrefix:"ap", meta:META_APARAS,
       fmtY: v=> v.toFixed(0)+"%", fmtTip: v=> fmt1(v)+"%",
-      aria:`Apara confirmada e apontada por mês, meta de ${fmtMeta()} na confirmada`
+      aria:`Apara confirmada e apontada por mês, ${quando}, meta de ${fmtMeta()} na confirmada`
     });
   }
 
@@ -3330,6 +3685,10 @@ const ORDEM_ETAPAS = ["Impressão", "Laminação", "Corte / Refile", "Coating"];
   const board = document.getElementById("machine-grid");
   const filters = document.getElementById("maq-filters");
   let filtro = "all";
+  // parte do OEE que ordena as máquinas (null: agrupadas por etapa, como sempre)
+  let foco = null;
+  const CHAVE_PARTE = { Qualidade:"qual", Performance:"perf", Disponibilidade:"disp" };
+  const NOME_PARTE = { qual:"qualidade (aparas)", perf:"performance (velocidade)", disp:"disponibilidade (paradas)" };
 
   const etapas = ORDEM_ETAPAS.filter(p=> MAQUINAS.some(m=>m.processo===p));
   filters.innerHTML = `<span class="segmented-thumb" aria-hidden="true"></span>` +
@@ -3370,7 +3729,7 @@ const ORDEM_ETAPAS = ["Impressão", "Laminação", "Corte / Refile", "Coating"];
           <div class="machine-oee"><span class="v">${st === "none" ? "—" : oeeTxt}</span><span class="l">${rotulo}</span></div>
         </div>
         ${st === "none" ? "" : `<div class="oee-fatores" aria-hidden="true">${fat.map(f=>`
-          <div class="oee-f${f.pior ? " pior" : ""}"${f.pior ? ` title="Maior perda do OEE desta máquina"` : ""}>
+          <div class="oee-f${f.pior ? " pior" : ""}${CHAVE_PARTE[f.nome] === foco ? " foco" : ""}" data-k="${CHAVE_PARTE[f.nome]}"${f.pior ? ` title="Maior perda do OEE desta máquina"` : ""}>
             <span class="oee-l">${f.nome} <small>${f.sub}</small></span>
             <span class="oee-t"><span style="width:${f.v != null ? Math.max(2, f.v).toFixed(1) : 0}%"></span></span>
             <span class="oee-v">${f.v != null ? Math.round(f.v) + "%" : "—"}</span>
@@ -3381,10 +3740,17 @@ const ORDEM_ETAPAS = ["Impressão", "Laminação", "Corte / Refile", "Coating"];
   }
 
   function render(animar){
-    const grupos = (filtro==="all" ? etapas : [filtro]).map(p=>({ etapa:p, lista: MAQUINAS.filter(m=>m.processo===p) }));
+    const visiveis = filtro==="all" ? etapas : [filtro];
     let i = 0;
     board.classList.toggle("anima", !!animar && !reduzMovimento());
-    board.innerHTML = grupos.map(g=>{
+    if(foco){
+      // ordenadas por uma parte do OEE: uma grade só, da menor para a maior; sem o dado, no fim
+      const lista = MAQUINAS.filter(m=>visiveis.includes(m.processo))
+        .sort((a,b)=> (a[foco] ?? Infinity) - (b[foco] ?? Infinity));
+      board.innerHTML = `<section class="etapa" aria-label="${esc("Máquinas por " + NOME_PARTE[foco])}">
+        <div class="machine-grid">${lista.map(m=>cartao(m, i++)).join("")}</div>
+      </section>`;
+    }else board.innerHTML = visiveis.map(p=>({ etapa:p, lista: MAQUINAS.filter(m=>m.processo===p) })).map(g=>{
       const comHoras = g.lista.filter(m=>m.horasTot > 0).length;
       return `<section class="etapa" aria-label="${esc(g.etapa)}">
         <div class="etapa-head"><h4 class="etapa-nome">${esc(g.etapa)}</h4>
@@ -3416,6 +3782,51 @@ const ORDEM_ETAPAS = ["Impressão", "Laminação", "Corte / Refile", "Coating"];
   render(true);
   requestAnimationFrame(moverThumb);
   new ResizeObserver(moverThumb).observe(filters);
+
+  // Troca de arranjo com cada máquina deslizando do lugar antigo para o novo (FLIP),
+  // na mola do painel. Com "Reduzir movimento", troca direto.
+  let mola = getComputedStyle(document.documentElement).getPropertyValue("--spring").trim() || "cubic-bezier(.32,.72,0,1)";
+  try{ document.body.animate([], { easing: mola }); }catch(e){ mola = "cubic-bezier(.32,.72,0,1)"; }
+  function comDeslize(mudar){
+    if(reduzMovimento()){ mudar(); return; }
+    const antes = new Map([...board.querySelectorAll(".machine-card")].map(c=>[c.dataset.maq, c.getBoundingClientRect()]));
+    mudar();
+    board.querySelectorAll(".machine-card").forEach((c, i)=>{
+      const a = antes.get(c.dataset.maq), d = c.getBoundingClientRect();
+      const atraso = Math.min(i, 14) * 16;
+      if(!a){ c.animate([{ opacity:0, transform:"scale(.94)" }, { opacity:1, transform:"none" }], { duration:420, easing:"cubic-bezier(.32,.72,0,1)", delay:120 + atraso, fill:"backwards" }); return; }
+      const dx = a.left - d.left, dy = a.top - d.top;
+      if(Math.abs(dx) < 1 && Math.abs(dy) < 1) return;
+      c.animate([{ transform:`translate(${dx}px, ${dy}px)` }, { transform:"none" }], { duration:720, easing:mola, delay:atraso, fill:"backwards" });
+    });
+    board.querySelectorAll(".etapa-head").forEach(h=> h.animate([{ opacity:0 }, { opacity:1 }], { duration:300, delay:260, fill:"backwards" }));
+  }
+  // Toque numa parte do OEE (cartões do topo): as máquinas se ordenam por ela.
+  const barra = document.getElementById("foco-barra");
+  window.focarMaquinas = (k, rolar)=>{
+    foco = k || null;
+    document.querySelectorAll(".oee-fator").forEach(b=> b.setAttribute("aria-pressed", String(b.dataset.k === foco)));
+    if(barra){
+      barra.hidden = !foco;
+      if(foco){
+        barra.innerHTML = `<span>Ordenadas por <b>${esc(NOME_PARTE[foco])}</b>, da menor para a maior</span><button type="button">Voltar às etapas</button>`;
+        barra.querySelector("button").addEventListener("click", ()=> window.focarMaquinas(null));
+        if(!reduzMovimento()){ barra.classList.remove("entra"); void barra.offsetWidth; barra.classList.add("entra"); }
+      }
+    }
+    // a parte em foco fica forte e as outras recuam, com transição (a classe entra no quadro seguinte)
+    const reordenar = ()=>{
+      board.classList.remove("focando");
+      comDeslize(()=> render(false));
+      if(foco) requestAnimationFrame(()=> requestAnimationFrame(()=> board.classList.add("focando")));
+    };
+    const painel = board.closest(".panel");
+    const r = painel.getBoundingClientRect();
+    if(rolar && foco && (r.top < 0 || r.top > window.innerHeight * 0.45)){
+      painel.scrollIntoView({ behavior: reduzMovimento() ? "auto" : "smooth", block:"start" });
+      setTimeout(reordenar, reduzMovimento() ? 0 : 450);
+    }else reordenar();
+  };
 })();
 
 /* ============ VIEW: AGORA NO CHÃO DE FÁBRICA ============
@@ -4162,20 +4573,26 @@ function renderGantt(){
   const sub = document.getElementById("gantt-panel-sub");
   const seletor = document.getElementById("tempo-dias");
   const HOURS = 24;
-  const maquinas = MAQUINAS.filter(m=> !FORA_DA_LINHA_DO_TEMPO.has(String(m.id).trim().toUpperCase()));
+  // as máquinas da linha do tempo; o filtro de setor (09/10) deixa só as de uma etapa
+  const todasTempo = MAQUINAS.filter(m=> !FORA_DA_LINHA_DO_TEMPO.has(String(m.id).trim().toUpperCase()));
+  const setores = ORDEM_ETAPAS.filter(p=> todasTempo.some(m=>m.processo === p));
+  if(LINHA_TEMPO.setor && !setores.includes(LINHA_TEMPO.setor)) LINHA_TEMPO.setor = null;
+  let maquinas = LINHA_TEMPO.setor ? todasTempo.filter(m=>m.processo === LINHA_TEMPO.setor) : todasTempo;
+  const filtrosTempo = document.getElementById("tempo-filtros"), setorEl = document.getElementById("tempo-setor");
   const corSeg = s => s.cor || statusColor(s.st);
   // hora no eixo: 0 = 06:00 do dia de produção
   const rotuloHora = h => String((INICIO_DIA_PRODUCAO + h) % 24).padStart(2,"0") + ":00";
   const hh = h => { const m = Math.round(((INICIO_DIA_PRODUCAO + h) % 24) * 60); return String(Math.floor(m/60) % 24).padStart(2,"0")+":"+String(m%60).padStart(2,"0"); };
 
   function desenhar(segsPorMaq, iso){
+    const maqs = maquinas;   // a lista desta pintura (o redesenho por tamanho usa a mesma)
     const inicio = iso ? inicioDoDia(iso) : null;
     const agoraH = inicio ? (Date.now() - inicio)/3600000 : null;
     const comAgora = agoraH != null && agoraH > 0 && agoraH < HOURS;
     const quando = d => inicio && mesmoDiaQue(d, inicio) ? fmtHM(d) : fmtDMHM(d);
     montarGrafico(holder, (W, animar)=>{
       const rowH = 26, gap = 6, padL = W < 520 ? 70 : 96, padB = 26;
-      const H = maquinas.length*(rowH+gap) + padB;
+      const H = maqs.length*(rowH+gap) + padB;
       const plotW = W - padL - 4;
       const xDe = h => padL + (h/HOURS)*plotW;
       const passo = [2,3,4,6,12].find(s => plotW/HOURS*s >= 54) || 12;
@@ -4193,7 +4610,7 @@ function renderGantt(){
       }
       // virada do dia do calendário (o turno da noite ainda é deste dia de produção)
       grid += `<line x1="${xDe(meiaNoite)}" y1="0" x2="${xDe(meiaNoite)}" y2="${H-padB}" stroke="var(--border-strong)" stroke-width="1" stroke-dasharray="3 4"/>`;
-      const linhas = maquinas.map((m,i)=>{
+      const linhas = maqs.map((m,i)=>{
         const y = i*(rowH+gap);
         const segs = segsPorMaq[i].map((s,si)=>{
           const x = xDe(s.ini);
@@ -4214,12 +4631,12 @@ function renderGantt(){
       const comApont = segsPorMaq.filter(s=>s.length).length;
       const qual = iso ? `dia de produção ${fmtDM(dataLocal(iso))}` : "dia";
       holder.innerHTML = `<svg class="${animar ? "anima" : ""}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img"
-        aria-label="${esc(`Linha do tempo de apontamentos, ${qual}: ${comApont} de ${maquinas.length} máquinas com apontamento`)}">
+        aria-label="${esc(`Linha do tempo de apontamentos, ${qual}: ${comApont} de ${maqs.length} máquinas com apontamento`)}">
         <style>.gseg{ cursor:default; } .gseg:hover{ filter:brightness(1.15); }</style>
         ${grid}${linhas}${agora}
       </svg>`;
       holder.querySelectorAll(".gseg").forEach(r=>{
-        const m = maquinas[+r.dataset.m];
+        const m = maqs[+r.dataset.m];
         const s = segsPorMaq[+r.dataset.m][+r.dataset.s];
         // horário real do evento (o que vem do dia anterior aparece com a data)
         const horario = s.de ? `${quando(s.de)} → ${quando(s.ate)} · ${fmt1((s.ate - s.de)/3600000)} h`
@@ -4257,6 +4674,7 @@ function renderGantt(){
   // Pré-visualização (sem Supabase): segmentos sorteados.
   if(!USANDO_DADOS_REAIS){
     if(seletor) seletor.hidden = true;
+    if(filtrosTempo) filtrosTempo.hidden = true;
     desenhar(maquinas.map(m=>{
       const segs = [];
       let t = 0, guard = 0;
@@ -4275,14 +4693,16 @@ function renderGantt(){
 
   if(!LINHA_TEMPO.dias.length){
     if(seletor) seletor.hidden = true;
+    if(filtrosTempo) filtrosTempo.hidden = true;
     if(legend) legend.innerHTML = "";
     semDados(holder, "Sem apontamentos publicados para a linha do tempo.");
     return;
   }
 
-  // Um dia por vez; trocar de dia redesenha com a mesma animação.
+  // Um dia por vez; trocar de dia redesenha com a mesma animação. Trocar de setor
+  // usa os eventos já lidos do dia e muda a altura do gráfico sem pular.
   let pedido = 0;
-  async function mostrar(iso){
+  async function mostrar(iso, suave){
     const meu = ++pedido;
     if(!holder.querySelector("svg")) holder.innerHTML = `<div class="empty-state">Carregando a linha do tempo…</div>`;
     else holder.classList.add("carregando");
@@ -4297,7 +4717,25 @@ function renderGantt(){
       return;
     }
     if(meu !== pedido) return;   // trocou de dia enquanto carregava
+    const h0 = suave && !reduzMovimento() ? holder.offsetHeight : 0;
     desenhar(maquinas.map(m=> porMaquina.get(m.id) || []), iso);
+    const h1 = holder.offsetHeight;
+    if(h0 && Math.abs(h1 - h0) > 2){
+      holder.style.height = h0 + "px";
+      holder.classList.add("altura-anima");
+      void holder.offsetHeight;
+      holder.style.height = h1 + "px";
+      clearTimeout(holder._alturaTimer);
+      holder._alturaTimer = setTimeout(()=>{ holder.classList.remove("altura-anima"); holder.style.height = ""; }, 560);
+    }
+  }
+  if(filtrosTempo && setorEl){
+    filtrosTempo.hidden = setores.length < 2;
+    if(setores.length >= 2) segmentado(setorEl, [["all", "Todas"], ...setores.map(p=>[p, p])], LINHA_TEMPO.setor || "all", v=>{
+      LINHA_TEMPO.setor = v === "all" ? null : v;
+      maquinas = LINHA_TEMPO.setor ? todasTempo.filter(m=>m.processo === LINHA_TEMPO.setor) : todasTempo;
+      mostrar(LINHA_TEMPO.dia, true);
+    });
   }
 
   if(!LINHA_TEMPO.dia || !LINHA_TEMPO.dias.includes(LINHA_TEMPO.dia)) LINHA_TEMPO.dia = diaPadraoLinhaTempo();
@@ -4909,9 +5347,38 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     if(ativas.length >= 2) s += ` Menor: ${b(esc(ativas[0].nome))} com ${ativas[0].tmr}%. Maior: ${b(esc(ativas.at(-1).nome))} com ${ativas.at(-1).tmr}%.`;
     return s + " Mais na tela TMR.";
   }
+  // OEE da fábrica, ou uma parte dele ("como está a disponibilidade?")
+  const PARTES_OEE = [["qualidade", "qual", "aparas"], ["performance", "perf", "velocidade"], ["disponibilidade", "disp", "paradas"]];
+  function rOee(q){
+    const per = periodo();
+    const o = window.OEE;
+    if(!o || o.oee == null) return `Não tenho o OEE ${per}: falta a qualidade (aparas) das máquinas no período.`;
+    const comOee = MAQUINAS.filter(m=>m.oee != null);
+    const parte = PARTES_OEE.find(p=> tem(q, p[0].slice(0, 7)));
+    if(parte){
+      const [nome, k, sub] = parte;
+      const l = comOee.filter(m=>m[k] != null).sort((a,b)=>a[k] - b[k]);
+      return `${nome[0].toUpperCase() + nome.slice(1)} (${sub}) da fábrica ${per}: ${b(pct1(o[k]))}.` +
+        (l.length >= 2 ? ` Menor: ${b(esc(l[0].nome))} ${pct1(l[0][k])}; maior: ${b(esc(l.at(-1).nome))} ${pct1(l.at(-1)[k])}.` : "") +
+        " Na Visão geral, toque na parte para ordenar as máquinas por ela.";
+    }
+    const pior = PARTES_OEE.reduce((a,c)=> o[c[1]] < o[a[1]] ? c : a);
+    const l = comOee.slice().sort((a,c)=>a.oee - c.oee);
+    return `OEE da fábrica ${per}: ${b(pct1(o.oee))} = qualidade ${pct1(o.qual)} × performance ${pct1(o.perf)} × disponibilidade ${pct1(o.disp)}. ` +
+      `Maior perda: ${b(pior[0])} (${pior[2]}).` +
+      (l.length >= 2 ? ` Menor OEE: ${l.slice(0, 3).map(m=>`${b(esc(m.nome))} ${Math.round(m.oee)}%`).join(", ")}.` : "") + " Mais na Visão geral.";
+  }
   function rRanking(q){
     const per = periodo();
     const melhor = tem(q, "melhor", "maior tmr", "mais rapida");
+    // OEE ou uma parte dele: "pior OEE", "menor disponibilidade"
+    const parte = PARTES_OEE.find(p=> tem(q, p[0].slice(0, 7)));
+    if(parte || tem(q, "oee")){
+      const k = parte ? parte[1] : "oee", nome = parte ? parte[0] : "OEE";
+      const l = MAQUINAS.filter(m=>m[k] != null && m.oee != null).sort((a,c)=> melhor ? c[k] - a[k] : a[k] - c[k]);
+      if(!l.length) return `Não tenho ${nome} por máquina ${per}.`;
+      return `${melhor ? "Maior" : "Menor"} ${nome} ${per}: ` + l.slice(0, 3).map(m=>`${b(esc(m.nome))} ${Math.round(m[k])}%`).join(", ") + ".";
+    }
     if(tem(q, "refugo", "perda", "apara")){
       const mapa = window.PERDA_POR_MAQ;
       if(!mapa) return `Não tenho refugo por máquina ${per}.`;
@@ -4940,6 +5407,11 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
           (m.vel != null ? `, velocidade ${fmt(m.vel)} m/min${m.velRef ? ` (melhor mês ${fmt(m.velRef)})` : ""}` : "") + ".");
       }else{
         partes.push(`${b(esc(m.nome))} não tem horas apontadas ${per}.`);
+      }
+      if(m.oee != null){
+        const fat = fatoresOee(m), pior = fat.find(f=>f.pior);
+        partes.push(`OEE ${b(Math.round(m.oee) + "%")} (` + fat.map(f=>`${f.nome.toLowerCase()} ${Math.round(f.v)}%`).join(", ") +
+          (pior ? `; maior perda: ${pior.nome.toLowerCase()}` : "") + ").");
       }
       const kg = window.PERDA_POR_MAQ ? window.PERDA_POR_MAQ.get(chaveMaq(id)) : null;
       if(kg){
@@ -5152,7 +5624,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     return s;
   }
 
-  const SUGESTOES = ["Como está a apara?", "Qual máquina teve o pior TMR?", "O que está parado agora?", "Compare com o mês anterior", "Entregas no prazo", "Como está a carteira?"];
+  const SUGESTOES = ["Como está o OEE?", "Como está a apara?", "O que está parado agora?", "Qual máquina teve o pior TMR?", "Compare com o mês anterior", "Entregas no prazo", "Como está a carteira?"];
   function responder(texto){
     if(window.FALHA_CARGA || USANDO_DADOS_REAIS !== true) return { html: "Sem dados carregados no painel agora." };
     const q = norm(texto);
@@ -5163,6 +5635,9 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     const mes = mesPedido(q);
     if(mes) return { html: rMes(q, mes), sug: ["Compare com o mês anterior"] };
     if(tem(q, "pior", "melhor", "ranking") || (tem(q, "mais", "maior", "menor") && tem(q, "maquina"))) return { html: rRanking(q), sug: ["Como está a R18?", "O que está parado agora?"] };
+    // "qualidade" sozinha é a do OEE (aparas); laudo, CQ, aprovado e reprovado são os laudos
+    if(tem(q, "laudo", "cq", "aprovad", "reprovad")) return { html: rLaudos(), sug: ["Como está a apara?"] };
+    if(tem(q, "oee", "qualidade", "performance", "disponibilidade")) return { html: rOee(q), sug: ["Qual máquina tem o menor OEE?", "Como está a disponibilidade?"] };
     if(tem(q, "apara", "scrap")) return { html: rApara(), sug: ["Refugo por motivo", "Compare com o mês anterior"] };
     if(tem(q, "tmr", "eficien", "tempo de maquina")) return { html: rTmr(), sug: ["Horas paradas por motivo", "Qual máquina teve o pior TMR?"] };
     if(tem(q, "fila", "programacao", "proxima", "proximas")) return { html: rFila(), sug: ["Fila da L04", "Entregas no prazo"] };
@@ -5170,7 +5645,6 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     if(tem(q, "setup")) return { html: rSetup(), sug: ["Como está o TMR?"] };
     if(tem(q, "wip", "pallet", "em processo")) return { html: rWip(), sug: ["Como está a carteira?"] };
     if(tem(q, "carteira", "pedido", "vencid", "faturad")) return { html: rCarteira(), sug: ["Entregas no prazo", "Como está o WIP?"] };
-    if(tem(q, "laudo", "cq", "qualidade", "aprovad", "reprovad")) return { html: rLaudos(), sug: ["Como está a apara?"] };
     if(tem(q, "refugo", "perda", "motivo")) return { html: rPerda(), sug: ["Qual máquina tem mais refugo?", "Como está a apara?"] };
     if(tem(q, "parad", "parou", "downtime")) return { html: rParadas(), sug: ["O que está parado agora?", "Como está o TMR?"] };
     if(tem(q, "aderencia", "plano", "planejado", "realizado")) return { html: rAderencia(), sug: ["Fila de programação", "Entregas no prazo"] };
@@ -5189,7 +5663,29 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     "sugest", "sugir", "recomend", "causa", "tendencia", "previs", "prever", "priori", "foco", "focar", "plano de acao", "acao",
     "dor\\b", "dores", "problem", "gargalo", "critic", "preocup", "risco", "atencao", "oportunidade", "ganh", "perdendo",
     "destaque", "principa", "o que (?:mais|esta) (?:pesa|pesando)", "diagnost", "avali", "opini", "acha\\b", "achas", "devemos", "dica"];
-  const vaiParaIA = (q, local) => local.semResposta || tem(q, ...ANALISE) || q.split(/\s+/).filter(Boolean).length > 6;
+  // Resposta cravada (09/10, "deixar apenas para perguntas que já tem resposta cravada"): o
+  // local só responde quando entende TODAS as palavras da pergunta: as de ligação, nome de
+  // máquina, mês, número e os assuntos que ele sabe responder. Uma palavra a mais, e a
+  // pergunta vai para a IA (antes, "como está" virava o resumo e "qualidade", os laudos).
+  const LIGACAO = new Set(("a o as os um uma de da do das dos d em no na nos nas num numa e ou que qual quais quanto quanta " +
+    "quantos quantas como esta estao estamos ta tao foi foram ficou ficaram fica tem teve tiveram ha houve me mostra mostre mostrar " +
+    "diga diz ver veja sobre pra para por pelo pela favor pf hoje ontem agora mes semana ano periodo atual atualmente nosso nossa nossos " +
+    "nossas fabrica geral total ja ainda so isso esse essa este dessa desse desta deste momento ate com seu sua mais menos maior menor " +
+    "pior piores melhor melhores ranking top lista quem rodando produzindo andamento e ai la").split(/\s+/));
+  const ASSUNTOS = ["apara", "scrap", "tmr", "eficien", "fila", "programacao", "proxim", "entrega", "prazo", "otimo", "pessimo", "setup",
+    "wip", "pallet", "processo", "carteira", "pedido", "vencid", "faturad", "laudo", "cq", "aprovad", "reprovad", "qualidade", "refugo",
+    "perda", "motivo", "parad", "parou", "downtime", "aderencia", "plano", "planejad", "realizad", "produtividade", "m2", "velocidad",
+    "rapid", "lent", "resumo", "oee", "performance", "disponibilidade", "compar", "anterior", "passado", "maquina", "bom", "boa", "dia",
+    "tarde", "noite", "ola", "oi", "chao", "confirmad", "apontad", "meta", "tempo"];
+  function cravada(q){
+    const maq = acharMaquina(q);
+    const daMaquina = maq ? norm(maq).split(/\s+/).map(t=> t.replace(/^0+(?=\d)/, "")) : [];
+    return q.replace(/[^a-z0-9\s]/g, " ").split(/\s+/).filter(Boolean).every(t=>
+      LIGACAO.has(t) || /^\d+$/.test(t) || ASSUNTOS.some(a=> t.startsWith(a)) ||
+      MESES_LONGOS.includes(t) || MESES_CURTOS.includes(t) || daMaquina.includes(t.replace(/^0+(?=\d)/, "")) ||
+      (maq && /^(reb|r|l|rt|hmc|coating|revisora)\d*$/.test(t)));
+  }
+  const vaiParaIA = (q, local) => local.semResposta || tem(q, ...ANALISE) || q.split(/\s+/).filter(Boolean).length > 6 || !cravada(q);
   const semHtml = s => String(s ?? "").replace(/<[^>]+>/g, "").replace(/&nbsp;/g, " ").replace(/&lt;/g, "<").replace(/&gt;/g, ">")
     .replace(/&quot;/g, '"').replace(/&amp;/g, "&").replace(/\s+/g, " ").trim();
   const v1 = v => v == null || !Number.isFinite(v) ? "—" : fmt1(v);
@@ -5326,9 +5822,9 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       body.dataset.inited = "1";
       const { de, ate } = periodoDaUrl();
       const rotulo = window.rotuloPeriodo ? window.rotuloPeriodo(de, ate) : "o período selecionado";
-      addMsg("bot", `Olá! Respondo com os números do painel, do período escolhido no topo (<b>${esc(rotulo)}</b>). ` +
-        `Pergunte sobre apara, TMR, uma máquina, o que está parado agora, entregas, fila, setup, WIP, carteira, laudos ou um mês. ` +
-        `Para análises ("por que a apara subiu?", "onde focar?"), uso uma IA: a bolinha do topo fica verde quando é ela que responde.`);
+      addMsg("bot", `Olá! Uso os números do painel, do período escolhido no topo (<b>${esc(rotulo)}</b>). ` +
+        `O que tem resposta direta nos números (OEE, apara, TMR, uma máquina, o que está parado agora, entregas, fila, setup, WIP, carteira, laudos, um mês) eu respondo na hora. ` +
+        `O resto, como "por que a apara subiu?" ou "onde focar?", quem responde é a IA: a bolinha do topo fica verde.`);
       addSuggestions(SUGESTOES.slice(0, 4));
     }
     input.focus({ preventScroll:true });
@@ -5348,6 +5844,315 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   sendBtn.addEventListener("click", ()=>{ if(input.value.trim()) ask(input.value.trim()); });
   input.addEventListener("keydown", e=>{ if(e.key==="Enter" && input.value.trim()) ask(input.value.trim()); });
   window.perguntarAoAssistente = texto => responder(texto).html;   // usado nos testes
+  // A pesquisa do topo usa este mesmo assistente: resposta cravada na hora, o resto na IA.
+  window.ASSISTENTE = {
+    responder,
+    vaiParaIA: texto => vaiParaIA(norm(texto), responder(texto)),
+    perguntarIA,
+    textoIA,
+    // leva para o painel do assistente uma pergunta feita na pesquisa, para continuar a conversa
+    continuar(pergunta, html, textoPuro, daIA){
+      abrir();
+      addMsg("user", esc(pergunta));
+      addMsg("bot", html);
+      conversa.push({ papel:"usuario", texto: pergunta }, { papel:"assistente", texto: textoPuro });
+      marcarFonte(daIA ? "ia" : "painel");
+    },
+  };
+})();
+
+/* ============ PESQUISA (09/10/2026) ============
+   Um lugar só para achar máquina, tela ou perguntar. Busca enquanto digita:
+   máquinas (com o OEE ao lado), telas e, quando a pergunta tem resposta direta
+   nos números, a resposta do painel na hora. O resto vai para a IA aqui mesmo,
+   dizendo o que está fazendo enquanto pensa. Sem texto: sugestões e as pesquisas
+   recentes (só neste navegador; dá para limpar). Ctrl/⌘+K ou "/" abre, setas
+   escolhem, Enter abre, Esc limpa e depois fecha. */
+(function(){
+  const raiz = document.getElementById("busca");
+  const A = window.ASSISTENTE;
+  if(!raiz || !A || window.FALHA_CARGA || USANDO_DADOS_REAIS !== true || raiz.dataset.pronta) return;
+  raiz.dataset.pronta = "1";
+  const input = document.getElementById("busca-input");
+  const campo = raiz.querySelector(".busca-campo");
+  const pop = document.getElementById("busca-pop");
+  const cont = document.getElementById("busca-conteudo");
+  const btnLimpar = document.getElementById("busca-limpar");
+  const btnCancelar = document.getElementById("busca-cancelar");
+  const atalho = document.getElementById("busca-atalho");
+  raiz.hidden = false;
+  if(atalho) atalho.textContent = /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent) ? "⌘K" : "Ctrl K";
+
+  const nrm = s => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().trim();
+  // "reb 5" acha a "REB 05": sem zeros à esquerda, sem espaço
+  const chave = s => nrm(s).replace(/\b0+(?=\d)/g, "").replace(/[^a-z0-9]/g, "");
+  const compacto = () => window.matchMedia("(max-width: 768px)").matches;
+  let mola = getComputedStyle(document.documentElement).getPropertyValue("--spring").trim() || "cubic-bezier(.32,.72,0,1)";
+  try{ document.body.animate([], { easing: mola }); }catch(e){ mola = "cubic-bezier(.32,.72,0,1)"; }
+
+  const svg = d => `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const IC_LUPA = svg(`<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.3-4.3"/>`);
+  const IC_RECENTE = svg(`<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>`);
+  const IC_MAQ = svg(`<rect x="3.5" y="7" width="17" height="10" rx="2.5"/><circle cx="8.5" cy="12" r="1.6"/><path d="M13 12h4.5"/>`);
+  // telas: as da barra lateral, com palavras que levam a cada uma
+  const EXTRAS = { overview:"geral oee resumo inicio", agora:"agora chao fabrica paradas rodando", aparas:"aparas refugo qualidade laudos perda",
+    produtividade:"tmr produtividade setup paradas velocidade", aderencia:"aderencia plano programacao fila entregas",
+    timeline:"linha tempo gantt apontamentos", wip:"wip carteira pedidos estoque" };
+  const TELAS = [...document.querySelectorAll(".rail-btn[data-view]"), document.getElementById("qualidade-link")].filter(Boolean).map(b=>({
+    v: b.dataset.view || null, href: b.getAttribute("href") || null, nome: b.getAttribute("aria-label"),
+    icone: b.querySelector("svg") ? b.querySelector("svg").outerHTML : IC_LUPA,
+    palavras: nrm(b.getAttribute("aria-label") + " " + (EXTRAS[b.dataset.view] || (b.dataset.view ? "" : "conferencia dados fontes"))).split(/\s+/) }));
+  const SUGERIDAS = ["Como está o OEE?", "Qual máquina tem a menor disponibilidade?", "O que está parado agora?", "Por que a apara está acima da meta?"];
+
+  // pesquisas recentes: só neste navegador, e dá para limpar (searching.md: privacidade)
+  const CHAVE_RECENTES = "gualapack-busca-recentes";
+  const lerRecentes = () => { try{ const l = JSON.parse(localStorage.getItem(CHAVE_RECENTES)); return Array.isArray(l) ? l.slice(0, 5) : []; }catch(e){ return []; } };
+  const gravarRecente = t => { try{ localStorage.setItem(CHAVE_RECENTES, JSON.stringify([t, ...lerRecentes().filter(x=>x !== t)].slice(0, 5))); }catch(e){} };
+  const limparRecentes = () => { try{ localStorage.removeItem(CHAVE_RECENTES); }catch(e){} };
+
+  let itens = [], ativo = -1, aberto = false, modoIA = false, pedido = 0, ultima = null, qDesenhada = null;
+  let timerDig = 0, timerAltura = 0, timerFecha = 0;
+
+  function realce(txt, q){
+    const i = q ? nrm(txt).indexOf(nrm(q)) : -1;
+    if(i < 0) return esc(txt);
+    const f = i + nrm(q).length;
+    return esc(txt.slice(0, i)) + "<mark>" + esc(txt.slice(i, f)) + "</mark>" + esc(txt.slice(f));
+  }
+  function montar(q){
+    const n = nrm(q), secoes = [];
+    let resposta = null;
+    if(!n){
+      const rec = lerRecentes();
+      if(rec.length) secoes.push({ titulo:"Recentes", limpar:true, itens: rec.map(t=>({ icone:IC_RECENTE, rotulo:t, acao:()=>executar(t) })) });
+      secoes.push({ titulo:"Sugestões", itens: SUGERIDAS.map(t=>({ icone:IC_LUPA, rotulo:t, acao:()=>executar(t) })) });
+      return { secoes, resposta };
+    }
+    const palavras = n.split(/\s+/).filter(Boolean), k = chave(q);
+    // máquinas pelo nome ("r18", "reb 5") ou pela etapa ("laminação")
+    const maqs = palavras.length <= 3 && k ? MAQUINAS.filter(m=> chave(m.nome).includes(k) || (n.length >= 4 && nrm(m.processo).startsWith(n))).slice(0, 6) : [];
+    const telas = TELAS.filter(t=> palavras.some(p=> p.length >= 3 && t.palavras.some(w=> w.startsWith(p)))).slice(0, 4);
+    const cravada = n.length >= 3 && !A.vaiParaIA(q);
+    if(cravada) resposta = A.responder(q).html;
+    const ia = { ia:true, icone:"IA", rotulo:"Perguntar à IA", sub:`“${q.trim()}”`, acao:()=>perguntar(q.trim()) };
+    // pergunta que não tem resposta direta: a IA vem primeiro
+    const iaPrimeiro = !cravada && (palavras.length >= 3 || /\?\s*$/.test(q));
+    if(iaPrimeiro) secoes.push({ titulo:"", itens:[ia] });
+    if(maqs.length) secoes.push({ titulo:"Máquinas", itens: maqs.map(m=>({ icone:IC_MAQ, rotulo:m.nome, realce:q.trim(),
+      sub: m.processo + (m.rota && m.rota !== "—" ? " · " + m.rota : ""), dir: m.oee != null ? `OEE ${Math.round(m.oee)}%` : "",
+      acao:()=>{ gravarRecente(m.nome); fechar(); if(window.openMaquinaDrawer) window.openMaquinaDrawer(m, null); } })) });
+    if(telas.length) secoes.push({ titulo:"Telas", itens: telas.map(t=>({ icone:t.icone, rotulo:t.nome, acao:()=>irPara(t) })) });
+    if(!iaPrimeiro && n.length >= 3) secoes.push({ titulo:"", itens:[ia] });
+    return { secoes, resposta };
+  }
+  function irPara(t){
+    fechar();
+    if(t.href){ location.href = t.href; return; }
+    const b = document.querySelector(`.rail-btn[data-view="${t.v}"]`);
+    if(b && !b.classList.contains("active")) b.click();
+    else window.scrollTo({ top:0, behavior: reduzMovimento() ? "auto" : "smooth" });
+  }
+  // troca o conteúdo e a altura do popover acompanha, com mola (sem pular)
+  function trocar(html){
+    const h0 = pop.hidden ? 0 : pop.getBoundingClientRect().height;
+    pop.style.height = "";
+    cont.innerHTML = html;
+    if(!h0 || reduzMovimento() || raiz.classList.contains("cheia")) return;
+    const h1 = pop.getBoundingClientRect().height;
+    if(Math.abs(h1 - h0) < 2) return;
+    pop.style.height = h0 + "px";
+    void pop.offsetHeight;
+    pop.style.height = h1 + "px";
+    clearTimeout(timerAltura);
+    timerAltura = setTimeout(()=>{ pop.style.height = ""; }, 460);
+  }
+  function desenhar(animar){
+    const q = input.value;
+    qDesenhada = q;
+    const { secoes, resposta } = montar(q);
+    itens = [];
+    let k = 0;
+    const lista = secoes.map(s=>`<div class="busca-secao" role="group"${s.titulo ? ` aria-label="${esc(s.titulo)}"` : ""}>` +
+      (s.titulo ? `<div class="busca-secao-titulo" style="--k:${k++}"><span>${esc(s.titulo)}</span>${s.limpar ? ` <button type="button" data-limpar>Limpar</button>` : ""}</div>` : "") +
+      s.itens.map(it=>{
+        const i = itens.push(it) - 1;
+        return `<div class="busca-item${it.ia ? " ia" : ""}" role="option" id="busca-op-${i}" data-i="${i}" aria-selected="false" style="--k:${k++}">
+          <span class="ic" aria-hidden="true">${it.icone}</span>
+          <span class="tx"><span>${realce(it.rotulo, it.realce)}</span>${it.sub ? ` <small>${esc(it.sub)}</small>` : ""}</span>
+          ${it.dir ? ` <span class="dir">${esc(it.dir)}</span>` : ""}<span class="enter" aria-hidden="true">↵</span></div>`;
+      }).join("") + `</div>`).join("");
+    trocar((resposta ? `<div class="busca-resposta${animar ? " entra" : ""}" role="status">${resposta}<div class="busca-resposta-fonte">Resposta do painel, com os números do período escolhido</div></div>` : "") +
+      `<div class="busca-lista${animar ? " entra" : ""}" role="listbox" id="busca-lista" aria-label="Resultados da pesquisa">${lista}</div>`);
+    marcar(itens.length ? 0 : -1, false);
+  }
+  function marcar(i, rolar = true){
+    ativo = i;
+    cont.querySelectorAll(".busca-item").forEach(el=> el.setAttribute("aria-selected", String(+el.dataset.i === i)));
+    if(i >= 0){
+      input.setAttribute("aria-activedescendant", `busca-op-${i}`);
+      const el = document.getElementById(`busca-op-${i}`);
+      if(el && rolar) el.scrollIntoView({ block:"nearest" });
+    }else input.removeAttribute("aria-activedescendant");
+  }
+  function atualizar(animar){ if(!modoIA && aberto) desenhar(animar); }
+
+  // a IA responde aqui mesmo; enquanto isso, o que ela está fazendo (generative-ai.md › Outputs)
+  const ETAPAS_IA = ["Lendo os números do painel…", "Comparando máquinas e meses…", "Escrevendo a resposta…"];
+  const FONTE_IA = `<div class="msg-fonte"><span class="tag-ia">IA</span> com os números do painel · pode errar: confira na tela</div>`;
+  async function perguntar(q){
+    gravarRecente(q);
+    modoIA = true;
+    itens = []; marcar(-1);
+    const meu = ++pedido;
+    trocar(`<div class="busca-ia" aria-live="polite" aria-busy="true">
+      <div class="busca-ia-pergunta">${esc(q)}</div>
+      <div class="busca-ia-status"><i aria-hidden="true"></i><span id="busca-ia-etapa">${ETAPAS_IA[0]}</span></div>
+      <div class="busca-ia-linhas" aria-hidden="true"><span class="busca-ia-linha"></span><span class="busca-ia-linha" style="width:86%"></span><span class="busca-ia-linha" style="width:58%"></span></div>
+    </div>`);
+    let passo = 0;
+    const etapas = setInterval(()=>{
+      const el = document.getElementById("busca-ia-etapa");
+      if(meu !== pedido || !el){ clearInterval(etapas); return; }
+      passo = Math.min(passo + 1, ETAPAS_IA.length - 1);
+      el.textContent = ETAPAS_IA[passo];
+    }, 2300);
+    try{
+      const j = await A.perguntarIA(q);
+      clearInterval(etapas);
+      if(meu !== pedido) return;
+      const html = A.textoIA(j.resposta);
+      trocar(`<div class="busca-ia" aria-live="polite">
+        <div class="busca-ia-pergunta">${esc(q)}</div>
+        <div class="busca-ia-texto">${html}</div>${FONTE_IA}
+        <div class="busca-acoes"><button type="button" data-acao="continuar">Continuar no assistente</button><button type="button" data-acao="outra">Nova pesquisa</button></div>
+      </div>`);
+      cont.querySelectorAll(".busca-ia-texto > *").forEach((el, i)=> el.style.setProperty("--k", i));
+      ultima = { q, html: html + FONTE_IA, texto: j.resposta, ia:true };
+    }catch(err){
+      clearInterval(etapas);
+      if(meu !== pedido) return;
+      console.warn("pesquisa (IA):", err);
+      const r = A.responder(q), motivo = esc(err.mensagem || "A IA não respondeu agora.");
+      trocar(`<div class="busca-ia" aria-live="polite">
+        <div class="busca-ia-pergunta">${esc(q)}</div>
+        <div class="busca-resposta">${r.semResposta ? motivo : `${r.html}<div class="busca-resposta-fonte">${motivo} Esta é a resposta rápida do painel.</div>`}</div>
+        <div class="busca-acoes"><button type="button" data-acao="tentar">Tentar de novo</button><button type="button" data-acao="outra">Nova pesquisa</button></div>
+      </div>`);
+      ultima = { q, html: r.html, texto: r.html.replace(/<[^>]+>/g, ""), ia:false };
+    }
+  }
+  // sugestão ou recente escolhida: resposta direta na hora, ou a IA
+  function executar(t){
+    input.value = t;
+    mudouTexto();
+    if(A.vaiParaIA(t)) perguntar(t);
+    else{ gravarRecente(t); modoIA = false; desenhar(true); }
+    input.focus({ preventScroll:true });
+  }
+
+  // no celular, a pesquisa vira tela inteira; o campo sobe deslizando até o topo
+  function entrarCheia(){
+    if(raiz.classList.contains("cheia")) return;
+    const antes = campo.getBoundingClientRect();
+    raiz.classList.add("cheia");
+    document.body.classList.add("no-scroll", "busca-cheia");
+    if(reduzMovimento()) return;
+    const depois = campo.getBoundingClientRect();
+    campo.animate([{ transform:`translate(${antes.left - depois.left}px, ${antes.top - depois.top}px)` }, { transform:"none" }], { duration:460, easing:mola });
+  }
+  function sairCheia(){
+    if(!raiz.classList.contains("cheia")) return;
+    raiz.classList.remove("cheia");
+    document.body.classList.remove("no-scroll", "busca-cheia");
+  }
+  function abrir(){
+    if(aberto) return;
+    aberto = true;
+    clearTimeout(timerFecha);
+    raiz.classList.add("aberta");
+    input.setAttribute("aria-expanded", "true");
+    if(compacto()) entrarCheia();
+    pop.hidden = false;
+    pop.style.height = "";
+    pop.classList.remove("fechando");
+    if(!reduzMovimento()){ pop.classList.remove("abrindo"); void pop.offsetWidth; pop.classList.add("abrindo"); }
+    modoIA = false;
+    desenhar(true);
+  }
+  function fechar(){
+    if(!aberto) return;
+    aberto = false; modoIA = false; pedido++;
+    raiz.classList.remove("aberta");
+    input.setAttribute("aria-expanded", "false");
+    marcar(-1);
+    sairCheia();
+    if(reduzMovimento()){ pop.hidden = true; return; }
+    pop.classList.remove("abrindo");
+    pop.classList.add("fechando");
+    clearTimeout(timerFecha);
+    timerFecha = setTimeout(()=>{ if(!aberto){ pop.hidden = true; pop.classList.remove("fechando"); } }, 180);
+  }
+  function mudouTexto(){
+    raiz.classList.toggle("com-texto", !!input.value);
+    btnLimpar.hidden = !input.value;
+  }
+
+  input.addEventListener("focus", abrir);
+  campo.addEventListener("click", e=>{ if(e.target === campo || e.target.closest(".busca-lupa")) input.focus(); });
+  input.addEventListener("input", ()=>{
+    mudouTexto();
+    if(!aberto) abrir();
+    modoIA = false; pedido++;
+    clearTimeout(timerDig);
+    timerDig = setTimeout(()=> atualizar(false), 70);
+  });
+  input.addEventListener("keydown", e=>{
+    if(e.key === "ArrowDown" || e.key === "ArrowUp"){
+      if(!aberto) abrir();
+      if(!itens.length) return;
+      e.preventDefault();
+      marcar((ativo + (e.key === "ArrowDown" ? 1 : -1) + itens.length) % itens.length);
+    }else if(e.key === "Enter"){
+      e.preventDefault();
+      if(modoIA || !aberto) return;
+      clearTimeout(timerDig);
+      if(input.value !== qDesenhada) desenhar(false);   // digitou e deu Enter antes da lista atualizar
+      if(ativo >= 0 && itens[ativo]) itens[ativo].acao();
+    }else if(e.key === "Escape"){
+      e.preventDefault(); e.stopPropagation();
+      if(input.value){ input.value = ""; mudouTexto(); modoIA = false; pedido++; atualizar(false); }
+      else{ fechar(); input.blur(); }
+    }else if(e.key === "Tab") fechar();
+  });
+  btnLimpar.addEventListener("click", ()=>{ input.value = ""; mudouTexto(); modoIA = false; pedido++; atualizar(false); input.focus(); });
+  btnCancelar.addEventListener("click", ()=>{ input.value = ""; mudouTexto(); fechar(); input.blur(); });
+  // clicar numa opção não tira o foco do campo (assim o popover não fecha antes do clique)
+  cont.addEventListener("pointerdown", e=>{ if(e.target.closest(".busca-item, button")) e.preventDefault(); });
+  cont.addEventListener("pointermove", e=>{ const op = e.target.closest(".busca-item"); if(op && +op.dataset.i !== ativo) marcar(+op.dataset.i, false); });
+  cont.addEventListener("click", e=>{
+    if(e.target.closest("[data-limpar]")){ limparRecentes(); atualizar(false); return; }
+    const acao = e.target.closest("[data-acao]");
+    if(acao){
+      const a = acao.dataset.acao;
+      if(a === "continuar" && ultima){ const u = ultima; fechar(); A.continuar(u.q, u.html, u.texto, u.ia); }
+      else if(a === "tentar" && ultima) perguntar(ultima.q);
+      else if(a === "outra"){ input.value = ""; mudouTexto(); modoIA = false; pedido++; desenhar(true); input.focus(); }
+      return;
+    }
+    const op = e.target.closest(".busca-item");
+    if(op && itens[+op.dataset.i]) itens[+op.dataset.i].acao();
+  });
+  document.addEventListener("pointerdown", e=>{ if(aberto && !raiz.contains(e.target)) fechar(); });
+  // Ctrl/⌘+K em qualquer lugar; "/" quando não se está digitando em outro campo
+  document.addEventListener("keydown", e=>{
+    if((e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === "k"){ e.preventDefault(); input.focus(); input.select(); return; }
+    if(e.key === "/" && !e.ctrlKey && !e.metaKey && !e.altKey){
+      const t = document.activeElement;
+      if(t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+      e.preventDefault(); input.focus();
+    }
+  });
+  window.matchMedia("(max-width: 768px)").addEventListener("change", ()=>{ if(aberto){ if(compacto()) entrarCheia(); else sairCheia(); } });
 })();
 
 const footerNote = document.getElementById("footer-note");
@@ -5454,10 +6259,11 @@ if(footerNote){
       return;
     }
     const ate = window.DADOS_ATE ? new Date(window.DADOS_ATE + "T00:00:00") : null;
+    const quando = horaAtualizacao();
     if(!ate){
       dot.classList.add("ok");
-      label.textContent = "Atualizado";
-      chip.title = "Dados sincronizados com a base real.";
+      label.textContent = quando ? `Atualizado ${quando.texto}` : "Atualizado";
+      chip.title = quando ? `Última atualização do painel: ${quando.completo}. O hub atualiza a cada 10 minutos.` : "Dados sincronizados com a base real.";
       return;
     }
     const atraso = Math.floor((Date.now() - ate.getTime()) / 86400000);
@@ -5468,9 +6274,18 @@ if(footerNote){
       chip.title = `A carga rodou, mas a base de origem não é atualizada há ${atraso} dias. O painel mostra dado até ${ateTxt}.`;
     }else{
       dot.classList.add("ok");
-      label.textContent = `Atualizado · dados até ${ateTxt}`;
-      chip.title = "Dados sincronizados com a base real.";
+      label.textContent = quando ? `Atualizado ${quando.texto} · dados até ${ateTxt}` : `Atualizado · dados até ${ateTxt}`;
+      chip.title = quando ? `Última atualização do painel: ${quando.completo}. O hub atualiza a cada 10 minutos.` : "Dados sincronizados com a base real.";
     }
+  }
+  // Hora da última rodada do hub que publicou (v_hub_execucao): "às 14:31", ou
+  // "em 08/10, 17:32" quando não foi hoje.
+  function horaAtualizacao(){
+    const e = window.HUB_EXECUCAO;
+    const d = e ? new Date(e.publicada_em || e.terminada_em) : null;
+    if(!d || isNaN(d)) return null;
+    const hoje = new Date().toDateString() === d.toDateString();
+    return { texto: hoje ? `às ${fmtHM(d)}` : `em ${fmtDM(d)}, ${fmtHM(d)}`, completo: `${fmtDM(d)} às ${fmtHM(d)}` };
   }
   window.refreshLiveStatus = refreshStatus; // chamado pelo boot() depois de loadRealData()
 })();
@@ -5600,6 +6415,24 @@ if(footerNote){
   const btnCancelar = document.getElementById("period-cancelar");
   const btnConfirmar = document.getElementById("period-confirmar");
   const info = document.getElementById("period-info");
+
+  // "Hoje" (09/10): um toque para o dia de hoje, ao lado do seletor. Fica marcado
+  // quando o período já é hoje.
+  const hojeBtn = document.getElementById("hoje-btn");
+  if(hojeBtn){
+    const h = new Date(); h.setHours(0,0,0,0);
+    const atual = periodoDaUrl();
+    const ehHoje = mesmoDia(atual.de, h) && mesmoDia(atual.ate, addDays(h, 1));
+    hojeBtn.setAttribute("aria-pressed", String(ehHoje));
+    hojeBtn.title = ehHoje ? "O painel já mostra o dia de hoje" : "Ver só o dia de hoje";
+    hojeBtn.addEventListener("click", ()=>{
+      if(ehHoje) return;
+      const url = new URL(location.href);
+      url.searchParams.set("de", isoDate(h));
+      url.searchParams.set("ate", isoDate(addDays(h, 1)));
+      location.href = url.toString();
+    });
+  }
   if(!overlay || !btn) return;
 
   let modo = "mes";

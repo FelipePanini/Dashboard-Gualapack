@@ -233,7 +233,29 @@ vale daqui pra frente em `demo/index.html`:
   - O detalhe da máquina abre com o OEE e a maior perda escrita, e mostra de
     onde vem cada parte: kg de refugo, m/min contra o melhor mês, horas.
   - Sem meta de OEE, os cartões ficam neutros (sem verde, âmbar ou
-    vermelho). Na visão geral, o cartão "OEE" ocupa o lugar do TMR médio.
+    vermelho).
+- **OEE da fábrica em cartões próprios** (09/10, "separar em cards"), no
+  topo da Visão geral: o OEE num anel e as três partes, cada uma no seu
+  cartão, com a máquina mais baixa naquela parte e a maior perda em laranja.
+  Tocar numa parte ordena as máquinas por ela, da menor para a maior (cada
+  cartão desliza para o novo lugar); "Voltar às etapas" desfaz. A fileira de
+  baixo fica com apara confirmada, produtividade e aderência; sem o OEE no
+  período, os cartões somem e o TMR médio volta.
+- **Pesquisa** no topo de toda tela (09/10): máquina ("reb 5" acha a REB 05,
+  com o OEE ao lado), tela ou pergunta. Busca enquanto digita; a pergunta com
+  resposta direta nos números sai na hora, a outra vai para a IA no próprio
+  popover ("Continuar no assistente" leva a conversa para o chat). Sem
+  texto, sugestões e as pesquisas recentes, só neste navegador, com
+  "Limpar". Ctrl+K (⌘K) ou "/" abre. No celular vira tela inteira, com
+  "Cancelar".
+- **"Hoje"** ao lado do seletor de período, numa cápsula só; fica marcado
+  quando o período é hoje.
+- **Selo do topo com a hora**: "Atualizado às 14:31 · dados até 09/10" (a
+  última rodada do hub que publicou, de `v_hub_execucao`).
+- **Linha do tempo por setor**: Todas, Impressão, Laminação, Corte / Refile
+  ou Coating, com os eventos já lidos do dia (não busca de novo).
+- **Gráfico de aparas da Visão geral**: o ano do período, de janeiro até o
+  último mês com dado (antes, os últimos 12 meses).
 - **Máquina sem apontamento no período** fica neutra ("—", "sem
   apontamento no período"), não "Crítico 0%". As faixas do TMR (75% e 62%)
   continuam as mesmas até a meta ser definida.
@@ -253,13 +275,16 @@ vale daqui pra frente em `demo/index.html`:
   carteira exportam CSV (";" e vírgula decimal: abre direto no Excel).
 - **Leitura em páginas:** fila, WIP e carteira vêm inteiras mesmo acima do
   limite de 1.000 linhas por pedido do Supabase.
-- **Assistente** (botão redondo), em duas camadas:
-  - **Local:** responde na hora as perguntas comuns, com os números que o
-    painel já carregou (apara, TMR, uma máquina, o que está parado agora,
-    entregas, fila, setup, WIP, carteira, laudos e um mês da série).
+- **Assistente** (botão redondo e a pesquisa do topo), em duas camadas:
+  - **Local:** só a resposta cravada (09/10: "deixar apenas para perguntas
+    que já tem resposta cravada"). Responde na hora quando entende todas as
+    palavras da pergunta: OEE e suas partes, apara, TMR, uma máquina, o que
+    está parado agora, entregas, fila, setup, WIP, carteira, laudos e um mês
+    da série. "Qualidade" sozinha é a do OEE; laudo e CQ são os laudos.
   - **IA grátis** (desde 08/10/2026; decisão do dono: IA sem custo, nada de
-    API paga). Recebe as perguntas de análise ("por que", "o que fazer",
-    "onde focar"), as longas e as que o local não entende.
+    API paga). Recebe todo o resto: as perguntas de análise ("por que", "o
+    que fazer", "onde focar"), as longas e qualquer pergunta com uma palavra
+    que o local não conhece.
     - Vai pela Edge Function `assistente` para a API da Groq, no plano
       gratuito: modelo GPT-OSS 120B e, se a cota grátis dele acabar, Llama 3.3
       70B e modelos menores.
