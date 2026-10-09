@@ -1326,12 +1326,9 @@ html.vidro .rail{ background: var(--lg-reflexo), var(--lg-bg); -webkit-backdrop-
   border-right-color: var(--lg-borda); box-shadow: var(--lg-brilho); }
 html.vidro .rail-indicator{ background: var(--lg-lente); box-shadow: var(--lg-brilho), 0 3px 10px -4px rgba(12,56,104,.32); }
 html.vidro .rail-mark{ box-shadow: inset 0 1px 0 rgba(255,255,255,.4), 0 6px 16px -8px rgba(15,94,166,.6); }
-/* "Qualidade dos dados" fica no cartão da conta no celular com o vidro (a barra flutuante
-   tem 7 abas, sem rolagem: tab-bars.md, "Avoid overflow tabs") */
-.conta-qualidade{ display:none; }
+/* barra flutuante do celular: as 7 abas das telas, sem rolagem (tab-bars.md, "Avoid
+   overflow tabs"). "Dados" e "Enviar" saíram do painel em 09/10. */
 @media (max-width: 768px){
-  html.vidro #qualidade-link{ display:none; }
-  html.vidro .conta-qualidade{ display:flex; }
   html.vidro .rail-btn{ flex:1 1 0; min-width:0; }
   html.vidro .rail{
     left:10px; right:10px; bottom: calc(8px + env(safe-area-inset-bottom)); padding:5px;
@@ -1472,14 +1469,6 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8l9-4 9 4-9 4-9-4Z"/><path d="M3 12l9 4 9-4"/><path d="M3 16l9 4 9-4"/></svg>
         <span class="rail-label" aria-hidden="true">WIP</span>
       </button>
-      <a class="rail-btn" id="qualidade-link" title="Qualidade dos dados" aria-label="Qualidade dos dados" href="./qualidade.html">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 5H7a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V7a2 2 0 0 0-2-2h-2"/><rect x="9" y="3" width="6" height="4" rx="1"/><path d="M9 14l2 2 4-4"/></svg>
-        <span class="rail-label" aria-hidden="true">Dados</span>
-      </a>
-      <a class="rail-btn" id="upload-link" title="Atualizar dados" aria-label="Atualizar dados" href="./upload.html" hidden>
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12M7 10l5-5 5 5"/><path d="M5 21h14"/></svg>
-        <span class="rail-label" aria-hidden="true">Enviar</span>
-      </a>
       <a class="rail-btn" id="admin-link" title="Administração de acessos" aria-label="Administração de acessos" href="./admin.html" hidden>
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2l8 4v6c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-4Z"/><path d="M9 12l2 2 4-4"/></svg>
         <span class="rail-label" aria-hidden="true">Acessos</span>
@@ -1967,7 +1956,6 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
   </div>
   <dl class="conta-dados" id="conta-dados"></dl>
   <div class="conta-acoes">
-    <a class="conta-link conta-qualidade" href="./qualidade.html">Qualidade dos dados</a>
     <a class="conta-link" id="conta-admin" href="./admin.html" hidden>Administração de acessos</a>
     <button type="button" class="conta-sair" id="conta-sair">
       <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><path d="M16 17l5-5-5-5"/><path d="M21 12H9"/></svg>
@@ -5935,10 +5923,10 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   const EXTRAS = { overview:"geral oee resumo inicio", agora:"agora chao fabrica paradas rodando", aparas:"aparas refugo qualidade laudos perda",
     produtividade:"tmr produtividade setup paradas velocidade", aderencia:"aderencia plano programacao fila entregas",
     timeline:"linha tempo gantt apontamentos", wip:"wip carteira pedidos estoque" };
-  const TELAS = [...document.querySelectorAll(".rail-btn[data-view]"), document.getElementById("qualidade-link")].filter(Boolean).map(b=>({
+  const TELAS = [...document.querySelectorAll(".rail-btn[data-view]")].map(b=>({
     v: b.dataset.view || null, href: b.getAttribute("href") || null, nome: b.getAttribute("aria-label"),
     icone: b.querySelector("svg") ? b.querySelector("svg").outerHTML : IC_LUPA,
-    palavras: nrm(b.getAttribute("aria-label") + " " + (EXTRAS[b.dataset.view] || (b.dataset.view ? "" : "conferencia dados fontes"))).split(/\s+/) }));
+    palavras: nrm(b.getAttribute("aria-label") + " " + (EXTRAS[b.dataset.view] || "")).split(/\s+/) }));
   const SUGERIDAS = ["Como está o OEE?", "Qual máquina tem a menor disponibilidade?", "O que está parado agora?", "Por que a apara está acima da meta?"];
 
   // pesquisas recentes: só neste navegador, e dá para limpar (searching.md: privacidade)
@@ -6411,7 +6399,6 @@ if(footerNote){
       .then(({ data: perfil })=>{
         if(perfil && perfil.role === "admin"){
           document.getElementById("admin-link").hidden = false;
-          document.getElementById("upload-link").hidden = false;
         }
         preencher(session.user, perfil || null);
       });

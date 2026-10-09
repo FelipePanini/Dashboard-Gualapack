@@ -268,8 +268,8 @@ jeitos:
   99,6% (L03). A performance usa o melhor mês da máquina, e não a meta de
   m/h da `View_usr_Acompanhamento_Prod`, porque essa meta dava mais de 100%
   (R18 158%, HMC01 393%).
-- **Página Qualidade dos dados** (`demo/qualidade.html`, ícone de prancheta
-  no menu): placar por status, cada indicador mês a mês e recorte a recorte,
+- **Página Qualidade dos dados** (`demo/qualidade.html`, fora do menu do
+  painel desde 09/10, só pelo endereço): placar por status, cada indicador mês a mês e recorte a recorte,
   o que corrigir nas planilhas, as fontes e os avisos.
 
 Só sai do PC o que é agregado: horas e metros por máquina/dia/código, peso

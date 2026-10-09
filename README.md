@@ -13,7 +13,8 @@ com login; cadastro direto com e-mail da Gualapack, os outros com chave de convi
 > num PC da rede da fábrica, aplica as regras dos BIs, confere cada indicador
 > contra a fonte oficial e publica o resultado no Supabase. A página
 > **Qualidade dos dados** (`demo/qualidade.html`) mostra cada número, a
-> fonte, o status e as divergências.
+> fonte, o status e as divergências. Desde 09/10/2026 ela sai do menu do
+> painel (as abas "Dados" e "Enviar" foram retiradas) e fica só no endereço.
 
 ---
 
@@ -219,8 +220,8 @@ vale daqui pra frente em `demo/index.html`:
     chat). Os cartões e painéis de conteúdo usam o material padrão, um vidro
     fosco mais denso, para os números continuarem legíveis.
   - O fundo é um degradê azul suave e fixo, que dá ao vidro o que refratar.
-  - No celular, a barra de abas vira uma cápsula flutuante com 7 abas; a
-    "Qualidade dos dados" vai para o cartão da conta.
+  - No celular, a barra de abas vira uma cápsula flutuante com as 7 abas
+    das telas.
   - Contraste do texto mais fraco no pior ponto: 5,1:1 no claro e 4,9:1 no
     escuro. Com "Reduzir transparência" ou "Aumentar contraste", tudo volta
     a ser opaco.
