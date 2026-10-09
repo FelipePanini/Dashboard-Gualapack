@@ -212,6 +212,10 @@ vale daqui pra frente em `demo/index.html`:
   - Todo `title` (e `<title>` de SVG) vira a dica do painel, que aparece
     depois de 0,5 s. Na barra lateral, a dica fica à direita do botão.
   - Basta usar `<select>` e `title` normais.
+  - Barra de rolagem como a de sobreposição do macOS (09/10): sem trilho e
+    sem setas, um traço fino que aparece ao rolar e some sozinho, e engrossa
+    com o ponteiro na borda. A rolagem continua a do sistema; no toque, fica a
+    barra do sistema; com "Aumentar contraste", ela fica sempre à vista.
 - **Vidro em tudo** (08/10, aprovado pelo dono; classe `vidro` no `<html>`
   do painel).
   - O vidro segue a divisão do HIG (`liquid-glass.md`, `materials.md`):

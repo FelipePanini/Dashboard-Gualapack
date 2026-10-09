@@ -7,6 +7,8 @@
       próprio sistema, que é o que as pessoas conhecem ali.
    2. Dica ("help tag") no lugar da dica nativa do title (e do <title> dos
       gráficos SVG): aparece com um pequeno atraso, no vidro do painel.
+   3. Barra de rolagem fina, que aparece ao rolar e engrossa perto do ponteiro
+      (09/10/2026), como as barras de sobreposição do macOS.
 
    Sem dependências; cada página só inclui este arquivo. */
 (function(){
@@ -80,6 +82,49 @@
   .gp-item.ativo{ outline:1px solid var(--accent, #0f5ea6); }
 }
 @media (pointer: coarse){ .gp-item{ min-height:44px; align-items:center; } }
+
+/* ---- barra de rolagem (09/10/2026): a das barras de sobreposição do macOS.
+   scroll-views.md: "a translucent scroll indicator that typically appears after
+   people begin scrolling". A rolagem continua a do sistema (roda, arrastar,
+   teclado); só o desenho muda: sem trilho e sem setas, um traço fino que aparece
+   ao rolar e some sozinho, e engrossa quando o ponteiro chega na borda. A
+   animação vem de duas propriedades registradas (@property), que o navegador
+   anima e a barra acompanha. Só com mouse: no toque, fica a barra do sistema. */
+@property --gp-barra-vis { syntax:'<number>'; inherits:true; initial-value:0; }
+@property --gp-barra-grossa { syntax:'<number>'; inherits:true; initial-value:0; }
+@media (hover: hover) and (pointer: fine){
+  :root{
+    --gp-barra-rgb: 24 46 74; --gp-barra-vis:0; --gp-barra-grossa:0;
+    /* some devagar, um instante depois de parar de rolar */
+    transition: --gp-barra-vis .5s cubic-bezier(.32,.72,0,1) .4s, --gp-barra-grossa .3s cubic-bezier(.32,.72,0,1);
+  }
+  /* aparece rápido ao rolar ou com o ponteiro na borda */
+  :root.gp-rolando, :root.gp-barra-perto{ --gp-barra-vis:1;
+    transition: --gp-barra-vis .16s ease-out, --gp-barra-grossa .3s cubic-bezier(.32,.72,0,1); }
+  :root.gp-barra-perto{ --gp-barra-grossa:1; }
+  /* áreas que rolam por dentro (chat, gaveta, pesquisa, tabelas): a barra aparece com o ponteiro em cima */
+  .assistant-body, .drawer-body, .busca-conteudo, .table-wrap{ transition: --gp-barra-vis .3s ease-out; }
+  .assistant-body:hover, .drawer-body:hover, .busca-conteudo:hover, .table-wrap:hover, .gp-menu:hover{ --gp-barra-vis:1; }
+  ::-webkit-scrollbar{ width:12px; height:12px; background:transparent; }
+  ::-webkit-scrollbar-track, ::-webkit-scrollbar-corner{ background:transparent; }
+  ::-webkit-scrollbar-button{ display:none; width:0; height:0; }
+  ::-webkit-scrollbar-thumb{
+    min-height:44px; min-width:44px; border-radius:999px; background-clip:padding-box;
+    /* traço de 5 px que vira 8 px perto do ponteiro: a borda transparente encolhe */
+    border: calc(2px + 1.5px * (1 - var(--gp-barra-grossa))) solid transparent;
+    /* contraste com o fundo claro: ~2,8:1 no traço fino, 3,5:1 perto do ponteiro (accessibility.md) */
+    background-color: rgb(var(--gp-barra-rgb) / calc(var(--gp-barra-vis) * (.48 + .16 * var(--gp-barra-grossa))));
+  }
+  ::-webkit-scrollbar-thumb:hover{ border-width:2px; background-color: rgb(var(--gp-barra-rgb) / .66); }
+  ::-webkit-scrollbar-thumb:active{ border-width:2px; background-color: rgb(var(--gp-barra-rgb) / .78); }
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){ --gp-barra-rgb: 226 236 250; } }
+:root[data-theme="dark"]{ --gp-barra-rgb: 226 236 250; }
+/* aumentar contraste: a barra fica sempre à vista e mais forte */
+@media (hover: hover) and (pointer: fine) and (prefers-contrast: more){
+  :root{ --gp-barra-vis:1 !important; }
+  ::-webkit-scrollbar-thumb{ background-color: rgb(var(--gp-barra-rgb) / .72); }
+}
 `;
   const estilo = document.createElement("style");
   estilo.textContent = css;
@@ -87,6 +132,29 @@
 
   const CHECK = `<svg class="gp-check" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2.5 7.5l3 3 6-7"/></svg>`;
   const esc = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+
+  /* ---------------------------------------------------------------- barra de rolagem */
+  // Rolar em qualquer lugar (página, chat, gaveta, tabela) acende a barra; ela some um
+  // instante depois de parar. O ponteiro na borda direita da janela acende e engrossa.
+  if(window.matchMedia("(hover: hover) and (pointer: fine)").matches){
+    const raiz = document.documentElement;
+    let tRola = 0, perto = false, quadro = 0, ultimoX = 0;
+    document.addEventListener("scroll", ()=>{
+      raiz.classList.add("gp-rolando");
+      clearTimeout(tRola);
+      tRola = setTimeout(()=> raiz.classList.remove("gp-rolando"), 500);
+    }, { capture:true, passive:true });
+    document.addEventListener("mousemove", e=>{
+      ultimoX = e.clientX;
+      if(quadro) return;
+      quadro = requestAnimationFrame(()=>{
+        quadro = 0;
+        const n = ultimoX >= window.innerWidth - 24 && raiz.scrollHeight > window.innerHeight;
+        if(n !== perto){ perto = n; raiz.classList.toggle("gp-barra-perto", n); }
+      });
+    }, { passive:true });
+    document.addEventListener("mouseleave", ()=>{ if(perto){ perto = false; raiz.classList.remove("gp-barra-perto"); } });
+  }
 
   /* ---------------------------------------------------------------- menu */
   let aberto = null;   // { sel, menu, itens, ativo }
