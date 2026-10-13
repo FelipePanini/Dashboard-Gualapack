@@ -2413,8 +2413,11 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
     // planilha velha — em 18/09 a base estava parada em 31/08 e nada na tela
     // dizia isso. Fora do throw de propósito: view nova não pode derrubar o
     // painel inteiro.
+    // Data depois de hoje não conta: a Refugo Aparas tem linhas datadas no fim
+    // do mês, e em 13/10 o selo dizia "dados até 31/10".
+    const hojeIso = isoDate(new Date());
     window.DADOS_STATUS = (statusRes && !statusRes.error ? statusRes.data || [] : [])
-      .filter(r => r.ate)
+      .filter(r => r.ate && String(r.ate).slice(0,10) <= hojeIso)
       .sort((a, b) => String(b.ate).localeCompare(String(a.ate)));
     window.DADOS_ATE = window.DADOS_STATUS.length ? window.DADOS_STATUS[0].ate : null;
 
@@ -2830,6 +2833,7 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
                                 "refugo.aparas", "indicadores.producao_kg", "machine_card.producao_metros"]);
         const status = (hubFontesRes.data||[]).filter(r=>usadas.has(r.fonte) && r.dado_ate)
           .map(r=>({ base: r.fonte, ate: String(r.dado_ate).slice(0,10) }))
+          .filter(r=>r.ate <= isoDate(new Date()))   // data futura (fim do mês na Refugo Aparas) não conta
           .sort((a,b)=>b.ate.localeCompare(a.ate));
         if(status.length){ window.DADOS_STATUS = status; window.DADOS_ATE = status[0].ate; }
       }
