@@ -11,6 +11,12 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="./supabase-config.js"></script>
 <script src="./assets/ui.js"></script>
+<!-- maquete 3D da aba WIP: o three.js só baixa quando a aba abre (import dinâmico) -->
+<script type="importmap">{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }</script>
+<link rel="stylesheet" href="./assets/maquete.css" />
 <style>
 /* Some vazio até a sessão ser confirmada — evita mostrar dados antes do login.
    O indicador de carregamento fica visível mesmo assim (visibility pode ser
@@ -996,6 +1002,36 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
 .kpi-row.tres{ grid-template-columns: repeat(3, minmax(0,1fr)); }
 @media (max-width: 1080px){ .kpi-row.tres{ grid-template-columns: repeat(2, minmax(0,1fr)); } }
 @media (max-width: 380px){ .kpi-row.tres{ grid-template-columns: minmax(0,1fr); } }
+/* telas por parte do OEE (14/10): fileiras de dois cartões, e um título curto
+   quando a tela junta dois assuntos (Performance: velocidade e aderência) */
+.kpi-row.duas{ grid-template-columns: repeat(2, minmax(0,1fr)); }
+@media (max-width: 380px){ .kpi-row.duas{ grid-template-columns: minmax(0,1fr); } }
+.grupo-titulo{ font-size:13px; font-weight:650; color: var(--text-secondary); margin:6px 2px 10px; letter-spacing:-0.005em; }
+.view > .grupo-titulo ~ .grupo-titulo{ margin-top:26px; }
+
+/* =========================================================================
+   NAVEGAÇÃO (14/10/2026): Geral e Agora; as três partes do OEE (Qualidade,
+   Performance, Disponibilidade) agrupadas sob "OEE"; depois as telas à parte
+   (Carteira, WIP, Acessos). No celular, as três partes viram a aba "OEE" e o
+   seletor no topo da tela troca entre elas: a barra de baixo fica com cinco.
+   ========================================================================= */
+.shell{ grid-template-columns: 102px 1fr; }
+.rail-btn{ width:92px; }
+.rail-grupo{ display:flex; flex-direction:column; align-items:center; gap:2px; margin:8px 0 6px; padding-top:10px; border-top:1px solid var(--border); }
+.rail-grupo-nome{ font-size:10px; font-weight:700; letter-spacing:.09em; color: var(--text-muted); margin:0 0 4px; }
+.rail-sep{ display:block; width:56px; height:1px; background: var(--border); margin:2px auto 8px; flex:none; }
+.rail-oee{ display:none; }
+.oee-seg{ display:none; }
+@media (max-width: 768px){
+  .shell{ grid-template-columns: minmax(0,1fr); }
+  .rail-btn{ width:auto; }
+  .rail-grupo, .rail-sep{ display:none; }
+  .rail-oee{ display:flex; }
+  /* Acessos fica no cartão da conta (toque no avatar), não na barra de baixo */
+  .rail-nav #admin-link{ display:none; }
+  body.em-oee .oee-seg{ display:flex; width:100%; margin:-4px 0 16px; }
+  .oee-seg button{ flex:1 1 0; padding:8px 6px; }
+}
 
 /* =========================================================================
    OEE DA FÁBRICA (09/10/2026, pedido da gerência: "separar em cards"): o
@@ -1449,23 +1485,33 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2.5-6 5 12 2.5-6H21"/></svg>
         <span class="rail-label" aria-hidden="true">Agora</span>
       </button>
-      <button class="rail-btn" data-view="aparas" title="Aparas e qualidade" aria-label="Aparas e qualidade">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 3v7.5a3 3 0 0 0 6 0V3"/><path d="M9 13.5V21"/><path d="M15 21V9a3 3 0 0 1 3-3h3"/></svg>
-        <span class="rail-label" aria-hidden="true">Aparas</span>
+      <!-- As três partes do OEE. No celular viram uma aba só ("OEE") com um seletor
+           no topo: sete abas não cabem na barra de baixo (tab-bars.md, "Avoid overflow tabs"). -->
+      <div class="rail-grupo" role="group" aria-label="OEE">
+        <span class="rail-grupo-nome" aria-hidden="true">OEE</span>
+        <button class="rail-btn" data-view="qualidade" title="Qualidade: aparas, perdas e laudos" aria-label="Qualidade">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><path d="M8.4 12.3l2.5 2.5 4.8-5"/></svg>
+          <span class="rail-label" aria-hidden="true">Qualidade</span>
+        </button>
+        <button class="rail-btn" data-view="performance" title="Performance: velocidade e aderência ao plano" aria-label="Performance">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4.2 17a8.5 8.5 0 1 1 15.6 0"/><path d="M12 13.5l4.2-4.2"/><circle cx="12" cy="13.5" r="1.3" fill="currentColor"/></svg>
+          <span class="rail-label" aria-hidden="true">Performance</span>
+        </button>
+        <button class="rail-btn" data-view="disponibilidade" title="Disponibilidade: TMR, paradas e linha do tempo" aria-label="Disponibilidade">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="13.5" r="7.5"/><path d="M12 9.5v4l2.6 2"/><path d="M9.5 2.8h5"/></svg>
+          <span class="rail-label" aria-hidden="true">Disponibilidade</span>
+        </button>
+      </div>
+      <button class="rail-btn rail-oee" type="button" id="rail-oee" title="OEE: qualidade, performance e disponibilidade" aria-label="OEE: qualidade, performance e disponibilidade">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M11 4a8.5 8.5 0 1 0 9 9h-9Z"/><path d="M14 2.6A8.5 8.5 0 0 1 21.4 10H14Z"/></svg>
+        <span class="rail-label" aria-hidden="true">OEE</span>
       </button>
-      <button class="rail-btn" data-view="produtividade" title="Produtividade e TMR" aria-label="Produtividade e TMR">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 20a8 8 0 1 1 8-8"/><path d="M12 12l4.5-3.5"/><path d="M12 20h8"/></svg>
-        <span class="rail-label" aria-hidden="true">TMR</span>
+      <span class="rail-sep" aria-hidden="true"></span>
+      <button class="rail-btn" data-view="carteira" title="Carteira, entregas e fila de programação" aria-label="Carteira e entregas">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="7" width="17" height="12.5" rx="2.5"/><path d="M8.5 7V5.5a2 2 0 0 1 2-2h3a2 2 0 0 1 2 2V7"/><path d="M3.5 12.5h17"/></svg>
+        <span class="rail-label" aria-hidden="true">Carteira</span>
       </button>
-      <button class="rail-btn" data-view="aderencia" title="Aderência ao planejado" aria-label="Aderência ao planejado">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r=".8" fill="currentColor"/></svg>
-        <span class="rail-label" aria-hidden="true">Aderência</span>
-      </button>
-      <button class="rail-btn" data-view="timeline" title="Linha do tempo" aria-label="Linha do tempo">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 6h11M4 12h16M4 18h8"/><circle cx="18" cy="6" r="1.6"/><circle cx="14" cy="18" r="1.6"/></svg>
-        <span class="rail-label" aria-hidden="true">Tempo</span>
-      </button>
-      <button class="rail-btn" data-view="wip" title="WIP e carteira" aria-label="WIP e carteira">
+      <button class="rail-btn" data-view="wip" title="WIP: onde está cada pallet em processo" aria-label="WIP em processo">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 8l9-4 9 4-9 4-9-4Z"/><path d="M3 12l9 4 9-4"/><path d="M3 16l9 4 9-4"/></svg>
         <span class="rail-label" aria-hidden="true">WIP</span>
       </button>
@@ -1536,6 +1582,8 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
         </div>
         <span class="status-chip" id="data-source-tag" role="status"><span class="live-dot" id="live-dot"></span><span id="live-label">Carregando…</span></span>
       </div>
+      <!-- celular: as três partes do OEE numa aba só, trocadas aqui -->
+      <div class="segmented oee-seg" id="oee-seg" role="group" aria-label="Parte do OEE"></div>
 
       <!-- ============ VISÃO GERAL ============ -->
       <div class="view active" id="view-overview">
@@ -1595,8 +1643,8 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
         </section>
       </div>
 
-      <!-- ============ APARAS & QUALIDADE ============ -->
-      <div class="view" id="view-aparas">
+      <!-- ============ QUALIDADE (aparas, perdas e laudos) ============ -->
+      <div class="view" id="view-qualidade">
         <section class="kpi-row cinco" id="aparas-kpis"></section>
 
         <section class="grid-2 uneven equal-cols">
@@ -1682,9 +1730,47 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
         </section>
       </div>
 
-      <!-- ============ PRODUTIVIDADE & TMR ============ -->
-      <div class="view" id="view-produtividade">
-        <section class="kpi-row" id="prod-kpis"></section>
+      <!-- ============ PERFORMANCE (velocidade e aderência ao plano) ============ -->
+      <div class="view" id="view-performance">
+        <h3 class="grupo-titulo">Velocidade</h3>
+        <section class="kpi-row duas" id="perf-kpis"></section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3 class="panel-title">Velocidade média por máquina</h3>
+              <div class="panel-sub">m/min &middot; medido contra o melhor mês da própria máquina nos últimos 12 meses</div>
+            </div>
+          </div>
+          <div class="grafico" id="velocidade-chart"></div>
+        </section>
+        <h3 class="grupo-titulo">Aderência ao plano</h3>
+        <section class="kpi-row" id="ader-kpis"></section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3 class="panel-title">Planejado x Realizado por máquina</h3>
+              <div class="panel-sub" id="ader-chart-sub">Km lineares no período &middot; barra clara = planejado, sólida = realizado</div>
+            </div>
+          </div>
+          <div class="grafico" id="ader-chart"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3 class="panel-title">Aderência por processo</h3>
+              <div class="panel-sub">% de aderência à OP em cada etapa da rota</div>
+            </div>
+          </div>
+          <div class="proc-grid" id="proc-grid"></div>
+        </section>
+      </div>
+
+      <!-- ============ DISPONIBILIDADE (TMR, paradas, linha do tempo e setup) ============ -->
+      <div class="view" id="view-disponibilidade">
+        <section class="kpi-row duas" id="disp-kpis"></section>
 
         <section class="grid-2 uneven equal-cols">
           <div class="panel">
@@ -1710,11 +1796,26 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
         <section class="panel">
           <div class="panel-head">
             <div>
-              <h3 class="panel-title">Velocidade média por máquina</h3>
-              <div class="panel-sub">m/min &middot; medido contra o melhor mês da própria máquina nos últimos 12 meses</div>
+              <h3 class="panel-title">Pareto de paradas</h3>
+              <div class="panel-sub">Horas acumuladas por motivo, sem fim de turno &middot; linha mostra o % acumulado</div>
             </div>
           </div>
-          <div class="grafico" id="velocidade-chart"></div>
+          <div class="grafico" id="pareto-chart"></div>
+        </section>
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3 class="panel-title">Linha do tempo de apontamentos</h3>
+              <div class="panel-sub" id="gantt-panel-sub">Ocupação das máquinas no dia de produção, das 06:00 às 06:00 &middot; passe o mouse para ver o motivo e a OP</div>
+            </div>
+            <div class="segmented" id="tempo-dias" role="group" aria-label="Dia de produção" hidden></div>
+          </div>
+          <div class="tempo-filtros" id="tempo-filtros" hidden>
+            <span class="tempo-filtros-rotulo" id="tempo-setor-rotulo">Setor</span>
+            <div class="segmented" id="tempo-setor" role="group" aria-labelledby="tempo-setor-rotulo"></div>
+          </div>
+          <div class="legend gantt-legenda" id="status-legend"></div>
+          <div class="grafico" id="gantt-chart"></div>
         </section>
 
         <section class="panel">
@@ -1729,28 +1830,52 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
         </section>
       </div>
 
-      <!-- ============ ADERÊNCIA ============ -->
-      <div class="view" id="view-aderencia">
-        <section class="kpi-row" id="ader-kpis"></section>
+      <!-- ============ CARTEIRA (pedidos em aberto, entregas e fila de programação) ============ -->
+      <div class="view" id="view-carteira">
+        <section class="kpi-row duas" id="carteira-kpis"></section>
 
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <h3 class="panel-title">Planejado x Realizado por máquina</h3>
-              <div class="panel-sub" id="ader-chart-sub">Km lineares no período &middot; barra clara = planejado, sólida = realizado</div>
+        <section class="grid-2 uneven equal-cols">
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3 class="panel-title">Carteira x Produção x Faturamento</h3>
+                <div class="panel-sub">t por mês &middot; carteira pela data pedida pelo cliente &middot; meses fechados</div>
+              </div>
+              <div class="legend" id="carteira-legend"></div>
             </div>
+            <div class="grafico" id="carteira-chart"></div>
           </div>
-          <div class="grafico" id="ader-chart"></div>
+          <div class="panel">
+            <div class="panel-head">
+              <div>
+                <h3 class="panel-title">Carteira em aberto por entrega</h3>
+                <div class="panel-sub">Saldo a faturar (t) pelo mês da entrega pedida &middot; agora</div>
+              </div>
+            </div>
+            <div class="grafico" id="carteira-prazo-chart"></div>
+          </div>
         </section>
 
         <section class="panel">
           <div class="panel-head">
             <div>
-              <h3 class="panel-title">Aderência por processo</h3>
-              <div class="panel-sub">% de aderência à OP em cada etapa da rota</div>
+              <h3 class="panel-title">Carteira em aberto por cliente</h3>
+              <div class="panel-sub">Itens liberados, não liberados e revisados com saldo a faturar</div>
             </div>
+            <button type="button" class="icon-btn" id="carteira-export">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+              Exportar CSV
+            </button>
           </div>
-          <div class="proc-grid" id="proc-grid"></div>
+          <div class="table-wrap">
+            <table id="carteira-table">
+              <thead>
+                <tr><th scope="col">Cliente</th><th scope="col">Itens</th><th scope="col">Pedidos</th><th scope="col">Saldo</th><th scope="col">Vencido</th><th scope="col">Próxima entrega</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <button type="button" class="icon-btn mais-btn" id="carteira-mais" hidden></button>
         </section>
 
         <section class="grid-2 uneven equal-cols">
@@ -1801,38 +1926,44 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
         </section>
       </div>
 
-      <!-- ============ LINHA DO TEMPO ============ -->
-      <div class="view" id="view-timeline">
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <h3 class="panel-title">Linha do tempo de apontamentos</h3>
-              <div class="panel-sub" id="gantt-panel-sub">Ocupação das máquinas no dia de produção, das 06:00 às 06:00 &middot; passe o mouse para ver o motivo e a OP</div>
-            </div>
-            <div class="segmented" id="tempo-dias" role="group" aria-label="Dia de produção" hidden></div>
-          </div>
-          <div class="tempo-filtros" id="tempo-filtros" hidden>
-            <span class="tempo-filtros-rotulo" id="tempo-setor-rotulo">Setor</span>
-            <div class="segmented" id="tempo-setor" role="group" aria-labelledby="tempo-setor-rotulo"></div>
-          </div>
-          <div class="legend gantt-legenda" id="status-legend"></div>
-          <div class="grafico" id="gantt-chart"></div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <h3 class="panel-title">Pareto de paradas</h3>
-              <div class="panel-sub">Horas acumuladas por motivo, sem fim de turno &middot; linha mostra o % acumulado</div>
-            </div>
-          </div>
-          <div class="grafico" id="pareto-chart"></div>
-        </section>
-      </div>
-
-      <!-- ============ WIP & CARTEIRA ============ -->
+      <!-- ============ WIP (maquete 3D e pallets em processo) ============ -->
       <div class="view" id="view-wip">
-        <section class="kpi-row" id="wip-kpis"></section>
+        <section class="kpi-row duas" id="wip-kpis"></section>
+        <!-- Maquete 3D: cada área da planta vira uma coluna (altura = pallets, cor = idade
+             da OP, as cores do gráfico "Idade do WIP"); tocar numa área abre a coluna numa
+             bandeja, um quadrado por pallet. Código em assets/maquete.js, carregado só aqui. -->
+        <section class="panel maquete" id="maquete" aria-labelledby="maquete-titulo">
+          <div class="panel-head">
+            <div>
+              <h3 class="panel-title" id="maquete-titulo">Onde está o WIP</h3>
+              <div class="panel-sub" id="maquete-sub">Pallets em processo na planta do chão de fábrica &middot; agora &middot; toque numa área para ver os pallets</div>
+            </div>
+            <div class="maquete-acoes">
+              <div class="segmented" id="maquete-modo" role="group" aria-label="Vista da maquete"></div>
+              <button type="button" class="icon-btn" id="maquete-ajustar" aria-pressed="false" hidden>
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v18M3 12h18M12 3l-2.5 2.5M12 3l2.5 2.5M12 21l-2.5-2.5M12 21l2.5-2.5M3 12l2.5-2.5M3 12l2.5 2.5M21 12l-2.5-2.5M21 12l-2.5 2.5"/></svg>
+                Ajustar planta
+              </button>
+            </div>
+          </div>
+          <div class="maquete-filtros">
+            <div class="legend" id="maquete-idade" role="group" aria-label="Idade da OP: a cor das colunas"></div>
+            <div class="legend" id="maquete-situacao" role="group" aria-label="Situação do pallet"></div>
+          </div>
+          <div class="maquete-corpo">
+            <div class="maquete-palco" id="maquete-palco">
+              <div class="maquete-cena" id="maquete-cena" role="img" aria-label="Maquete 3D do chão de fábrica, com uma coluna de pallets em cada área. O mesmo conteúdo está na lista ao lado."></div>
+              <div class="maquete-rotulos" id="maquete-rotulos" aria-hidden="true"></div>
+              <div class="maquete-dica" id="maquete-dica" role="tooltip" hidden></div>
+              <div class="maquete-edicao" id="maquete-edicao" role="toolbar" aria-label="Ajustar planta" hidden></div>
+              <button type="button" class="maquete-recentrar" id="maquete-recentrar" aria-label="Ver a fábrica inteira" title="Ver a fábrica inteira" hidden>
+                <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true"><path d="M4 9V5a1 1 0 0 1 1-1h4M20 9V5a1 1 0 0 0-1-1h-4M4 15v4a1 1 0 0 0 1 1h4M20 15v4a1 1 0 0 1-1 1h-4"/></svg>
+              </button>
+              <div class="maquete-estado" id="maquete-estado" role="status"><span class="maquete-anel" aria-hidden="true"></span>Montando a maquete…</div>
+            </div>
+            <aside class="maquete-inspetor" id="maquete-inspetor" aria-live="polite" aria-label="Pallets da maquete"></aside>
+          </div>
+        </section>
 
         <section class="grid-2 uneven">
           <div class="panel">
@@ -1876,50 +2007,6 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
             </table>
           </div>
           <button type="button" class="icon-btn mais-btn" id="wip-mais" hidden></button>
-        </section>
-
-        <section class="grid-2 uneven equal-cols">
-          <div class="panel">
-            <div class="panel-head">
-              <div>
-                <h3 class="panel-title">Carteira x Produção x Faturamento</h3>
-                <div class="panel-sub">t por mês &middot; carteira pela data pedida pelo cliente &middot; meses fechados</div>
-              </div>
-              <div class="legend" id="carteira-legend"></div>
-            </div>
-            <div class="grafico" id="carteira-chart"></div>
-          </div>
-          <div class="panel">
-            <div class="panel-head">
-              <div>
-                <h3 class="panel-title">Carteira em aberto por entrega</h3>
-                <div class="panel-sub">Saldo a faturar (t) pelo mês da entrega pedida &middot; agora</div>
-              </div>
-            </div>
-            <div class="grafico" id="carteira-prazo-chart"></div>
-          </div>
-        </section>
-
-        <section class="panel">
-          <div class="panel-head">
-            <div>
-              <h3 class="panel-title">Carteira em aberto por cliente</h3>
-              <div class="panel-sub">Itens liberados, não liberados e revisados com saldo a faturar</div>
-            </div>
-            <button type="button" class="icon-btn" id="carteira-export">
-              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
-              Exportar CSV
-            </button>
-          </div>
-          <div class="table-wrap">
-            <table id="carteira-table">
-              <thead>
-                <tr><th scope="col">Cliente</th><th scope="col">Itens</th><th scope="col">Pedidos</th><th scope="col">Saldo</th><th scope="col">Vencido</th><th scope="col">Próxima entrega</th></tr>
-              </thead>
-              <tbody></tbody>
-            </table>
-          </div>
-          <button type="button" class="icon-btn mais-btn" id="carteira-mais" hidden></button>
         </section>
       </div>
 
@@ -4192,21 +4279,22 @@ const STATUS_LAUDO = [
                  : window.HUB_TOTAIS && window.HUB_TOTAIS.vel != null ? window.HUB_TOTAIS.vel
                  : MAQ_VEL.reduce((a,m)=>a+m.vel,0)/MAQ_VEL.length;
 
-  const kpisProd = [
+  // Disponibilidade: TMR e horas. Performance: produtividade e velocidade (sem o dado,
+  // o cartão aparece com "—", não some: a fileira não muda de forma de um período a outro).
+  renderKpis(document.getElementById("disp-kpis"), [
     { label:"TMR médio", value:tmrMedio, suffix:"%", decimals:1, comp: comparaMesAnterior(tmrMedio, "tmr"),
       nota:"horas produzindo ÷ horas totais", spark: serieMensal("tmr") },
-  ];
-  if(produtividade != null){
-    kpisProd.push({ label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:0,
-      comp: comparaMesAnterior(produtividade, "prodt", { unidade:"m²/h", casas:0 }), nota:"m² ÷ horas de máquina produzindo", spark: serieMensal("prodt") });
-  }
-  if(velDisponivel){
-    kpisProd.push({ label:"Velocidade média", value:velMedia, suffix:" m/min", decimals:0,
-      comp: comparaMesAnterior(velMedia, "vel", { unidade:"m/min", casas:0 }), nota:"metros ÷ horas produzindo, todas as máquinas", spark: serieMensal("vel") });
-  }
-  kpisProd.push({ label:"Horas produzindo", value: horasTot>0 ? horasProd : null, suffix:" h", decimals:0,
-    nota: horasTot>0 ? `de ${fmt(horasTot)} h totais` : "sem horas apontadas no período", spark: serieMensal("horasProd") });
-  renderKpis(document.getElementById("prod-kpis"), kpisProd);
+    { label:"Horas produzindo", value: horasTot>0 ? horasProd : null, suffix:" h", decimals:0,
+      nota: horasTot>0 ? `de ${fmt(horasTot)} h totais` : "sem horas apontadas no período", spark: serieMensal("horasProd") },
+  ]);
+  renderKpis(document.getElementById("perf-kpis"), [
+    { label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:0,
+      comp: produtividade != null ? comparaMesAnterior(produtividade, "prodt", { unidade:"m²/h", casas:0 }) : null,
+      nota: produtividade != null ? "m² ÷ horas de máquina produzindo" : "sem m² apontado no período", spark: serieMensal("prodt") },
+    { label:"Velocidade média", value: velDisponivel ? velMedia : null, suffix:" m/min", decimals:0,
+      comp: velDisponivel ? comparaMesAnterior(velMedia, "vel", { unidade:"m/min", casas:0 }) : null,
+      nota: velDisponivel ? "metros ÷ horas produzindo, todas as máquinas" : "sem velocidade medida no período", spark: serieMensal("vel") },
+  ]);
 
   // Máquina sem hora no período vai pro fim, com "—" e sem barra (não 0% vermelho).
   const comHoras = MAQUINAS.filter(m=>m.horasTot > 0).sort((a,b)=>b.tmr-a.tmr);
@@ -4874,6 +4962,8 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       nota: wip.length ? `${fmt(wipPallets)} pallets · ${fmt(wipMetros / 1000)} km` : bancoVazio("wip", "sem pallets em processo agora") },
     { label:"WIP com mais de 90 dias", value: wip.length ? velhoKg / 1000 : null, suffix:" t", decimals:1,
       nota: wipKg > 0 ? `${fmt1(velhoKg / wipKg * 100)}% do WIP em kg` : "pela idade da OP" },
+  ]);
+  renderKpis(document.getElementById("carteira-kpis"), [
     { label:"Carteira em aberto", value: cart.length ? cartKg / 1000 : null, suffix:" t", decimals:1,
       nota: cart.length ? `${fmt(cart.length)} itens em ${fmt(pedidos)} pedidos${semPeso ? ` · ${fmt(semPeso)} sem peso conhecido` : ""}`
                         : bancoVazio("carteira", "sem itens com saldo a faturar") },
@@ -5028,9 +5118,18 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   const views = document.querySelectorAll(".view");
   const titulo = document.getElementById("view-title");
   const ind = document.getElementById("rail-indicator");
+  // As três partes do OEE: no computador, três abas; no celular, uma aba "OEE" que
+  // abre a última parte vista, com o seletor no topo da tela.
+  const PILARES = ["qualidade", "performance", "disponibilidade"];
+  const oeeBtn = document.getElementById("rail-oee");
+  const oeeSeg = document.getElementById("oee-seg");
+  let ultimoPilar = "qualidade";
+  const botaoDa = v => buttons.find(b=> b.dataset.view === v);
 
   function moverIndicador(){
-    const b = buttons.find(x=>x.classList.contains("active"));
+    let b = buttons.find(x=>x.classList.contains("active"));
+    // parte do OEE com a aba escondida (celular): a seleção fica na aba "OEE"
+    if(b && !b.offsetWidth && oeeBtn && oeeBtn.offsetWidth && PILARES.includes(b.dataset.view)) b = oeeBtn;
     if(!b || !ind || !b.offsetWidth) return;
     ind.style.width = b.offsetWidth + "px";
     ind.style.height = b.offsetHeight + "px";
@@ -5056,11 +5155,37 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     });
     views.forEach(v=> v.classList.toggle("active", v.id === `view-${alvo}`));
     if(titulo) titulo.textContent = btn.getAttribute("aria-label");
+    const pilar = PILARES.includes(alvo);
+    if(pilar) ultimoPilar = alvo;
+    if(oeeBtn){
+      oeeBtn.classList.toggle("active", pilar);
+      if(pilar) oeeBtn.setAttribute("aria-current", "page"); else oeeBtn.removeAttribute("aria-current");
+    }
+    document.body.classList.toggle("em-oee", pilar);
+    if(pilar) sincronizarSeg(alvo);
     window.scrollTo({ top: 0 });
     moverIndicador();
     const v = document.getElementById(`view-${alvo}`);
     if(v) primeiraVez(v);
+    // a maquete do WIP (three.js) só carrega quando a aba abre pela primeira vez
+    if(alvo === "wip" && window.abrirMaquete) window.abrirMaquete();
   }
+  // seletor das partes do OEE (celular): a seleção desliza como nos outros controles
+  function sincronizarSeg(alvo){
+    if(!oeeSeg) return;
+    const b = oeeSeg.querySelector(`button[data-v="${alvo}"]`);
+    if(!b || b.classList.contains("active")) return;
+    oeeSeg.querySelectorAll("button").forEach(x=>{ const on = x === b; x.classList.toggle("active", on); x.setAttribute("aria-pressed", String(on)); });
+    const t = oeeSeg.querySelector(".segmented-thumb");
+    if(t && b.offsetWidth){ t.style.width = b.offsetWidth + "px"; t.style.transform = `translateX(${b.offsetLeft}px)`; }
+  }
+  if(oeeSeg) segmentado(oeeSeg, [["qualidade","Qualidade"], ["performance","Performance"], ["disponibilidade","Disponibilidade"]],
+    "qualidade", v=>{ const b = botaoDa(v); if(b) b.click(); });
+  if(oeeBtn) oeeBtn.addEventListener("click", ()=>{
+    if(oeeBtn.classList.contains("active")) return;
+    const b = botaoDa(ultimoPilar);
+    if(b) b.click();
+  });
   buttons.forEach(btn=>{
     btn.addEventListener("click", ()=>{
       if(btn.classList.contains("active")) return;
@@ -5085,6 +5210,28 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   moverIndicador();
   window.addEventListener("resize", moverIndicador);
   if(document.fonts && document.fonts.ready) document.fonts.ready.then(moverIndicador);
+})();
+
+/* ============ maquete 3D do WIP (assets/maquete.js) ============
+   Carrega na primeira vez que a aba WIP abre: o three.js e os pallets só descem
+   para quem usa a aba. Devolve a maquete pronta (ou null, se não deu). */
+(function(){
+  let carga = null;
+  window.abrirMaquete = function(){
+    if(carga){ carga.then(m=>{ if(m) m.mostrar(); }); return carga; }
+    const estado = document.getElementById("maquete-estado");
+    carga = import("./assets/maquete.js")
+      .then(mod=> mod.iniciar({ client: window.gualapackAuth, lerTudo, papel: ()=> window.PERFIL_PAPEL }))
+      .then(m=>{ window.MAQUETE = m; return m; })
+      .catch(e=>{
+        console.error("maquete:", e);
+        if(estado){ estado.hidden = false; estado.classList.add("falha");
+          estado.textContent = "Não deu para abrir a maquete agora. Os gráficos abaixo continuam valendo."; }
+        carga = null;
+        return null;
+      });
+    return carga;
+  };
 })();
 
 /* ============ gaveta de detalhe da máquina ============
@@ -5924,9 +6071,10 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   const IC_RECENTE = svg(`<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>`);
   const IC_MAQ = svg(`<rect x="3.5" y="7" width="17" height="10" rx="2.5"/><circle cx="8.5" cy="12" r="1.6"/><path d="M13 12h4.5"/>`);
   // telas: as da barra lateral, com palavras que levam a cada uma
-  const EXTRAS = { overview:"geral oee resumo inicio", agora:"agora chao fabrica paradas rodando", aparas:"aparas refugo qualidade laudos perda",
-    produtividade:"tmr produtividade setup paradas velocidade", aderencia:"aderencia plano programacao fila entregas",
-    timeline:"linha tempo gantt apontamentos", wip:"wip carteira pedidos estoque" };
+  const EXTRAS = { overview:"geral oee resumo inicio", agora:"agora chao fabrica paradas rodando",
+    qualidade:"qualidade aparas refugo laudos perda motivo", performance:"performance velocidade produtividade aderencia plano realizado",
+    disponibilidade:"disponibilidade tmr paradas pareto linha tempo gantt apontamentos setup",
+    carteira:"carteira pedidos entregas prazo fila programacao faturamento", wip:"wip pallets etiqueta estoque maquete planta" };
   const TELAS = [...document.querySelectorAll(".rail-btn[data-view]")].map(b=>({
     v: b.dataset.view || null, href: b.getAttribute("href") || null, nome: b.getAttribute("aria-label"),
     icone: b.querySelector("svg") ? b.querySelector("svg").outerHTML : IC_LUPA,
@@ -5971,8 +6119,26 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       sub: m.processo + (m.rota && m.rota !== "—" ? " · " + m.rota : ""), dir: m.oee != null ? `OEE ${Math.round(m.oee)}%` : "",
       acao:()=>{ gravarRecente(m.nome); fechar(); if(window.openMaquinaDrawer) window.openMaquinaDrawer(m, null); } })) });
     if(telas.length) secoes.push({ titulo:"Telas", itens: telas.map(t=>({ icone:t.icone, rotulo:t.nome, acao:()=>irPara(t) })) });
+    // WIP: etiqueta e OP na maquete. Com os pallets já carregados (a aba WIP abriu),
+    // aparecem os pallets de verdade; antes disso, um atalho que procura lá.
+    const telaWip = TELAS.find(t=> t.v === "wip");
+    if(telaWip){
+      const achados = window.MAQUETE && window.MAQUETE.buscar ? window.MAQUETE.buscar(q) : null;
+      if(achados && achados.length) secoes.push({ titulo:"WIP", itens: achados.slice(0, 4).map(r=>({ icone:telaWip.icone, rotulo:r.rotulo, realce:q.trim(),
+        sub:r.sub, acao:()=>{ gravarRecente(q.trim()); irParaWip(r); } })) });
+      else if(!achados && /^\d{4,}$/.test(q.trim())) secoes.push({ titulo:"WIP", itens:[{ icone:telaWip.icone, rotulo:`Procurar ${q.trim()} na maquete do WIP`,
+        sub:"etiqueta ou OP", acao:()=>{ gravarRecente(q.trim()); irParaWip({ busca:q.trim() }); } }] });
+    }
     if(!iaPrimeiro && n.length >= 3) secoes.push({ titulo:"", itens:[ia] });
     return { secoes, resposta };
+  }
+  // abre a aba WIP e leva a maquete até o pallet, a OP ou o número procurado
+  function irParaWip(alvo){
+    fechar();
+    const b = document.querySelector('.rail-btn[data-view="wip"]');
+    if(b && !b.classList.contains("active")) b.click();
+    const p = window.abrirMaquete ? window.abrirMaquete() : null;
+    if(p) p.then(m=>{ if(m && m.irPara) m.irPara(alvo); });
   }
   function irPara(t){
     fechar();
@@ -6404,6 +6570,9 @@ if(footerNote){
         if(perfil && perfil.role === "admin"){
           document.getElementById("admin-link").hidden = false;
         }
+        // a maquete do WIP mostra "Ajustar planta" só para administrador (o banco também confere)
+        window.PERFIL_PAPEL = perfil && perfil.role || null;
+        document.dispatchEvent(new CustomEvent("gualapack:perfil", { detail: window.PERFIL_PAPEL }));
         preencher(session.user, perfil || null);
       });
   }

@@ -31,3 +31,19 @@ select coalesce(etapa, 'Sem etapa')    as etapa,
        min(op_hora_inicio)             as op_mais_antiga
 from w, ref
 group by all;
+
+-- Os mesmos pallets, um por linha: a maquete 3D do painel (aba WIP) acha cada
+-- etiqueta e OP na planta. Mesma regra: sem metro nem kg não conta.
+create or replace table clean.wip_pallet as
+select trim(cast(id as varchar))                 as etiqueta,
+       trim(op)                                  as op,
+       coalesce(nullif(trim(cod_ativ), ''), 'Sem etapa')       as etapa,
+       coalesce(nullif(trim(local_estoque), ''), 'Sem local')  as local,
+       coalesce(nullif(trim(op_cliente), ''), 'Sem cliente')   as cliente,
+       coalesce(nullif(trim(status_wip), ''), '')              as situacao,
+       nullif(trim(status_op), '')               as situacao_op,
+       coalesce(qtd_metro_linear, 0)             as metros,
+       coalesce(qtd_kg, 0)                       as kg,
+       op_hora_inicio                            as inicio
+from raw.banco__wip
+where coalesce(qtd_metro_linear, 0) > 0 or coalesce(qtd_kg, 0) > 0;

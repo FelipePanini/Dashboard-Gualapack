@@ -219,3 +219,55 @@ def test_sem_o_005_as_series_novas_ficam_de_fora_sem_quebrar(tmp_path, monkeypat
     assert "horas_maquina_dia 2 mês(es)" in resumo and "sem o 005_banco.sql" in resumo and "laudo_dia" in resumo
     assert supa.enviados[0]["agora"][0]["desde"] == "2026-09-02T10:00:00"   # foto vai no pacote, hora da fábrica
     assert con.execute("select count(*) from publicacao_mes where conjunto = 'laudo_dia'").fetchone()[0] == 0
+
+
+def test_pallets_do_wip_vao_numa_chamada_so_quando_mudam(tmp_path, monkeypatch):
+    con = _con_com_dados(tmp_path)
+    _com_apontamentos_banco(con)
+    con.execute("""create table raw.banco__wip as select * from (values
+        (132478, '43634 ', 'FUNGICIDA', 'MATRIZ - COATING 01', 'UNILEVER', 'Em uso', 'Encerrada', 3209.0, 300.5, timestamp '2026-03-26 06:38'),
+        (140001, '45001', 'REFILE FILME', 'MATRIZ - REB10', 'COLGATE', 'Disponivel', 'Aberta', 1200.0, 0.0, timestamp '2026-10-01 08:00'),
+        (140002, '45001', 'REFILE FILME', 'MATRIZ - REB10', 'COLGATE', 'Dividido', 'Aberta', 0.0, 0.0, timestamp '2026-10-01 08:00'))
+        t(id, op, cod_ativ, local_estoque, op_cliente, status_wip, status_op, qtd_metro_linear, qtd_kg, op_hora_inicio)""")
+    for col in ("qtd_metro_linear", "qtd_kg"):                       # no banco são números de ponto flutuante
+        con.execute(f"alter table raw.banco__wip alter {col} type double")
+    sql = (Path(__file__).resolve().parents[1] / "sql" / "clean" / "180_wip.sql").read_text(encoding="utf-8")
+    con.execute(sql)
+    # pallet dividido (sem metro nem kg) não conta, como no WIP somado
+    assert [r[0] for r in con.execute("select etiqueta from clean.wip_pallet order by 1").fetchall()] == ["132478", "140001"]
+
+    class Supabase008(_SupabaseFalso):
+        def post(self, url, **kw):
+            dados = json.loads(kw["data"])["dados"] if url.endswith("/rpc/hub_publicar") else None
+            if dados and "wip_pallets" in dados:
+                self.enviados.append(dados)
+                return type("R", (), {"status_code": 200, "text": "",
+                                      "json": lambda s: {"wip_pallets": len(dados["wip_pallets"]), "versao": 6}})()
+            return super().post(url, **kw)
+    monkeypatch.setattr(publicacao, "senha_do_cofre", lambda email: "x")
+    monkeypatch.setattr(publicacao, "config_supabase", lambda: {"url": "https://x", "anon_key": "k"})
+    cfg = {"pasta_entrada": tmp_path, "indicadores": [], "publicacao": {"ativa": True, "email": "e@x.invalid"}}
+    pallets = lambda s: [d["wip_pallets"] for d in s.enviados if "wip_pallets" in d]
+
+    antigo = _SupabaseFalso()                                       # Supabase sem o 008: fica de fora, com aviso
+    monkeypatch.setattr(publicacao.requests, "Session", lambda: antigo)
+    resumo = publicacao.publicar(con, 1, cfg)
+    assert "sem o 008_wip_maquete.sql" in resumo and "wip_pallets" in resumo
+    assert "wip_pallets" not in antigo.enviados[0]                  # nunca dentro do pacote grande
+
+    novo = Supabase008()                                            # rodou o 008: vai, uma vez
+    monkeypatch.setattr(publicacao.requests, "Session", lambda: novo)
+    resumo = publicacao.publicar(con, 1, cfg)
+    assert "WIP 2 pallets" in resumo
+    assert pallets(novo) == [[
+        {"etiqueta": "132478", "op": "43634", "etapa": "FUNGICIDA", "local": "MATRIZ - COATING 01", "cliente": "UNILEVER",
+         "situacao": "Em uso", "situacao_op": "Encerrada", "metros": 3209.0, "kg": 300.5, "inicio": "2026-03-26T06:38:00"},
+        {"etiqueta": "140001", "op": "45001", "etapa": "REFILE FILME", "local": "MATRIZ - REB10", "cliente": "COLGATE",
+         "situacao": "Disponivel", "situacao_op": "Aberta", "metros": 1200.0, "kg": 0.0, "inicio": "2026-10-01T08:00:00"}]]
+
+    novo.enviados.clear()
+    publicacao.publicar(con, 1, cfg)                                # nada mudou: os pallets não vão de novo
+    assert pallets(novo) == []
+    con.execute("update clean.wip_pallet set kg = 12 where etiqueta = '140001'")
+    publicacao.publicar(con, 1, cfg)
+    assert len(pallets(novo)) == 1

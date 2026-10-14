@@ -322,6 +322,13 @@ FOTOS: dict[str, tuple[str, str]] = {
         order by coalesce(entrega_pcp, entrega_cliente) nulls last, num_pedido, item"""),
     "carteira_mes": ("clean.carteira_mes", "select * from clean.carteira_mes order by mes"),
 }
+# Pallets do WIP um a um (008_wip_maquete.sql): vão numa chamada própria, só
+# quando mudam (a assinatura fica em publicacao_mes com uma data fixa no lugar do mês).
+WIP_PALLETS = """
+    select etiqueta, op, etapa, local, cliente, situacao, situacao_op,
+           round(cast(metros as double), 1) as metros, round(cast(kg as double), 2) as kg, inicio
+    from clean.wip_pallet order by local, inicio, etiqueta"""
+FOTO_SEM_MES = date(2000, 1, 1)
 
 
 def assinaturas(con: duckdb.DuckDBPyConnection, conjunto: str) -> dict[date, str]:
@@ -466,9 +473,29 @@ def publicar(con: duckdb.DuckDBPyConnection, run_id: int, cfg: dict, republicar:
                     ["evento_dia", dia, assinatura])
         dias_enviados += 1
 
+    # Pallets do WIP, um por linha (maquete 3D da aba WIP): ~3 mil linhas, numa
+    # chamada só e só quando mudam. A função anterior ao 008 ignora a chave e
+    # não devolve a contagem: fica de fora, com aviso, e vai de novo na próxima.
+    pallets_enviados = 0
+    if tabela_existe(con, "clean.wip_pallet"):
+        linhas = _linhas(con, WIP_PALLETS)
+        assinatura = hashlib.md5(json.dumps(linhas, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+        if ja_foi.get(("wip_pallet", FOTO_SEM_MES)) != assinatura:
+            resposta = enviar({"wip_pallets": linhas})
+            if resposta.get("wip_pallets") == len(linhas):
+                con.execute("""insert into publicacao_mes values (?, ?, ?, current_timestamp)
+                               on conflict (conjunto, mes) do update set assinatura = excluded.assinatura,
+                                                                         publicado_em = excluded.publicado_em""",
+                            ["wip_pallet", FOTO_SEM_MES, assinatura])
+                pallets_enviados = len(linhas)
+            else:
+                faltando.setdefault("008_wip_maquete.sql", []).append("wip_pallets")
+
     series = ", ".join(f"{c} {n} mês(es)" for c, n in enviados.items())
     if dias_enviados:
         series = (series + ", " if series else "") + f"linha do tempo {dias_enviados} dia(s)"
+    if pallets_enviados:
+        series = (series + ", " if series else "") + f"WIP {pallets_enviados} pallets"
     series = series or "nenhuma série mudou"
     falta = "".join(f"; sem o {sql} no Supabase, ficaram de fora: {', '.join(cs)}" for sql, cs in sorted(faltando.items()))
     return (f"publicado: {len(pacote['validacao'])} validações, {len(pacote['fontes'])} fontes, "

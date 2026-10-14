@@ -106,7 +106,7 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 
 | Caminho | O que é |
 |---|---|
-| [`demo/`](./demo/) | O site: `index.html` (painel), `login.html`, `admin.html` (convites), `qualidade.html` (validação publicada pelo hub), `upload.html` (upload manual, legado), `assets/ui.js` (menus e dicas no tema do painel). O nome `demo` ficou porque é o endereço já publicado. |
+| [`demo/`](./demo/) | O site: `index.html` (painel), `login.html`, `admin.html` (convites), `qualidade.html` (validação publicada pelo hub), `upload.html` (upload manual, legado), `assets/ui.js` (menus e dicas no tema do painel), `assets/maquete.js` e `maquete.css` (maquete 3D da aba WIP, carregada só quando a aba abre). O nome `demo` ficou porque é o endereço já publicado. |
 | [`backend/sql/`](./backend/sql/) | Estrutura do banco: login e convites, tabelas dos dados, funções e views (as do fluxo anterior). |
 | [`backend/sync-drive/`](./backend/sync-drive/) | Fluxo anterior: a carga diária das planilhas do Drive (etapas 1 e 2). |
 | [`backend/functions/`](./backend/functions/) | Funções do Supabase: cadastro com convite, upload manual e a `assistente` (IA grátis da Groq para as perguntas de análise do chat; segredo `GROQ_API_KEY`). |
@@ -135,7 +135,8 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 | Entregas no prazo | `View_usr_Entregas_Desempenho` (a consulta da Aderência Semanal) | Ótimo: faturado até a data do cliente; Bom: até a do PCP; Regular, Ruim e Péssimo: até 5, 10 e mais de 10 dias depois da do PCP |
 | Fila de programação | `view_usr_ProgramacaoPlanner` | OPs alocadas e não finalizadas, na ordem do PCP |
 | Setup programado x real | `View_usr_Acompanhamento_Prod` | minutos programados x reais por OP |
-| WIP | `view_usr_pallet_wip_disponiveis` | pallets, metros e kg por etapa, cliente e idade |
+| WIP | `view_usr_pallet_wip_disponiveis` | pallets, metros e kg por etapa, cliente e idade; pallet sem metro nem kg não conta |
+| Maquete do WIP (aba WIP) | idem, pallet a pallet (`v_hub_wip_pallet`, 008) | a mesma regra; o `LocalEstoque` dá a área na planta; a cor é a idade da OP, nas faixas do gráfico "Idade do WIP" (até 30 dias, 31 a 90, mais de 90) |
 | Carteira | `View_usr_ListaPedidosVenda` + estrutura do produto | um item por linha; kg = a quantidade em KG, ou m² × gramatura da estrutura ÷ 1000 |
 | Faturado | `view_usr_notas_saida_entrada_custo` | notas de produto acabado; kg = m² × gramatura ÷ 1000, como o BI |
 | Laudos do CQ | `view_usr_LaudoAnalise` | por resultado |
@@ -187,6 +188,22 @@ página Qualidade dos dados.
 
 Revisada pelas diretrizes de design da Apple (skill `apple-design`). O que
 vale daqui pra frente em `demo/index.html`:
+
+- **Abas (14/10).** Geral e Agora; as três partes do OEE agrupadas sob "OEE"
+  (Qualidade: aparas, perdas e laudos; Performance: velocidade e aderência ao
+  plano; Disponibilidade: TMR, paradas, linha do tempo e setup); depois as
+  telas à parte: Carteira (pedidos, entregas e fila de programação), WIP e
+  Acessos (só administrador). No celular, sete abas não cabem na barra de
+  baixo (`tab-bars.md`, "Avoid overflow tabs"): as três partes viram a aba
+  "OEE", com um seletor no topo da tela, e Acessos fica no cartão da conta.
+- **Maquete do WIP (14/10).** Cada área da planta é uma coluna (altura =
+  pallets, cor = idade da OP, o mais velho embaixo); tocar numa área abre a
+  coluna numa bandeja acima das máquinas, um quadrado por pallet, em fileiras
+  por idade. A lista ao lado tem as mesmas áreas e pallets (também é o caminho
+  sem 3D). A planta baixa fica no Supabase, atrás do login (o repositório é
+  público): `hub/scripts/gerar_planta.py` e `publicar_planta.py`. As posições
+  das máquinas são estimadas (os nomes não se leem na planta) até um
+  administrador corrigir em "Ajustar planta".
 
 - **Contraste mínimo 4,5:1** nos textos, nos dois temas. As cores são tokens
   no topo do CSS (`--text-muted`, `--good`, `--warning`...): mudar uma cor é
@@ -323,12 +340,13 @@ vale daqui pra frente em `demo/index.html`:
 - **Meta de OEE a definir.** Até os gestores darem a meta (`META_OEE` em
   `demo/index.html`), os cartões ficam neutros e só a maior perda aparece
   destacada. Com ela: verde na meta, âmbar até 85% dela, vermelho abaixo.
-- **SQL do Supabase:** 7 arquivos, de `001` a `007_oee.sql`;
+- **SQL do Supabase:** 8 arquivos, de `001` a `008_wip_maquete.sql`;
   num Supabase novo, rodar em ordem (`hub/README.md`). Sem o 005, as telas do
   banco mostram "Sem dados". Sem o 006, a linha do tempo mostra só o dia mais
   recente e a aderência fica na conta antiga (ADERÊNCIA DIÁRIA). Sem o 007, os
   cartões das máquinas mostram performance e disponibilidade, sem qualidade e
-  sem OEE, e a visão geral volta ao TMR médio. O resto do
+  sem OEE, e a visão geral volta ao TMR médio. Sem o 008, a maquete da aba
+  WIP mostra "Sem dados da maquete" e os gráficos do WIP seguem. O resto do
   painel funciona igual.
 - **Planejado da aderência ainda de planilha.** O banco guarda só a
   programação atual. Desde 05/10/2026 o hub guarda uma foto por dia da

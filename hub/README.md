@@ -333,6 +333,15 @@ Uma vez só, nesta ordem:
     conjuntos por dia são uma lista: série nova = uma linha na lista). Tem de
     mostrar `funcoes_ok = true`. A próxima rodada do hub publica a série. Sem
     o 007, o hub publica o resto e avisa o que ficou de fora.
+11. No **SQL Editor** → rodar `sql/supabase/008_wip_maquete.sql` (a maquete
+    3D da aba WIP: os pallets um a um, a planta baixa atrás do login, as
+    posições ajustadas por um administrador e o `hub_publicar` versão 6, que
+    recebe os pallets e a planta em chamadas próprias). Tem de mostrar
+    `maquete_ok = true`. A próxima rodada do hub publica os pallets (só quando
+    mudam). A planta vai uma vez, à mão:
+    `uv run --with pillow --with numpy python scripts/gerar_planta.py "<planta.png>"`
+    e depois `uv run python scripts/publicar_planta.py` (a imagem fica em
+    `data/planta`, fora do git). Sem o 008, o hub publica o resto e avisa.
 
 Feitos: 1 a 3 em 25/09, 4 a 6 em 30/09, o 8 (que já faz o 7) em 07/10, o 9
 em 08/10.
