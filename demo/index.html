@@ -1593,6 +1593,9 @@ html.vidro .rail-foot:hover, html.vidro .conta-topo:hover, html.vidro .rail-foot
 body.rolou .topbar::before{ opacity:1; }
 @media (min-width: 769px){
   .shell{ grid-template-columns: 120px minmax(0,1fr); }
+  /* o desfoque do topo vai até a borda da janela, por baixo da barra lateral: começar na
+     coluna do conteúdo deixava um degrau claro colado na barra (16/10) */
+  .topbar::before{ left:-120px; }
   .rail, html.vidro .rail{
     top:12px; height:calc(100vh - 24px); height:calc(100dvh - 24px); margin:12px 0 0 12px;
     padding:12px 6px 12px; gap:10px; border:0; border-radius:26px; box-shadow: var(--barra-sombra);
