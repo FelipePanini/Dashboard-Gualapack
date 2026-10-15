@@ -10,7 +10,34 @@
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@1,600;1,700&family=Archivo:wght@600;700;800&family=Public+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="./supabase-config.js"></script>
+<script>
+// Prévia da abertura com GSAP (login.html?intro=1, 16/10/2026): a marca acende com a
+// rolagem, o cartão inclina com o ponteiro e o login certo abre o painel com uma cortina
+// em curva (assets/login-intro.js). Só neste modo, e sem "reduzir movimento", o GSAP
+// desce do CDN; o login de sempre não muda.
+(function(){
+  if(!/[?&]intro=1(&|$)/.test(location.search) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const raiz = document.documentElement;
+  raiz.classList.add("intro", "intro-carregando");
+  const pronto = ()=> raiz.classList.remove("intro-carregando");
+  const css = document.createElement("link");
+  css.rel = "stylesheet"; css.href = "./assets/login-intro.css";
+  document.head.appendChild(css);
+  const V = "https://cdn.jsdelivr.net/npm/gsap@3.15.0/dist/";
+  const carregar = src => new Promise((ok, falha)=>{
+    const s = document.createElement("script"); s.src = src; s.onload = ok; s.onerror = falha; document.head.appendChild(s);
+  });
+  window.INTRO_PRONTA = carregar(V + "gsap.min.js")
+    .then(()=> Promise.all(["ScrollTrigger", "ScrollToPlugin", "MorphSVGPlugin"].map(p=> carregar(V + p + ".min.js"))))
+    .then(()=> new Promise(ok=>{ if(document.readyState === "loading") document.addEventListener("DOMContentLoaded", ok); else ok(); }))
+    .then(()=> carregar("./assets/login-intro.js"))
+    .catch(()=> raiz.classList.remove("intro"))
+    .finally(pronto);
+  setTimeout(pronto, 5000);   // sem rede: mostra o login de sempre
+})();
+</script>
 <style>
+html.intro-carregando body{ opacity:0; }
 :root{
   color-scheme: light;
   --bg: #eef2f6;
@@ -321,6 +348,12 @@ function switchTab(which){
 tabLogin.addEventListener("click", ()=> switchTab("login"));
 tabRegister.addEventListener("click", ()=> switchTab("register"));
 
+// Login certo: abre o painel (com a abertura em prévia, pela cortina em curva).
+function entrarNoPainel(){
+  const ir = ()=>{ window.location.href = "./index.html"; };
+  if(window.cortinaDeEntrada) window.cortinaDeEntrada(ir); else ir();
+}
+
 function setLoading(btn, on){
   btn.disabled = on;
   btn.classList.toggle("loading", on);
@@ -344,7 +377,7 @@ formLogin.addEventListener("submit", async (e)=>{
     showMsg("E-mail ou senha incorretos.", "error");
     return;
   }
-  window.location.href = "./index.html";
+  entrarNoPainel();
 });
 
 // E-mail com "gualapack" no domínio (depois do @) dispensa a chave de convite
@@ -395,7 +428,7 @@ formRegister.addEventListener("submit", async (e)=>{
     const { error } = await client.auth.signInWithPassword({ email, password });
     setLoading(btn, false);
     if(error){ switchTab("login"); return; }
-    window.location.href = "./index.html";
+    entrarNoPainel();
   }catch(err){
     showMsg("Erro de conexão com o servidor. Tente novamente.", "error");
     setLoading(btn, false);
@@ -406,7 +439,8 @@ formRegister.addEventListener("submit", async (e)=>{
 (async ()=>{
   if(!configured) return;
   const { data } = await client.auth.getSession();
-  if(data.session) window.location.href = "./index.html";
+  // na prévia da abertura, quem já está logado vê a abertura mesmo assim
+  if(data.session && !document.documentElement.classList.contains("intro")) window.location.href = "./index.html";
 })();
 </script>
 </body>
