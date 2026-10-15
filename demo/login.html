@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8" />
-<title>Entrar — Painel de Produção Gualapack</title>
+<title>Entrar · Painel de Produção Gualapack</title>
 <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -431,7 +431,7 @@ formRegister.addEventListener("submit", async (e)=>{
       setLoading(btn, false);
       return;
     }
-    showMsg("Conta criada! Entrando...", "success");
+    showMsg("Conta criada. Entrando…", "success");
     const { error } = await client.auth.signInWithPassword({ email, password });
     setLoading(btn, false);
     if(error){ switchTab("login"); return; }

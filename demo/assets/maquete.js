@@ -120,7 +120,7 @@ export async function iniciar({ client, lerTudo, papel }) {
     client.from("v_hub_planta_area").select("*"),
   ]);
   if (pal.error) {
-    mostrarEstado("Sem dados da maquete ainda: os pallets aparecem aqui quando o hub publicar (precisa do SQL 008 no Supabase).");
+    mostrarEstado("Sem dados da maquete ainda. Os pallets aparecem aqui quando o hub publicar.");
     return { mostrar() {}, buscar: () => null, irPara() {} };
   }
   const planta = !plantaRes.error && plantaRes.data && plantaRes.data[0] ? plantaRes.data[0] : null;

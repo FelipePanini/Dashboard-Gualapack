@@ -2,7 +2,7 @@
 <html lang="pt-BR" class="vidro">
 <head>
 <meta charset="UTF-8" />
-<title>Painel de Produção — Gualapack</title>
+<title>Painel de Produção · Gualapack</title>
 <link rel="icon" type="image/svg+xml" href="./assets/favicon.svg">
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -818,6 +818,10 @@ svg.anima .anel{ animation: anel 1s var(--ease-out) backwards .1s; }
 .chip:nth-child(2){ animation-delay:.06s; } .chip:nth-child(3){ animation-delay:.12s; }
 .chip:hover{ border-color: var(--accent); }
 .chip:active{ transform: scale(.95); transition-duration:.1s; }
+/* o botão que abre a tela da resposta: navega, não pergunta, então se diferencia das sugestões */
+.chip.chip-tela{ color: var(--accent); font-weight:600; border-color: color-mix(in srgb, var(--accent) 35%, var(--border));
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface-1)); }
+.chip.chip-tela::after{ content:" ›"; font-weight:700; }
 .assistant-input{ display:flex; gap:8px; padding:12px; border-top:1px solid var(--glass-border); }
 .assistant-input input{
   flex:1; min-width:0; border:1px solid var(--border); border-radius:12px; padding:10px 12px; font-size:14px;
@@ -1873,7 +1877,7 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
           <div class="panel">
             <div class="panel-head">
               <div>
-                <h3 class="panel-title">Aparas GPK — Confirmado x Apontado</h3>
+                <h3 class="panel-title">Aparas GPK: confirmado x apontado</h3>
                 <div class="panel-sub" id="aparas-panel-sub">% sobre peso bruto REBs &middot; últimos 12 meses &middot; meta de 12% na confirmada</div>
               </div>
               <div class="legend" id="aparas-legend"></div>
@@ -1897,7 +1901,7 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
           <div class="panel-head">
             <div>
               <h3 class="panel-title">Máquinas</h3>
-              <div class="panel-sub">OEE do período por recurso = qualidade (aparas) &times; performance (velocidade) &times; disponibilidade (paradas) &middot; em laranja, a maior perda &middot; toque para ver o detalhe</div>
+              <div class="panel-sub">OEE de cada máquina no período: qualidade (aparas) &times; performance (velocidade) &times; disponibilidade (paradas). Em laranja, a maior perda. Toque numa máquina para ver o detalhe.</div>
             </div>
             <div class="segmented" id="maq-filters" role="group" aria-label="Filtrar por etapa"></div>
           </div>
@@ -2137,7 +2141,7 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
           <div class="panel-head">
             <div>
               <h3 class="panel-title">Produção acima do programado</h3>
-              <div class="panel-sub" id="exc-sub">OPs que terminaram na máquina no período &middot; o produzido (a maior passada) contra a última programação da OP &middot; toque numa máquina para filtrar</div>
+              <div class="panel-sub" id="exc-sub">OPs que terminaram na máquina no período, com o produzido (a maior passada) contra a última programação da OP. Toque numa máquina para filtrar.</div>
             </div>
             <div class="segmented" id="exc-faixa" role="group" aria-label="Quanto acima do programado"></div>
           </div>
@@ -3250,7 +3254,7 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
         };
       }
       // Série mensal real (meses fechados) do
-      // "Disponibilidade (TMR) — últimos 12 meses" do detalhe da máquina.
+      // "Disponibilidade (TMR) nos últimos 12 meses" do detalhe da máquina.
       if(!hubMensalRes.error && (hubMensalRes.data||[]).length){
         const porMes = new Map(), porMaqMes = new Map();
         const zero = () => ({ tot:0, prod:0, metros:0, plan:0, prodz:0, m2:0, hm2:0, perda:0 });
@@ -3747,7 +3751,7 @@ function indicadoresSerie(linhas){
     qual: ref + peso > 0 ? 100 - ref / (ref + peso) * 100 : null,
     ader: plan > 0 ? real / plan * 100 : null };
 }
-const SEM_009 = "Sem dados: esta parte chega com a atualização 009 do banco do painel.";
+const SEM_009 = "Sem dados: esta parte ainda não foi ativada no banco do painel.";
 const IC_X = `<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6"/></svg>`;
 // Chips do que está filtrando um grupo de gráficos ("Motivo: Marcas de Emenda ×  Limpar").
 function desenharChips(el, itens, aoLimparTudo){
@@ -4063,7 +4067,7 @@ function multiLineChart(holder, labels, series, opts={}){
         <text x="${padL+6}" y="${my-6}" font-size="11" font-weight="600" fill="var(--good)">meta ${opts.fmtY ? opts.fmtY(opts.meta) : opts.meta}</text>`;
     }
 
-    holder.innerHTML = `<svg class="${animar ? "anima" : ""}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc((opts.aria||"") + (resumo ? ". Último valor — " + resumo : ""))}">
+    holder.innerHTML = `<svg class="${animar ? "anima" : ""}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc((opts.aria||"") + (resumo ? ". Último valor: " + resumo : ""))}">
         ${defs}${grid}${xLab}<g clip-path="url(#${id}-revela)">${areas}${lines}</g>${metaLine}${dots}<g class="hover-layer"></g>
       </svg>`;
 
@@ -4481,7 +4485,7 @@ function renderMotivoChart(){
     value: t.kg,
     display: fmt1(t.kg/1000)+" t",
     color:"var(--series-3)",
-    tip:`<b>${t.cod ? t.cod+" — " : ""}${esc(t.nome)}</b><br>${fmt(t.kg)} kg · ${fmt1(t.kg/perdaTotalKg*100)}% do refugo`
+    tip:`<b>${t.cod ? t.cod+" · " : ""}${esc(t.nome)}</b><br>${fmt(t.kg)} kg · ${fmt1(t.kg/perdaTotalKg*100)}% do refugo`
   })), { labelW:150, valueW:58, aria:"Perda por motivo em toneladas" });
   pintarTotal("motivo-total", TIPOS_PERDA.length ? perdaTotalKg/1000 : null, 1, "t", "total no período");
 }
@@ -5251,7 +5255,7 @@ const STATUS_LAUDO = [
       nota: comHoje ? `o que falta para o planejado ${window.PLANO.mesAberto ? "do mês" : "do período"}` : "o que faltou para o plano",
       spark: serieMensal("gapKm") },
     { label:"Acima do programado", value: exc && excProg > 0 ? excMais/1000 : null, suffix:" km", decimals:1,
-      nota: !exc ? "chega com a atualização 009" : excProg > 0 ? `${fmt1(excMais/excProg*100)}% do programado · ${fmt(excOps)} de ${fmt(exc.length)} OPs passaram`
+      nota: !exc ? "ainda não ativado no banco do painel" : excProg > 0 ? `${fmt1(excMais/excProg*100)}% do programado · ${fmt(excOps)} de ${fmt(exc.length)} OPs passaram`
                                                             : "sem OPs terminadas no período" },
   ]);
   const subAder = document.getElementById("ader-chart-sub");
@@ -5374,7 +5378,7 @@ const CLASSES_ENTREGA = [
     dest.innerHTML = `<div class="destaque"><span class="destaque-num">${fmt1(noPrazo)}%</span>
       <span class="destaque-txt">no prazo (Ótimo + Bom) · ${fmt(total)} itens faturados no período</span></div>`;
     hBarChart(holder, porClasse.map(c=>({ label:c.nome, value:c.itens, display:`${fmt(c.itens)} · ${fmt(c.itens / total * 100)}%`, color:c.cor,
-      tip:`<b>${c.nome}</b> — ${esc(c.desc)}<br>${fmt(c.itens)} itens · ${fmt1(c.itens / total * 100)}%` })),
+      tip:`<b>${c.nome}</b>: ${esc(c.desc)}<br>${fmt(c.itens)} itens · ${fmt1(c.itens / total * 100)}%` })),
       { labelW:80, valueW:84, rowH:30, aria:"Itens faturados por classificação de entrega" });
   }
 
@@ -6154,7 +6158,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
         <div class="drawer-agora" style="--cor:${e.cor}"><span class="classe-pill"><span class="dot"></span>${esc(e.nome)}</span></div>
         ${itens.map(([k, v])=>`<div class="drawer-facas-item"><span>${k}</span><span class="quebra">${v}</span></div>`).join("")}`;
     }
-    const secaoFila = !bancoOk("programacao") ? "" : `<div class="drawer-section-title">Próximas na fila${fila.length ? ` — ${fmt(fila.length)} ${fila.length === 1 ? "OP" : "OPs"}` : ""}</div>
+    const secaoFila = !bancoOk("programacao") ? "" : `<div class="drawer-section-title">Próximas na fila${fila.length ? ` (${fmt(fila.length)} ${fila.length === 1 ? "OP" : "OPs"})` : ""}</div>
       ${fila.length ? fila.slice(0, 5).map(r=>{
         const ini = dataLocal(r.ini_plan);
         return `<div class="drawer-facas-item"><span class="quebra-esq">${fmt(Number(r.posicao)||0)}. OP ${esc(r.num_ordem || "—")} · ${esc(limpaTexto(r.cliente) || "—")}</span><span>${ini ? fmtDMHM(ini) : "—"}</span></div>`;
@@ -6171,7 +6175,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       </div>
       ${secaoAgora}
 
-      <div class="drawer-section-title">Disponibilidade (TMR) — últimos 12 meses</div>
+      <div class="drawer-section-title">Disponibilidade (TMR) nos últimos 12 meses</div>
       ${path ? `<svg width="100%" viewBox="0 0 ${w} ${h}" style="display:block;overflow:visible" class="${reduzMovimento() ? "" : "anima"}" role="img" aria-label="TMR dos últimos 12 meses fechados">
         <defs><linearGradient id="dg" x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stop-color="${cor}" stop-opacity="0.26"/><stop offset="100%" stop-color="${cor}" stop-opacity="0"/>
@@ -6200,7 +6204,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       <div class="drawer-facas-item"><span>Horas totais</span><span>${fmt(m.horasTot)} h</span></div>
       <div class="drawer-facas-item"><span>Downtime</span><span>${fmt(m.horasTot-m.horasProd)} h</span></div>
 
-      <div class="drawer-section-title">Refugo — ${perdaMaq == null ? "—" : fmt(perdaMaq) + " kg"} no período</div>
+      <div class="drawer-section-title">Refugo no período: ${perdaMaq == null ? "—" : fmt(perdaMaq) + " kg"}</div>
       ${topMotivos.length ? topMotivos.map(t=>`<div class="drawer-facas-item">
         <span>${esc(t.nome)}</span>
         <span>${fmt(t.kg)} kg</span>
@@ -6292,10 +6296,31 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     body.scrollTo({ top: body.scrollHeight, behavior: reduzMovimento() ? "auto" : "smooth" });
     return el;
   }
-  function addSuggestions(list){
-    if(!list || !list.length) return;
+  // Embaixo da resposta, o botão que abre a tela de onde ela saiu ("pe:L04" = pé de máquina da L04).
+  const NOME_TELA = { overview:"Geral", agora:"Agora", qualidade:"Qualidade", performance:"Performance", disponibilidade:"Disponibilidade",
+    carteira:"Carteira", wip:"WIP", pe:"Pé de máquina" };
+  function botaoTela(tela){
+    if(!tela) return null;
+    const [v, maq] = tela.split(":");
+    if(!NOME_TELA[v] || !document.querySelector(`.rail-btn[data-view="${v}"]`)) return null;
+    const c = document.createElement("button");
+    c.type = "button"; c.className = "chip chip-tela";
+    c.textContent = maq ? `Abrir o pé de máquina da ${maq}` : `Abrir ${NOME_TELA[v]}`;
+    c.addEventListener("click", ()=>{
+      if(maq && window.PE) window.PE.mostrar(maq);
+      const b = document.querySelector(`.rail-btn[data-view="${v}"]`);
+      if(b && !b.classList.contains("active")) b.click();
+      if(window.matchMedia("(max-width: 768px)").matches) fechar();
+    });
+    return c;
+  }
+  function addSuggestions(list, tela){
+    const ir = botaoTela(tela);
+    if((!list || !list.length) && !ir) return;
     const wrap = document.createElement("div");
     wrap.className = "msg-suggestions";
+    if(ir) wrap.appendChild(ir);
+    list = list || [];
     list.forEach(q=>{
       const c = document.createElement("button");
       c.type = "button"; c.className = "chip"; c.textContent = q;
@@ -6383,7 +6408,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       const dif = ok(confirmMedia) ? confirmMedia - aparasMedia : null;
       s += ` A apontada foi ${b(pct1(aparasMedia))}` + (dif != null ? `, ${fmt1(Math.abs(dif))} p.p. ${dif >= 0 ? "abaixo" : "acima"} da confirmada` : "") + ".";
     }
-    return s + " Mais na tela Aparas.";
+    return s;
   }
   function rTmr(){
     const per = periodo();
@@ -6392,7 +6417,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     const ativas = MAQUINAS.filter(m=>m.horasTot > 0).sort((a,b)=>a.tmr - b.tmr);
     let s = `TMR ${per}: ${b(pct1(tmrMedio))}${comparado(comp)}.`;
     if(ativas.length >= 2) s += ` Menor: ${b(esc(ativas[0].nome))} com ${ativas[0].tmr}%. Maior: ${b(esc(ativas.at(-1).nome))} com ${ativas.at(-1).tmr}%.`;
-    return s + " Mais na tela TMR.";
+    return s;
   }
   // OEE da fábrica, ou uma parte dele ("como está a disponibilidade?")
   const PARTES_OEE = [["qualidade", "qual", "aparas"], ["performance", "perf", "velocidade"], ["disponibilidade", "disp", "paradas"]];
@@ -6413,7 +6438,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     const l = comOee.slice().sort((a,c)=>a.oee - c.oee);
     return `OEE da fábrica ${per}: ${b(pct1(o.oee))} = qualidade ${pct1(o.qual)} × performance ${pct1(o.perf)} × disponibilidade ${pct1(o.disp)}. ` +
       `Maior perda: ${b(pior[0])} (${pior[2]}).` +
-      (l.length >= 2 ? ` Menor OEE: ${l.slice(0, 3).map(m=>`${b(esc(m.nome))} ${Math.round(m.oee)}%`).join(", ")}.` : "") + " Mais na Visão geral.";
+      (l.length >= 2 ? ` Menor OEE: ${l.slice(0, 3).map(m=>`${b(esc(m.nome))} ${Math.round(m.oee)}%`).join(", ")}.` : "");
   }
   function rRanking(q){
     const per = periodo();
@@ -6431,18 +6456,18 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       if(!mapa) return `Não tenho refugo por máquina ${per}.`;
       const l = [...mapa].filter(([,kg])=>kg > 0).sort((a,b)=>b[1] - a[1]);
       if(!l.length) return `Sem refugo apontado ${per}.`;
-      return `Mais refugo ${per}: ` + l.slice(0, 3).map(([id, kg])=>`${b(esc(id))} ${fmt(kg)} kg`).join(", ") + ". Mais na tela Aparas.";
+      return `Mais refugo ${per}: ` + l.slice(0, 3).map(([id, kg])=>`${b(esc(id))} ${fmt(kg)} kg`).join(", ") + ".";
     }
     if(tem(q, "velocidad", "rapid", "lent")){
       const l = MAQUINAS.filter(m=>m.vel != null && m.velRef > 0).map(m=>({ m, r: m.vel / m.velRef }))
         .sort((a,b)=> melhor ? b.r - a.r : a.r - b.r);
       if(!l.length) return `Não tenho velocidade por máquina ${per}.`;
       return `${melhor ? "Mais perto" : "Mais longe"} do próprio melhor mês ${per}: ` +
-        l.slice(0, 3).map(x=>`${b(esc(x.m.nome))} ${fmt(x.m.vel)} de ${fmt(x.m.velRef)} m/min`).join(", ") + ". Mais na tela TMR.";
+        l.slice(0, 3).map(x=>`${b(esc(x.m.nome))} ${fmt(x.m.vel)} de ${fmt(x.m.velRef)} m/min`).join(", ") + ".";
     }
     const l = MAQUINAS.filter(m=>m.horasTot > 0).sort((a,b)=> melhor ? b.tmr - a.tmr : a.tmr - b.tmr);
     if(!l.length) return `Nenhuma máquina com horas apontadas ${per}.`;
-    return `${melhor ? "Maior" : "Menor"} TMR ${per}: ` + l.slice(0, 3).map(m=>`${b(esc(m.nome))} ${m.tmr}%`).join(", ") + ". Mais na tela TMR.";
+    return `${melhor ? "Maior" : "Menor"} TMR ${per}: ` + l.slice(0, 3).map(m=>`${b(esc(m.nome))} ${m.tmr}%`).join(", ") + ".";
   }
   function rMaquina(id){
     const per = periodo();
@@ -6497,7 +6522,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     let s = `Agora${ate ? ` (dados até ${fmtHM(ate)})` : ""}: ${b(prod)} produzindo, ${b(setup)} em setup, ${b(paradas.length)} paradas` +
       (fora ? ` e ${fora} fora de turno ou inativas` : "") + ".";
     if(lista.length) s += `<br>Paradas há mais tempo: ${lista.join("; ")}.`;
-    return s + " Mais na tela Agora.";
+    return s;
   }
   function rPerda(){
     const per = periodo();
@@ -6508,7 +6533,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       const l = [...window.PERDA_POR_MAQ].sort((a,b)=>b[1] - a[1]);
       if(l.length && l[0][1] > 0) s += ` Máquina com mais refugo: ${b(esc(l[0][0]))} (${fmt(l[0][1])} kg).`;
     }
-    return s + " Mais na tela Aparas.";
+    return s;
   }
   function rParadas(){
     const per = periodo();
@@ -6517,7 +6542,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     PARADAS_TODAS.forEach(x=> porClasse.set(x.classeNome, (porClasse.get(x.classeNome) || 0) + x.horas));
     const classes = [...porClasse].sort((a,b)=>b[1] - a[1]).slice(0, 3).map(([n, h])=>`${esc(n)} ${fmt(h)} h`);
     const codigos = PARADAS_TODAS.slice(0, 3).map(x=>`${esc(x.nome)} ${fmt(x.horas)} h`);
-    return `Horas sem produzir ${per}, por classe: ${classes.join(", ")}. Maiores motivos: ${codigos.join(", ")}. Mais nas telas TMR e Tempo.`;
+    return `Horas sem produzir ${per}, por classe: ${classes.join(", ")}. Maiores motivos: ${codigos.join(", ")}.`;
   }
   function rAderencia(){
     const per = periodo();
@@ -6529,7 +6554,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       (tot && tot.planHojeKm != null ? `, ${fmt(tot.realKm)} km realizados de ${fmt(tot.planHojeKm)} km planejados até hoje (${fmt(tot.planKm)} km no período)`
        : tot ? `, ${fmt(tot.realKm)} de ${fmt(tot.planKm)} km planejados` : "") + ".";
     if(l.length) s += ` Menor: ${b(esc(l[0].nome))} com ${fmt(l[0].aderencia)}%.`;
-    return s + " Mais na tela Aderência.";
+    return s;
   }
   function rEntregas(){
     const per = periodo();
@@ -6540,7 +6565,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     if(!total) return esc(bancoVazio("entregas", `Sem itens faturados ${per}.`));
     const prazo = (porClasse[0].itens + porClasse[1].itens) / total * 100;
     return `Entregas ${per}: ${b(pct1(prazo))} no prazo (Ótimo + Bom), de ${fmt(total)} itens faturados. ` +
-      porClasse.map(c=>`${c.nome} ${fmt(c.itens)}`).join(", ") + ". Mais na tela Aderência.";
+      porClasse.map(c=>`${c.nome} ${fmt(c.itens)}`).join(", ") + ".";
   }
   function rFila(){
     const linhas = bancoLinhas("programacao");
@@ -6551,7 +6576,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     const maiores = [...porMaq].filter(([k])=>!/PENDENCIA/i.test(k)).sort((a,b)=>b[1] - a[1]).slice(0, 3).map(([k, n])=>`${b(esc(k))} ${fmt(n)}`);
     const vencidas = linhas.filter(r=>{ const e = dataLocal(r.entrega); return e && e < hoje; }).length;
     return `Fila de programação agora: ${b(fmt(linhas.length))} OPs. Maiores filas: ${maiores.join(", ")}.` +
-      (vencidas ? ` ${b(fmt(vencidas))} OPs com a entrega já vencida.` : "") + ` Pergunte por uma máquina ("fila da L04") ou veja a tela Aderência.`;
+      (vencidas ? ` ${b(fmt(vencidas))} OPs com a entrega já vencida.` : "") + ` Para a fila de uma máquina, pergunte "fila da L04".`;
   }
   function rSetup(){
     const per = periodo();
@@ -6562,7 +6587,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     const piores = d.filter(x=>x.real > x.prog).sort((a,b)=>(b.real - b.prog) - (a.real - a.prog)).slice(0, 3)
       .map(x=>`${b(esc(x.nome))} +${fmt((x.real - x.prog) / 60)} h`);
     return `Setup ${per}: ${b(P > 0 ? fmt(R / P * 100) + "%" : "—")} do tempo programado (${fmt(R / 60)} h reais de ${fmt(P / 60)} h).` +
-      (piores.length ? ` Mais acima do programado: ${piores.join(", ")}.` : "") + " Mais na tela TMR.";
+      (piores.length ? ` Mais acima do programado: ${piores.join(", ")}.` : "");
   }
   function rWip(){
     const w = bancoLinhas("wip");
@@ -6573,7 +6598,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     w.forEach(r=>{ const k = limpaTexto(r.etapa) || "Sem etapa"; et.set(k, (et.get(k) || 0) + (Number(r.kg) || 0)); });
     const [etapa, kgEt] = [...et].sort((a,b)=>b[1] - a[1])[0];
     return `WIP agora: ${b(fmtT(kg))} em ${fmt(pal)} pallets; ${b(fmtT(velho))}${kg > 0 ? ` (${fmt1(velho / kg * 100)}%)` : ""} com mais de 90 dias. ` +
-      `Etapa com mais WIP: ${esc(etapa)} (${fmtT(kgEt)}). Mais na tela WIP.`;
+      `Etapa com mais WIP: ${esc(etapa)} (${fmtT(kgEt)}).`;
   }
   function rCarteira(){
     const c = bancoLinhas("carteira");
@@ -6587,7 +6612,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     const top = [...cli].sort((a,b)=>b[1] - a[1]).slice(0, 3).map(([k, v])=>`${esc(k)} ${fmtT(v)}`);
     const semPeso = c.filter(r=>r.kg_saldo == null).length;
     return `Carteira em aberto: ${b(fmtT(kg))} em ${fmt(c.length)} itens; ${b(fmtT(venc))} com a entrega pedida já vencida. Maiores clientes: ${top.join(", ")}.` +
-      (semPeso ? ` ${fmt(semPeso)} itens sem peso conhecido ficam fora das toneladas.` : "") + " Mais na tela WIP.";
+      (semPeso ? ` ${fmt(semPeso)} itens sem peso conhecido ficam fora das toneladas.` : "");
   }
   function rLaudos(){
     const per = periodo();
@@ -6596,7 +6621,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     if(!tot) return esc(bancoVazio("laudos", `Sem laudos emitidos ${per}.`));
     const aprov = l.filter(r=>/^aprovado/i.test(r.s)).reduce((a,r)=>a + r.n, 0);
     return `Laudos do CQ ${per}: ${b(pct1(aprov / tot * 100))} aprovados, de ${fmt(tot)} laudos. ` +
-      l.sort((a,b)=>b.n - a.n).map(r=>`${esc(r.s)} ${fmt(r.n)}`).join(", ") + ". Mais na tela Aparas.";
+      l.sort((a,b)=>b.n - a.n).map(r=>`${esc(r.s)} ${fmt(r.n)}`).join(", ") + ".";
   }
   function rProdutividade(){
     const per = periodo();
@@ -6608,7 +6633,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       s += `Produtividade do corte ${per}: ${b(fmt(produtividade) + " m²/h")}${comparado(comp)}, m² ÷ horas produzindo das cortadeiras.`;
     }
     if(tot && ok(tot.vel)) s += ` Velocidade média: ${b(fmt(tot.vel) + " m/min")}.`;
-    return s + " Mais na tela TMR.";
+    return s;
   }
   function rComparar(){
     if(!mesAnteriorDoPeriodo()) return "A comparação é com o mês anterior quando o período escolhido é um mês. Escolha um mês no topo e pergunte de novo.";
@@ -6676,28 +6701,29 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     if(window.FALHA_CARGA || USANDO_DADOS_REAIS !== true) return { html: "Sem dados carregados no painel agora." };
     const q = norm(texto);
     const maq = acharMaquina(q);
-    if(maq && !tem(q, "pior", "melhor", "ranking")) return { html: rMaquina(maq), sug: ["O que está parado agora?", "Qual máquina teve o pior TMR?"] };
-    if(tem(q, "agora", "neste momento", "nesse momento", "esta parad", "estao parad", "chao de fabrica")) return { html: rAgora(), sug: ["Qual máquina teve o pior TMR?", "Fila de programação"] };
-    if(tem(q, "compar", "mes anterior", "mes passado")) return { html: rComparar(), sug: ["Como está a apara?", "Resumo"] };
+    if(maq && !tem(q, "pior", "melhor", "ranking")) return { html: rMaquina(maq), sug: ["O que está parado agora?", "Qual máquina teve o pior TMR?"], tela: "pe:" + maq };
+    if(tem(q, "agora", "neste momento", "nesse momento", "esta parad", "estao parad", "chao de fabrica")) return { html: rAgora(), sug: ["Qual máquina teve o pior TMR?", "Fila de programação"], tela: "agora" };
+    if(tem(q, "compar", "mes anterior", "mes passado")) return { html: rComparar(), sug: ["Como está a apara?", "Resumo"], tela: "overview" };
     const mes = mesPedido(q);
     if(mes) return { html: rMes(q, mes), sug: ["Compare com o mês anterior"] };
-    if(tem(q, "pior", "melhor", "ranking") || (tem(q, "mais", "maior", "menor") && tem(q, "maquina"))) return { html: rRanking(q), sug: ["Como está a R18?", "O que está parado agora?"] };
+    if(tem(q, "pior", "melhor", "ranking") || (tem(q, "mais", "maior", "menor") && tem(q, "maquina"))) return { html: rRanking(q), sug: ["Como está a R18?", "O que está parado agora?"],
+      tela: tem(q, "oee", "qualidade", "performance", "disponibilidade") ? "overview" : tem(q, "refugo", "perda", "apara") ? "qualidade" : tem(q, "velocidad", "rapid", "lent") ? "performance" : "disponibilidade" };
     // "qualidade" sozinha é a do OEE (aparas); laudo, CQ, aprovado e reprovado são os laudos
-    if(tem(q, "laudo", "cq", "aprovad", "reprovad")) return { html: rLaudos(), sug: ["Como está a apara?"] };
-    if(tem(q, "oee", "qualidade", "performance", "disponibilidade")) return { html: rOee(q), sug: ["Qual máquina tem o menor OEE?", "Como está a disponibilidade?"] };
-    if(tem(q, "apara", "scrap")) return { html: rApara(), sug: ["Refugo por motivo", "Compare com o mês anterior"] };
-    if(tem(q, "tmr", "eficien", "tempo de maquina")) return { html: rTmr(), sug: ["Horas paradas por motivo", "Qual máquina teve o pior TMR?"] };
-    if(tem(q, "fila", "programacao", "proxima", "proximas")) return { html: rFila(), sug: ["Fila da L04", "Entregas no prazo"] };
-    if(tem(q, "entrega", "prazo", "otimo", "pessimo")) return { html: rEntregas(), sug: ["Como está a carteira?", "Fila de programação"] };
-    if(tem(q, "setup")) return { html: rSetup(), sug: ["Como está o TMR?"] };
-    if(tem(q, "wip", "pallet", "em processo")) return { html: rWip(), sug: ["Como está a carteira?"] };
-    if(tem(q, "carteira", "pedido", "vencid", "faturad")) return { html: rCarteira(), sug: ["Entregas no prazo", "Como está o WIP?"] };
-    if(tem(q, "refugo", "perda", "motivo")) return { html: rPerda(), sug: ["Qual máquina tem mais refugo?", "Como está a apara?"] };
-    if(tem(q, "parad", "parou", "downtime")) return { html: rParadas(), sug: ["O que está parado agora?", "Como está o TMR?"] };
-    if(tem(q, "aderencia", "plano", "planejado", "realizado")) return { html: rAderencia(), sug: ["Fila de programação", "Entregas no prazo"] };
-    if(tem(q, "produtividade", "m2", "velocidad")) return { html: rProdutividade(), sug: ["Qual máquina está mais lenta?"] };
+    if(tem(q, "laudo", "cq", "aprovad", "reprovad")) return { html: rLaudos(), sug: ["Como está a apara?"], tela: "qualidade" };
+    if(tem(q, "oee", "qualidade", "performance", "disponibilidade")) return { html: rOee(q), sug: ["Qual máquina tem o menor OEE?", "Como está a disponibilidade?"], tela: "overview" };
+    if(tem(q, "apara", "scrap")) return { html: rApara(), sug: ["Refugo por motivo", "Compare com o mês anterior"], tela: "qualidade" };
+    if(tem(q, "tmr", "eficien", "tempo de maquina")) return { html: rTmr(), sug: ["Horas paradas por motivo", "Qual máquina teve o pior TMR?"], tela: "disponibilidade" };
+    if(tem(q, "fila", "programacao", "proxima", "proximas")) return { html: rFila(), sug: ["Fila da L04", "Entregas no prazo"], tela: "carteira" };
+    if(tem(q, "entrega", "prazo", "otimo", "pessimo")) return { html: rEntregas(), sug: ["Como está a carteira?", "Fila de programação"], tela: "carteira" };
+    if(tem(q, "setup")) return { html: rSetup(), sug: ["Como está o TMR?"], tela: "disponibilidade" };
+    if(tem(q, "wip", "pallet", "em processo")) return { html: rWip(), sug: ["Como está a carteira?"], tela: "wip" };
+    if(tem(q, "carteira", "pedido", "vencid", "faturad")) return { html: rCarteira(), sug: ["Entregas no prazo", "Como está o WIP?"], tela: "carteira" };
+    if(tem(q, "refugo", "perda", "motivo")) return { html: rPerda(), sug: ["Qual máquina tem mais refugo?", "Como está a apara?"], tela: "qualidade" };
+    if(tem(q, "parad", "parou", "downtime")) return { html: rParadas(), sug: ["O que está parado agora?", "Como está o TMR?"], tela: "disponibilidade" };
+    if(tem(q, "aderencia", "plano", "planejado", "realizado")) return { html: rAderencia(), sug: ["Fila de programação", "Entregas no prazo"], tela: "performance" };
+    if(tem(q, "produtividade", "m2", "velocidad")) return { html: rProdutividade(), sug: ["Qual máquina está mais lenta?"], tela: "performance" };
     if(tem(q, "resumo", "como esta", "como estamos", "visao geral", "geral", "bom dia", "boa tarde", "boa noite", "ola", "oi\\b")) return { html: rResumo(), sug: SUGESTOES.slice(0, 3) };
-    return { html: "Ainda não sei responder isso. Pergunte sobre apara, TMR, uma máquina (ex.: R18), o que está parado agora, entregas, fila, setup, WIP, carteira, laudos ou um mês (ex.: agosto).", sug: SUGESTOES, semResposta: true };
+    return { html: "Essa eu ainda não sei responder. Tente apara, TMR, uma máquina (a R18, por exemplo), o que está parado agora, entregas, fila, WIP, carteira ou um mês.", sug: SUGESTOES, semResposta: true };
   }
 
   // ---------- IA (Groq, plano gratuito, pela Edge Function "assistente")
@@ -6831,7 +6857,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     const fim = (html, sug, textoPuro)=>{
       typing.remove();
       addMsg("bot", html);
-      addSuggestions(sug);
+      addSuggestions(sug, r.tela);
       conversa.push({ papel: "usuario", texto: text }, { papel: "assistente", texto: textoPuro });
       esperando = false;
       sendBtn.disabled = false;
@@ -6866,9 +6892,9 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       body.dataset.inited = "1";
       const { de, ate } = periodoDaUrl();
       const rotulo = window.rotuloPeriodo ? window.rotuloPeriodo(de, ate) : "o período selecionado";
-      addMsg("bot", `Olá! Uso os números do painel, do período escolhido no topo (<b>${esc(rotulo)}</b>). ` +
-        `O que tem resposta direta nos números (OEE, apara, TMR, uma máquina, o que está parado agora, entregas, fila, setup, WIP, carteira, laudos, um mês) eu respondo na hora. ` +
-        `O resto, como "por que a apara subiu?" ou "onde focar?", quem responde é a IA: a bolinha do topo fica verde.`);
+      addMsg("bot", `Respondo com os números do painel no período escolhido no topo (<b>${esc(rotulo)}</b>). ` +
+        `Perguntas como "como está o OEE?" ou "o que está parado agora?" eu respondo na hora. ` +
+        `As que pedem análise, como "por que a apara subiu?", vão para a IA, e a bolinha do topo fica verde.`);
       addSuggestions(SUGESTOES.slice(0, 4));
     }
     input.focus({ preventScroll:true });
