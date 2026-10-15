@@ -11,12 +11,19 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
 <script src="./supabase-config.js"></script>
 <script>
-// Prévia da abertura com GSAP (login.html?intro=1, 16/10/2026): a marca acende com a
-// rolagem, o cartão inclina com o ponteiro e o login certo abre o painel com uma cortina
-// em curva (assets/login-intro.js). Só neste modo, e sem "reduzir movimento", o GSAP
-// desce do CDN; o login de sempre não muda.
+// Abertura do login com GSAP (16/10/2026, aprovada pelo dono depois da prévia): a marca
+// acende com a rolagem, o cartão inclina com o ponteiro e o login certo abre o painel com
+// uma cortina em curva (assets/login-intro.js).
+// - Na primeira visita a abertura começa do topo; nas seguintes a página abre já no login
+//   (rolar para cima revê). "?intro=1" força a abertura do começo.
+// - Com "reduzir movimento", ou "?intro=0", fica o login simples, sem GSAP.
 (function(){
-  if(!/[?&]intro=1(&|$)/.test(location.search) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  const pedido = new URLSearchParams(location.search).get("intro");
+  if(pedido === "0" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  let vista = false;
+  try{ vista = localStorage.getItem("gualapack-abertura-vista") === "1"; }catch(e){}
+  window.ABERTURA = { doComeco: pedido === "1" || !vista };
+  if("scrollRestoration" in history) history.scrollRestoration = "manual";
   const raiz = document.documentElement;
   raiz.classList.add("intro", "intro-carregando");
   const pronto = ()=> raiz.classList.remove("intro-carregando");
@@ -439,8 +446,8 @@ formRegister.addEventListener("submit", async (e)=>{
 (async ()=>{
   if(!configured) return;
   const { data } = await client.auth.getSession();
-  // na prévia da abertura, quem já está logado vê a abertura mesmo assim
-  if(data.session && !document.documentElement.classList.contains("intro")) window.location.href = "./index.html";
+  // "?intro=1" mostra a abertura mesmo para quem já está logado
+  if(data.session && !/[?&]intro=1(&|$)/.test(location.search)) window.location.href = "./index.html";
 })();
 </script>
 </body>

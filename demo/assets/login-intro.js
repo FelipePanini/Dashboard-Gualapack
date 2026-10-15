@@ -1,4 +1,4 @@
-/* Abertura da tela de login (prévia em login.html?intro=1, 16/10/2026).
+/* Abertura da tela de login (16/10/2026; prévia em login.html?intro=1, aprovada e padrão).
 
    1. A marca Gualapack acende conforme a página rola: uma sequência de quadros no
       canvas, presa à rolagem pelo ScrollTrigger (scrub), como a demo "Image Sequence"
@@ -11,8 +11,10 @@
       mais leve enquanto a pessoa digita).
    4. Login certo: uma cortina em curva (MorphSVG) cobre a tela e abre o painel.
 
-   Com "reduzir movimento" ligado, nada disso roda: fica o login de sempre.
-   GSAP 3.15 (ScrollTrigger, ScrollToPlugin e MorphSVGPlugin) vem do CDN só neste modo. */
+   Na primeira visita a abertura começa do topo; nas seguintes a página abre já no login
+   (rolar para cima revê a abertura). "?intro=1" força o começo.
+   Com "reduzir movimento" ligado, ou "?intro=0", nada disso roda: fica o login simples.
+   GSAP 3.15 (ScrollTrigger, ScrollToPlugin e MorphSVGPlugin) vem do CDN. */
 (function(){
   "use strict";
   const { gsap, ScrollTrigger, ScrollToPlugin, MorphSVGPlugin } = window;
@@ -22,6 +24,9 @@
 
   const card = document.querySelector(".card");
   const toque = !window.matchMedia("(pointer: fine)").matches;
+  // depois de ver a abertura uma vez, as próximas visitas abrem já no login
+  const marcarVista = ()=>{ try{ localStorage.setItem("gualapack-abertura-vista", "1"); }catch(e){} };
+  const doComeco = !window.ABERTURA || window.ABERTURA.doComeco;
 
   /* ------------------------------------------------------------------ palco e acesso */
   const palco = document.createElement("section");
@@ -194,15 +199,23 @@
         onUpdate: self =>{
           anel.style.strokeDashoffset = (C * (1 - self.progress)).toFixed(2);
           dica.classList.toggle("sumindo", self.progress > 0.92);
+          if(self.progress > 0.98) marcarVista();
         },
       },
     });
-    window.INTRO = { seq, palco, acesso, desenhar };
+    // visita seguinte: direto no login (a abertura fica acima, acesa)
+    if(!doComeco){
+      ScrollTrigger.refresh();
+      window.scrollTo(0, ScrollTrigger.maxScroll(window));
+      ScrollTrigger.update();
+    }
+    window.INTRO = { seq, palco, acesso, desenhar, doComeco };
   });
   window.addEventListener("resize", ()=>{ medir(); if(seq) seq.redesenhar(); });
 
   // a pílula: leva direto ao login (a sequência corre junto, pela rolagem)
   dica.addEventListener("click", ()=>{
+    marcarVista();
     gsap.to(window, { duration: 1.8, ease: "power2.inOut", scrollTo: { y: acesso, autoKill: true } });
   });
   // a pílula chama a atenção depois de um tempo parada no topo
@@ -253,6 +266,7 @@
   const CURVA = "M 0 100 V 50 Q 50 0 100 50 V 100 z";
   const CHEIA = "M 0 100 V 0 Q 50 0 100 0 V 100 z";
   window.cortinaDeEntrada = depois =>{
+    marcarVista();
     gsap.timeline({ onComplete: depois })
       .set(cortina, { autoAlpha: 1 })
       .to(caminho, { morphSVG: CURVA, ease: "power2.in", duration: 0.45 })
