@@ -1564,6 +1564,69 @@ html.vidro .rail-foot:hover, html.vidro .conta-topo:hover, html.vidro .rail-foot
               inset 0 1px 0 rgba(255,255,255,.45);
 }
 
+/* =========================================================================
+   BARRAS FLUTUANTES (16/10/2026, pedido do dono: "a barra lateral fica bugada
+   na tela" e "não gostei daquela borda branca"). Com o grupo Fábrica, a barra
+   lateral passou da altura da tela e os últimos botões ficavam fora do fundo.
+   - Barra lateral: um painel de vidro solto da borda, com cantos e sombra suave,
+     sem linha (sidebars.md, "Extend visually rich content beneath the sidebar").
+     Em tela baixa as abas ficam mais justas e, se ainda não couberem, rolam dentro
+     do painel, com as pontas esmaecendo; a escolhida sempre aparece.
+   - Topo: sem faixa e sem linha. Marca e controles ficam sobre a página; quando
+     ela rola, o conteúdo some num desfoque suave por baixo deles (o "scroll edge
+     effect" do liquid-glass.md: "use a scroll edge effect instead of a solid or
+     semi-opaque background color beneath them").
+   ========================================================================= */
+:root{ --barra-sombra: 0 0 0 1px color-mix(in srgb, var(--text-primary) 6%, transparent),
+                       0 22px 44px -26px rgba(12,56,104,.42), 0 3px 10px -6px rgba(12,56,104,.16); }
+.topbar, html.vidro .topbar{
+  background: transparent; border-bottom:0; box-shadow:none;
+  -webkit-backdrop-filter:none; backdrop-filter:none; isolation:isolate;
+}
+.topbar::before{
+  content:""; position:absolute; inset:0 0 -34px 0; z-index:-1; pointer-events:none;
+  background: linear-gradient(to bottom, color-mix(in srgb, var(--bg) 94%, transparent) 0%, color-mix(in srgb, var(--bg) 86%, transparent) 62%, color-mix(in srgb, var(--bg) 30%, transparent));
+  -webkit-backdrop-filter: blur(22px) saturate(1.5); backdrop-filter: blur(22px) saturate(1.5);
+  -webkit-mask-image: linear-gradient(to bottom, #000 66%, transparent); mask-image: linear-gradient(to bottom, #000 66%, transparent);
+  opacity:0; transition: opacity .3s var(--ease-out);
+}
+body.rolou .topbar::before{ opacity:1; }
+@media (min-width: 769px){
+  .shell{ grid-template-columns: 120px minmax(0,1fr); }
+  .rail, html.vidro .rail{
+    top:12px; height:calc(100vh - 24px); height:calc(100dvh - 24px); margin:12px 0 0 12px;
+    padding:12px 6px 12px; gap:10px; border:0; border-radius:26px; box-shadow: var(--barra-sombra);
+  }
+  .rail-mark{ flex:none; }
+  .rail-nav{
+    flex:1 1 auto; min-height:0; width:100%; align-items:center; padding:2px 0 4px;
+    overflow-y:auto; overflow-x:hidden; overscroll-behavior:contain; scrollbar-width:none;
+  }
+  .rail-nav::-webkit-scrollbar{ display:none; }
+  /* as pontas esmaecem só quando há mais abas para aquele lado */
+  .rail-nav.rola-cima{ -webkit-mask-image: linear-gradient(to bottom, transparent, #000 26px); mask-image: linear-gradient(to bottom, transparent, #000 26px); }
+  .rail-nav.rola-baixo{ -webkit-mask-image: linear-gradient(to top, transparent, #000 26px); mask-image: linear-gradient(to top, transparent, #000 26px); }
+  .rail-nav.rola-cima.rola-baixo{ -webkit-mask-image: linear-gradient(to bottom, transparent, #000 26px, #000 calc(100% - 26px), transparent);
+    mask-image: linear-gradient(to bottom, transparent, #000 26px, #000 calc(100% - 26px), transparent); }
+  .rail-foot{ flex:none; }
+  /* grupos: o nome pequeno, sem a linha de cima */
+  .rail-grupo{ border-top:0; margin:10px 0 2px; padding-top:0; }
+  .rail-grupo-nome{ font-size:9.5px; letter-spacing:.12em; margin:0 0 3px; opacity:.85; }
+  .rail-sep{ width:28px; margin:8px auto 8px; background: color-mix(in srgb, var(--text-primary) 10%, transparent); }
+  .rail-btn{ width:96px; }
+  .rail-btn.active{ font-weight:650; }
+}
+/* tela baixa (notebook): abas mais justas antes de precisar rolar */
+@media (min-width: 769px) and (max-height: 880px){
+  .rail, html.vidro .rail{ padding-top:10px; padding-bottom:10px; gap:6px; }
+  .rail-mark{ width:32px; height:32px; font-size:17px; border-radius:9px; }
+  .rail-btn{ padding:6px 2px 5px; gap:3px; }
+  .rail-btn svg{ width:19px; height:19px; }
+  .rail-grupo{ margin:6px 0 0; }
+  .rail-sep{ margin:5px auto 5px; }
+  .rail-foot{ width:32px; height:32px; font-size:12.2px; }
+}
+
 /* camadas flutuantes que já eram vidro: o brilho de borda do Liquid Glass */
 html.vidro .drawer, html.vidro .assistant-panel, html.vidro .period-popup, html.vidro .conta-pop{
   background: var(--lg-reflexo), var(--lg-bg-forte);
@@ -5934,6 +5997,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     });
     window.scrollTo({ top: 0 });
     moverIndicador();
+    if(window.mostrarAbaNaBarra) window.mostrarAbaNaBarra(btn);
     const v = document.getElementById(`view-${alvo}`);
     if(v) primeiraVez(v);
     // a maquete do WIP (three.js) só carrega quando a aba abre pela primeira vez
@@ -5984,6 +6048,36 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   moverIndicador();
   window.addEventListener("resize", moverIndicador);
   if(document.fonts && document.fonts.ready) document.fonts.ready.then(moverIndicador);
+})();
+
+/* Barras flutuantes: o desfoque por baixo do topo aparece quando a página rola; a barra
+   lateral esmaece as pontas quando tem abas para rolar e mostra sempre a aba escolhida. */
+(function(){
+  const nav = document.querySelector(".rail-nav");
+  const rolou = ()=> document.body.classList.toggle("rolou", window.scrollY > 4);
+  const pontas = ()=>{
+    if(!nav) return;
+    const vertical = nav.scrollHeight > nav.clientHeight + 2 && getComputedStyle(nav).flexDirection === "column";
+    nav.classList.toggle("rola-cima", vertical && nav.scrollTop > 2);
+    nav.classList.toggle("rola-baixo", vertical && nav.scrollTop + nav.clientHeight < nav.scrollHeight - 2);
+  };
+  window.addEventListener("scroll", rolou, { passive:true });
+  rolou();
+  if(nav){
+    nav.addEventListener("scroll", pontas, { passive:true });
+    new ResizeObserver(pontas).observe(nav);
+    window.addEventListener("resize", pontas);
+    // a aba escolhida entra na área visível da barra (sem mexer na rolagem da página)
+    window.mostrarAbaNaBarra = b =>{
+      if(!b || !b.offsetHeight || nav.scrollHeight <= nav.clientHeight + 2) return;
+      let topo = 0;
+      for(let el = b; el && el !== nav; el = el.offsetParent) topo += el.offsetTop;
+      if(topo < nav.scrollTop + 8) nav.scrollTo({ top: topo - 12, behavior: reduzMovimento() ? "auto" : "smooth" });
+      else if(topo + b.offsetHeight > nav.scrollTop + nav.clientHeight - 8)
+        nav.scrollTo({ top: topo + b.offsetHeight - nav.clientHeight + 12, behavior: reduzMovimento() ? "auto" : "smooth" });
+    };
+    pontas();
+  }
 })();
 
 /* ============ maquete 3D do WIP (assets/maquete.js) ============
