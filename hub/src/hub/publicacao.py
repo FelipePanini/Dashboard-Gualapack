@@ -299,6 +299,12 @@ CONJUNTOS: dict[str, tuple[str, str]] = {
     "qualidade_maquina_dia": ("clean.qualidade_maquina_dia", """
         select dia, maquina, round(refugo_kg, 3) as refugo_kg, round(peso_ops_kg, 3) as peso_ops_kg, ops
         from clean.qualidade_maquina_dia"""),
+    # --- 009_gestao.sql ---
+    # programado x produzido por OP e máquina: o que se produziu a mais que o programado
+    "op_plano_dia": ("clean.op_plano_dia", """
+        select dia, maquina, num_ordem, produto, round(planejado, 3) as planejado,
+               round(produzido, 3) as produzido, passadas
+        from clean.op_plano_dia"""),
 }
 # Conjuntos que só existem a partir de um SQL do Supabase: sem ele, o Supabase
 # não conhece o conjunto e eles ficam de fora, com um aviso (o resto publica
@@ -307,6 +313,7 @@ SQL_DO_CONJUNTO = {
     **{c: "005_banco.sql" for c in ("entrega_dia", "setup_dia", "laudo_dia", "faturamento_dia")},
     **{c: "006_tempo_aderencia.sql" for c in ("plano_dia", "evento_dia")},
     "qualidade_maquina_dia": "007_oee.sql",
+    "op_plano_dia": "009_gestao.sql",
 }
 
 # Fotos do estado atual: vão inteiras no pacote, a cada publicação (005_banco.sql).

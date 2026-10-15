@@ -137,6 +137,8 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 | Setup programado x real | `View_usr_Acompanhamento_Prod` | minutos programados x reais por OP |
 | WIP | `view_usr_pallet_wip_disponiveis` | pallets, metros e kg por etapa, cliente e idade; pallet sem metro nem kg não conta |
 | Maquete do WIP (aba WIP) | idem, pallet a pallet (`v_hub_wip_pallet`, 008) | a mesma regra; o `LocalEstoque` dá a área na planta; a cor é a idade da OP, nas faixas do gráfico "Idade do WIP" (até 30 dias, 31 a 90, mais de 90) |
+| D-1, pé de máquina e evolução por dia ou mês (009) | os mesmos de TMR, velocidade, qualidade do OEE e aderência, por máquina e dia | as mesmas contas, num dia ou mês; o dia de produção vai das 06:00 às 06:00; a meta é a da máquina, gravada no painel por um administrador (sem meta, nada de cor de status) |
+| Produção acima do programado (009) | planilha Histórico Aderência Programação + apontamentos | por OP e máquina: a última programação da OP (a planilha repete a OP a cada reprogramação) contra a maior passada (a L04 passa a mesma OP 2 a 3 vezes); entra no período em que a OP terminou na máquina. Em set/2026: 317 km acima em 9.543 km programados (3,3%) |
 | Carteira | `View_usr_ListaPedidosVenda` + estrutura do produto | um item por linha; kg = a quantidade em KG, ou m² × gramatura da estrutura ÷ 1000 |
 | Faturado | `view_usr_notas_saida_entrada_custo` | notas de produto acabado; kg = m² × gramatura ÷ 1000, como o BI |
 | Laudos do CQ | `view_usr_LaudoAnalise` | por resultado |
@@ -337,17 +339,21 @@ vale daqui pra frente em `demo/index.html`:
 
 ## Pendências e limitações conhecidas
 
-- **Meta de OEE a definir.** Até os gestores darem a meta (`META_OEE` em
-  `demo/index.html`), os cartões ficam neutros e só a maior perda aparece
-  destacada. Com ela: verde na meta, âmbar até 85% dela, vermelho abaixo.
-- **SQL do Supabase:** 8 arquivos, de `001` a `008_wip_maquete.sql`;
+- **Metas por máquina a preencher.** Desde 15/10/2026 um administrador grava
+  as metas (velocidade, TMR, qualidade e OEE de cada máquina, e TMR,
+  qualidade e OEE da fábrica) no botão "Metas" do D-1 e do pé de máquina.
+  Sem meta, os cartões e gráficos ficam neutros (nada de cor de status
+  inventada). Com ela: verde na meta, âmbar até 10% abaixo, vermelho abaixo.
+- **SQL do Supabase:** 9 arquivos, de `001` a `009_gestao.sql`;
   num Supabase novo, rodar em ordem (`hub/README.md`). Sem o 005, as telas do
   banco mostram "Sem dados". Sem o 006, a linha do tempo mostra só o dia mais
   recente e a aderência fica na conta antiga (ADERÊNCIA DIÁRIA). Sem o 007, os
   cartões das máquinas mostram performance e disponibilidade, sem qualidade e
   sem OEE, e a visão geral volta ao TMR médio. Sem o 008, a maquete da aba
-  WIP mostra "Sem dados da maquete" e os gráficos do WIP seguem. O resto do
-  painel funciona igual.
+  WIP mostra "Sem dados da maquete" e os gráficos do WIP seguem. Sem o 009, o
+  D-1, o pé de máquina, a evolução e a produção acima do programado dizem que
+  falta a atualização, e os gráficos não se filtram pelas paradas por máquina.
+  O resto do painel funciona igual.
 - **Planejado da aderência ainda de planilha.** O banco guarda só a
   programação atual. Desde 05/10/2026 o hub guarda uma foto por dia da
   programação do PCP; com algumas semanas de fotos dá pra calcular o

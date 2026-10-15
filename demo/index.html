@@ -489,6 +489,139 @@ body.no-scroll{ overflow:hidden; }
 .panel-total-valor{ font-size:24px; font-weight:700; letter-spacing:-0.02em; font-variant-numeric: tabular-nums; white-space:nowrap; }
 .panel-total-un{ font-size:.58em; font-weight:600; letter-spacing:0; color: var(--text-secondary); margin-left:3px; }
 .panel-total-rot{ font-size:11.5px; color: var(--text-muted); margin-top:5px; white-space:nowrap; }
+/* =========================================================================
+   GESTÃO POR MÁQUINA (15/10/2026): D-1, pé de máquina, evolução por dia e mês,
+   metas por máquina e gráficos que se filtram um ao outro.
+   ========================================================================= */
+.barra-filtros{ display:flex; flex-wrap:wrap; align-items:center; gap:10px 12px; margin:0 0 16px; }
+.barra-filtros .espaco{ flex:1 1 auto; }
+.passo-dia{ display:inline-flex; align-items:center; gap:2px; background: var(--surface-1); border:1px solid var(--border);
+  border-radius:12px; padding:3px; }
+.passo-dia button{ width:34px; height:34px; border:0; background:none; border-radius:9px; color: var(--text-secondary); cursor:pointer;
+  display:grid; place-items:center; transition: background .15s var(--ease-out); }
+.passo-dia button svg{ width:15px; height:15px; }
+.passo-dia button:hover:not(:disabled){ background: var(--surface-sunken); color: var(--text-primary); }
+.passo-dia button:disabled{ opacity:.3; cursor:default; }
+.passo-dia .rotulo{ min-width:128px; text-align:center; font-size:13.5px; font-weight:650; font-variant-numeric: tabular-nums; line-height:1.15; }
+.passo-dia .rotulo small{ display:block; font-size:11px; font-weight:500; color: var(--text-muted); }
+.icon-btn svg{ width:15px; height:15px; flex:none; }
+/* gráficos que filtram: a escolha fica em destaque e o resto esmaece */
+.linha-barra.clicavel, .col-barra.clicavel{ cursor:pointer; }
+.linha-barra.clicavel:focus, .col-barra.clicavel:focus{ outline:none; }
+.linha-barra.clicavel:focus-visible .fundo-hover{ fill: var(--surface-sunken); stroke: var(--accent); stroke-width:1.5; }
+.col-barra.clicavel:focus-visible .fundo-col{ fill: var(--surface-sunken); stroke: var(--accent); stroke-width:1.5; }
+.grafico svg .linha-barra, .grafico svg .col-barra{ transition: opacity .25s var(--ease-out); }
+.linha-barra.apagada, .col-barra.apagada{ opacity:.3; }
+.linha-barra.escolhida .fundo-hover{ fill: color-mix(in srgb, var(--accent) 9%, transparent); }
+.fundo-col{ fill: transparent; transition: fill .15s var(--ease-out); }
+.col-barra:hover .fundo-col{ fill: var(--surface-sunken); }
+.filtro-ativo{ display:flex; flex-wrap:wrap; align-items:center; gap:8px; margin:0 0 14px; font-size:13px; color: var(--text-secondary); }
+.filtro-ativo[hidden]{ display:none; }
+.chip-filtro{ display:inline-flex; align-items:center; gap:4px; height:30px; padding:0 4px 0 12px; border-radius:15px; font-weight:600;
+  color: var(--text-primary); background: color-mix(in srgb, var(--accent) 11%, var(--surface-1));
+  border:1px solid color-mix(in srgb, var(--accent) 28%, transparent); animation: entra-leve .3s var(--ease-out); }
+.chip-filtro small{ font-weight:500; color: var(--text-secondary); margin-right:2px; }
+.chip-filtro button{ width:24px; height:24px; border-radius:12px; border:0; background:none; cursor:pointer; color: var(--text-secondary);
+  display:grid; place-items:center; }
+.chip-filtro button:hover{ background: var(--surface-sunken); color: var(--text-primary); }
+.chip-filtro button svg{ width:11px; height:11px; }
+.filtro-ativo .limpar{ border:0; background:none; color: var(--accent); font: inherit; font-weight:600; cursor:pointer; padding:4px 6px; border-radius:8px; }
+.filtro-ativo .limpar:hover{ background: var(--surface-sunken); }
+.dica-painel{ font-size:12px; color: var(--text-muted); }
+/* tabela de máquinas x metas (D-1) */
+.tab-metas td{ vertical-align:middle; }
+.tab-metas tr.clicavel{ cursor:pointer; }
+.tab-metas tr.clicavel:focus-visible{ outline:2px solid var(--accent); outline-offset:-2px; }
+.tab-metas .maq b{ display:block; font-weight:650; }
+.tab-metas .maq small{ color: var(--text-muted); font-size:11.5px; }
+.cel{ display:flex; flex-direction:column; align-items:flex-end; gap:2px; font-variant-numeric: tabular-nums; }
+.cel b{ font-weight:650; color: var(--c, var(--text-primary)); display:inline-flex; align-items:center; gap:6px; }
+.cel b::before{ content:""; width:7px; height:7px; border-radius:50%; background: var(--c, transparent); display:var(--ponto, none); }
+.cel small{ font-size:11px; color: var(--text-muted); }
+.cel.st-good{ --c: var(--good); --ponto: inline-block; }
+.cel.st-warning{ --c: var(--warning); --ponto: inline-block; }
+.cel.st-critical{ --c: var(--critical); --ponto: inline-block; }
+.metas-batidas{ display:inline-flex; gap:3px; }
+.metas-batidas i{ width:9px; height:9px; border-radius:3px; background: var(--surface-sunken); border:1px solid var(--border-strong); }
+.metas-batidas i.good{ background: var(--good); border-color: transparent; }
+.metas-batidas i.warning{ background: var(--warning); border-color: transparent; }
+.metas-batidas i.critical{ background: var(--critical); border-color: transparent; }
+.sem-dado{ color: var(--text-muted); }
+/* pé de máquina */
+.pe-cabeca{ display:flex; flex-wrap:wrap; align-items:flex-end; justify-content:space-between; gap:14px 28px; margin:4px 0 18px; }
+.pe-nome{ font-size:44px; font-weight:750; letter-spacing:-0.035em; line-height:1; }
+.pe-setor{ font-size:13.5px; color: var(--text-secondary); margin-top:8px; }
+.pe-agora{ display:flex; flex-direction:column; align-items:flex-end; gap:5px; text-align:right; font-size:13px; color: var(--text-secondary); max-width:560px; }
+.pe-estado{ display:inline-flex; align-items:center; gap:9px; font-size:16px; font-weight:650; color: var(--text-primary); }
+.pe-estado i{ width:11px; height:11px; border-radius:50%; background: var(--c); box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 22%, transparent); }
+.pe-estado.vivo i{ animation: pulsa 2.4s var(--ease-out) infinite; }
+@keyframes pulsa{ 0%,100%{ box-shadow: 0 0 0 4px color-mix(in srgb, var(--c) 22%, transparent); } 50%{ box-shadow: 0 0 0 8px color-mix(in srgb, var(--c) 8%, transparent); } }
+.pe-grade{ display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:14px; margin-bottom:16px; }
+.pe-ind{ position:relative; overflow:hidden; background: var(--surface-1); border:1px solid var(--border); border-radius:18px;
+  padding:18px 20px 16px 22px; box-shadow: var(--shadow-card); display:flex; flex-direction:column; gap:10px; min-width:0; }
+.pe-ind::before{ content:""; position:absolute; inset:0 auto 0 0; width:4px; background: var(--c, transparent); }
+.pe-ind .rot{ font-size:13px; font-weight:600; color: var(--text-secondary); display:flex; justify-content:space-between; gap:8px; }
+.pe-ind .selo{ font-size:12px; font-weight:650; color: var(--c, var(--text-muted)); white-space:nowrap; }
+.pe-ind .val{ font-size:46px; font-weight:750; letter-spacing:-0.035em; line-height:1; font-variant-numeric: tabular-nums; white-space:nowrap; }
+.pe-ind .val small{ font-size:.4em; font-weight:600; color: var(--text-secondary); margin-left:3px; letter-spacing:0; }
+.pe-trilho{ position:relative; height:8px; border-radius:4px; background: var(--surface-sunken); }
+.pe-trilho b{ position:absolute; inset:0 auto 0 0; border-radius:4px; background: var(--c, var(--series-3)); transform-origin:left center; }
+.view.active .pe-trilho b{ animation: cresce-x .9s var(--ease-out) backwards .1s; }
+.pe-trilho i{ position:absolute; top:-5px; bottom:-5px; width:2px; margin-left:-1px; border-radius:1px; background: var(--text-primary); }
+.pe-ind .meta{ display:flex; justify-content:space-between; gap:8px; font-size:12.5px; color: var(--text-muted); }
+.pe-mini{ display:grid; grid-template-columns: repeat(3, minmax(0,1fr)); gap:18px; }
+.pe-mini h4{ margin:0 0 6px; font-size:13px; font-weight:650; color: var(--text-secondary); }
+@media (max-width: 1080px){ .pe-grade{ grid-template-columns: repeat(2, minmax(0,1fr)); } .pe-mini{ grid-template-columns: minmax(0,1fr); } }
+@media (max-width: 768px){ .pe-nome{ font-size:32px; } .pe-ind .val{ font-size:34px; } .pe-agora{ align-items:flex-start; text-align:left; }
+  .pe-ind{ padding:14px 14px 12px 18px; } }
+@media (max-width: 380px){ .pe-grade{ grid-template-columns: minmax(0,1fr); } }
+/* tela cheia (TV ao lado da máquina) */
+#view-pe:fullscreen{ background: var(--bg); padding:28px 36px; overflow:auto; }
+#view-pe:fullscreen .pe-nome{ font-size:72px; }
+#view-pe:fullscreen .pe-ind .val{ font-size:76px; }
+#view-pe:fullscreen .pe-ind .rot, #view-pe:fullscreen .pe-agora{ font-size:16px; }
+/* evolução (o drill de cada parte do OEE) */
+.evo-controles{ display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.evo-resumo{ display:flex; flex-wrap:wrap; gap:4px 18px; font-size:13px; color: var(--text-secondary); margin:-2px 0 12px; min-height:18px; }
+.evo-resumo b{ color: var(--text-primary); font-variant-numeric: tabular-nums; }
+.evo-trilha{ display:flex; align-items:center; gap:4px; font-size:13px; margin:-4px 0 8px; }
+.evo-trilha[hidden]{ display:none; }
+.evo-trilha button{ border:0; background:none; color: var(--accent); font: inherit; font-weight:600; cursor:pointer; padding:3px 6px; border-radius:7px; }
+.evo-trilha button:hover{ background: var(--surface-sunken); }
+/* o gráfico guarda a altura enquanto carrega: a página não pula (e a volta da atualização
+   automática acha a mesma altura de rolagem) */
+.evolucao .grafico{ min-height:220px; }
+#pe-tendencia .grafico{ min-height:130px; }
+.evo-trilha span{ color: var(--text-secondary); }
+/* metas (só administrador) */
+.metas-folha{ border:0; padding:0; border-radius:20px; width:min(820px, calc(100vw - 24px)); max-height:min(88vh, 920px);
+  background: var(--glass-bg-strong); backdrop-filter: blur(28px) saturate(1.4); -webkit-backdrop-filter: blur(28px) saturate(1.4);
+  color: var(--text-primary); box-shadow: var(--shadow-pop); overflow:hidden; }
+.metas-folha[open]{ display:flex; flex-direction:column; animation: entra .35s var(--ease-out); }
+.metas-folha::backdrop{ background: rgba(10,21,36,.34); }
+.metas-cab{ padding:20px 22px 10px; }
+.metas-cab h3{ margin:0; font-size:19px; letter-spacing:-0.01em; }
+.metas-cab p{ margin:5px 0 0; font-size:13px; color: var(--text-secondary); line-height:1.45; }
+.metas-corpo{ overflow:auto; padding:0 22px; flex:1 1 auto; }
+.metas-tab th{ position:sticky; top:0; z-index:1; background: var(--surface-1); }
+.metas-tab td{ padding:7px 6px; vertical-align:top; }
+.metas-tab td:first-child{ padding-top:15px; font-weight:650; }
+.metas-tab input{ width:100%; min-width:76px; height:36px; border-radius:10px; border:1px solid var(--border); background: var(--surface-1);
+  color: var(--text-primary); font: inherit; font-size:14px; padding:0 9px; font-variant-numeric: tabular-nums; }
+.metas-tab input:focus{ outline:2px solid var(--accent); outline-offset:1px; }
+.metas-tab input.mudou{ border-color: var(--accent); background: color-mix(in srgb, var(--accent) 6%, var(--surface-1)); }
+.metas-tab input.invalido{ border-color: var(--critical); }
+.metas-tab input:disabled{ background: var(--surface-sunken); }
+.metas-tab .ref{ display:block; font-size:11px; color: var(--text-muted); margin-top:3px; white-space:nowrap; }
+.metas-pe{ display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; padding:14px 22px 18px; border-top:1px solid var(--border); }
+.metas-msg{ font-size:13px; color: var(--text-secondary); }
+.metas-msg.erro{ color: var(--critical); }
+.metas-acoes{ display:flex; gap:8px; }
+.botao-pri{ min-height:36px; padding:0 18px; border-radius:999px; border:0; background: var(--accent); color:#fff; font: inherit; font-size:13.5px;
+  font-weight:650; cursor:pointer; transition: transform .25s var(--spring), opacity .2s; }
+.botao-pri:active{ transform: scale(.97); }
+.botao-pri:disabled{ opacity:.45; cursor:default; }
+
 /* selo do topo depois de uma atualização automática: um brilho curto */
 @keyframes renovado{ 0%{ box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 45%, transparent); } 100%{ box-shadow: 0 0 0 9px transparent; } }
 .status-chip.renovado{ animation: renovado 1.1s var(--ease-out) 2; }
@@ -602,6 +735,8 @@ thead th{
   padding: 0 10px 10px; border-bottom:1px solid var(--border); white-space:nowrap;
 }
 tbody td{ padding: 11px 10px; border-bottom:1px solid var(--border); white-space:nowrap; vertical-align:top; }
+/* tabelas da gestão (D-1, acima do programado): números à direita, com o título junto */
+.tab-metas th.num, .tab-metas td.num, #exc-table th.num, #exc-table td.num{ text-align:right; }
 tbody td.quebra{ white-space:normal; min-width:220px; max-width:360px; line-height:1.4; }
 tbody tr:last-child td{ border-bottom:none; }
 tbody tr{ transition: background .15s var(--ease-out); }
@@ -1058,7 +1193,7 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
 .rail-grupo-nome{ font-size:10px; font-weight:700; letter-spacing:.09em; color: var(--text-muted); margin:0 0 4px; }
 .rail-sep{ display:block; width:56px; height:1px; background: var(--border); margin:2px auto 8px; flex:none; }
 .rail-oee{ display:none; }
-.oee-seg{ display:none; }
+.oee-seg, .fab-seg{ display:none; }
 @media (max-width: 768px){
   .shell{ grid-template-columns: minmax(0,1fr); }
   .rail-btn{ width:auto; }
@@ -1066,8 +1201,8 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
   .rail-oee{ display:flex; }
   /* Acessos fica no cartão da conta (toque no avatar), não na barra de baixo */
   .rail-nav #admin-link{ display:none; }
-  body.em-oee .oee-seg{ display:flex; width:100%; margin:-4px 0 16px; }
-  .oee-seg button{ flex:1 1 0; padding:8px 6px; }
+  body.em-oee .oee-seg, body.em-fab .fab-seg{ display:flex; width:100%; margin:-4px 0 16px; }
+  .oee-seg button, .fab-seg button{ flex:1 1 0; padding:8px 6px; }
 }
 
 /* =========================================================================
@@ -1510,6 +1645,27 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
 })();
 </script>
 
+<dialog class="metas-folha" id="metas-folha" aria-labelledby="metas-titulo">
+  <div class="metas-cab">
+    <h3 id="metas-titulo">Metas por máquina</h3>
+    <p>A referência para o D-1, o pé de máquina, a evolução e os gráficos por máquina. Em branco, a máquina fica sem meta.
+      Embaixo de cada campo, o resultado do período escolhido no topo e o melhor mês, para ajudar a definir.</p>
+  </div>
+  <div class="metas-corpo">
+    <table class="metas-tab">
+      <thead><tr><th>Máquina</th><th>Velocidade (m/min)</th><th>TMR (%)</th><th>Qualidade (%)</th><th>OEE (%)</th></tr></thead>
+      <tbody id="metas-linhas"></tbody>
+    </table>
+  </div>
+  <div class="metas-pe">
+    <span class="metas-msg" id="metas-msg" role="status"></span>
+    <div class="metas-acoes">
+      <button type="button" class="icon-btn" id="metas-cancelar">Cancelar</button>
+      <button type="button" class="botao-pri" id="metas-salvar" disabled>Salvar metas</button>
+    </div>
+  </div>
+</dialog>
+
 <div class="shell">
   <aside class="rail">
     <div class="rail-mark"><span class="brandmark">G</span></div>
@@ -1519,9 +1675,26 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
         <span class="rail-label" aria-hidden="true">Geral</span>
       </button>
-      <button class="rail-btn" data-view="agora" title="Agora no chão de fábrica" aria-label="Agora no chão de fábrica">
+      <!-- Chão de fábrica (15/10): o agora, o dia anterior (D-1) e o pé de máquina. No celular,
+           uma aba só ("Fábrica") com o seletor no topo, como o OEE. -->
+      <div class="rail-grupo" role="group" aria-label="Chão de fábrica">
+        <span class="rail-grupo-nome" aria-hidden="true">FÁBRICA</span>
+        <button class="rail-btn" data-view="agora" title="Agora no chão de fábrica" aria-label="Agora no chão de fábrica">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2.5-6 5 12 2.5-6H21"/></svg>
+          <span class="rail-label" aria-hidden="true">Agora</span>
+        </button>
+        <button class="rail-btn" data-view="d1" title="D-1: o dia anterior, máquina a máquina, contra as metas" aria-label="D-1: dia anterior">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/><path d="M9 15h6"/></svg>
+          <span class="rail-label" aria-hidden="true">D-1</span>
+        </button>
+        <button class="rail-btn" data-view="pe" title="Pé de máquina: o quadro de cada máquina contra as metas" aria-label="Pé de máquina">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="12.5" rx="2.5"/><path d="M8 20.5h8M12 16.5v4"/><path d="M7 12.5V10M10.5 12.5V8M14 12.5V9.5M17.5 12.5V7.5"/></svg>
+          <span class="rail-label" aria-hidden="true">Pé de máquina</span>
+        </button>
+      </div>
+      <button class="rail-btn rail-oee" type="button" id="rail-fab" title="Chão de fábrica: agora, D-1 e pé de máquina" aria-label="Chão de fábrica: agora, D-1 e pé de máquina">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2.5-6 5 12 2.5-6H21"/></svg>
-        <span class="rail-label" aria-hidden="true">Agora</span>
+        <span class="rail-label" aria-hidden="true">Fábrica</span>
       </button>
       <!-- As três partes do OEE. No celular viram uma aba só ("OEE") com um seletor
            no topo: sete abas não cabem na barra de baixo (tab-bars.md, "Avoid overflow tabs"). -->
@@ -1622,6 +1795,7 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
       </div>
       <!-- celular: as três partes do OEE numa aba só, trocadas aqui -->
       <div class="segmented oee-seg" id="oee-seg" role="group" aria-label="Parte do OEE"></div>
+      <div class="segmented fab-seg" id="fab-seg" role="group" aria-label="Chão de fábrica"></div>
 
       <!-- ============ VISÃO GERAL ============ -->
       <div class="view active" id="view-overview">
@@ -1682,16 +1856,116 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
         </section>
       </div>
 
+      <!-- ============ D-1: o dia anterior, máquina a máquina, contra as metas ============ -->
+      <div class="view" id="view-d1">
+        <div class="barra-filtros">
+          <div class="passo-dia" role="group" aria-label="Dia de produção">
+            <button type="button" id="d1-ant" aria-label="Dia anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="rotulo" id="d1-dia" aria-live="polite"></div>
+            <button type="button" id="d1-prox" aria-label="Dia seguinte"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 6l6 6-6 6"/></svg></button>
+          </div>
+          <div class="segmented" id="d1-setor" role="group" aria-label="Setor"></div>
+          <label class="select-wrap">
+            <span class="sr-only">Máquina</span>
+            <select id="d1-maquina" aria-label="Máquina"></select>
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 4.5l3 3 3-3"/></svg>
+          </label>
+          <span class="espaco"></span>
+          <button type="button" class="icon-btn" data-abrir-metas hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>Metas</button>
+        </div>
+        <section class="kpi-row" id="d1-kpis"></section>
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3 class="panel-title">Máquinas x metas</h3>
+              <div class="panel-sub" id="d1-sub">Dia de produção, das 06:00 às 06:00 &middot; toque numa máquina para abrir o pé de máquina</div>
+            </div>
+          </div>
+          <div class="table-wrap">
+            <table class="tab-metas" id="d1-tabela">
+              <thead><tr><th>Máquina</th><th class="num">TMR</th><th class="num">Velocidade</th><th class="num">Qualidade</th>
+                <th class="num">Produzido / plano</th><th class="num">Refugo</th><th>Maior parada</th><th>Metas</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </section>
+        <section class="grid-2 uneven equal-cols">
+          <div class="panel">
+            <div class="panel-head">
+              <div><h3 class="panel-title">Paradas do dia</h3><div class="panel-sub">Horas por motivo, sem fim de turno</div></div>
+              <div class="panel-total" id="d1-paradas-total" hidden></div>
+            </div>
+            <div class="grafico" id="d1-paradas"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <div><h3 class="panel-title">Perda por motivo do dia</h3><div class="panel-sub">kg apontados pelos operadores</div></div>
+              <div class="panel-total" id="d1-perdas-total" hidden></div>
+            </div>
+            <div class="grafico" id="d1-perdas"></div>
+          </div>
+        </section>
+      </div>
+
+      <!-- ============ PÉ DE MÁQUINA: o quadro de uma máquina contra as metas ============ -->
+      <div class="view" id="view-pe">
+        <div class="barra-filtros">
+          <label class="select-wrap">
+            <span class="sr-only">Máquina</span>
+            <select id="pe-maquina" aria-label="Máquina"></select>
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 4.5l3 3 3-3"/></svg>
+          </label>
+          <div class="passo-dia" role="group" aria-label="Dia de produção">
+            <button type="button" id="pe-ant" aria-label="Dia anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M15 6l-6 6 6 6"/></svg></button>
+            <div class="rotulo" id="pe-dia" aria-live="polite"></div>
+            <button type="button" id="pe-prox" aria-label="Dia seguinte"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M9 6l6 6-6 6"/></svg></button>
+          </div>
+          <span class="espaco"></span>
+          <button type="button" class="icon-btn" data-abrir-metas hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg>Metas</button>
+          <button type="button" class="icon-btn" id="pe-tela-cheia"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></svg><span>Tela cheia</span></button>
+        </div>
+        <section class="pe-cabeca" id="pe-cabeca"></section>
+        <section class="pe-grade" id="pe-indicadores" aria-label="Indicadores da máquina contra as metas"></section>
+        <section class="grid-2 uneven equal-cols">
+          <div class="panel">
+            <div class="panel-head">
+              <div><h3 class="panel-title">Paradas do dia</h3><div class="panel-sub">Horas por motivo, sem fim de turno</div></div>
+              <div class="panel-total" id="pe-paradas-total" hidden></div>
+            </div>
+            <div class="grafico" id="pe-paradas"></div>
+          </div>
+          <div class="panel">
+            <div class="panel-head">
+              <div><h3 class="panel-title">Produzido x programado</h3><div class="panel-sub" id="pe-plano-sub">Km lineares do dia</div></div>
+            </div>
+            <div class="grafico" id="pe-plano"></div>
+            <div class="panel-head" style="margin-top:18px">
+              <div><h3 class="panel-title">Refugo por motivo</h3><div class="panel-sub">kg apontados no dia</div></div>
+              <div class="panel-total" id="pe-perdas-total" hidden></div>
+            </div>
+            <div class="grafico" id="pe-perdas"></div>
+          </div>
+        </section>
+        <section class="panel">
+          <div class="panel-head">
+            <div><h3 class="panel-title">Últimos 14 dias</h3><div class="panel-sub">A linha tracejada é a meta &middot; toque num dia para ver o quadro dele</div></div>
+          </div>
+          <div class="pe-mini" id="pe-tendencia"></div>
+        </section>
+      </div>
+
       <!-- ============ QUALIDADE (aparas, perdas e laudos) ============ -->
       <div class="view" id="view-qualidade">
         <section class="kpi-row tres" id="aparas-kpis"></section>
+        <section class="panel evolucao" id="evo-qualidade" data-pilar="qualidade"></section>
+        <div class="filtro-ativo" id="qual-filtro" hidden></div>
 
         <section class="grid-2 uneven equal-cols">
           <div class="panel">
             <div class="panel-head">
               <div>
                 <h3 class="panel-title">Perda por motivo (kg)</h3>
-                <div class="panel-sub">Estratificação por tipo de apontamento</div>
+                <div class="panel-sub" id="perda-tipo-sub">Toque num motivo para ver as máquinas que mais tiveram</div>
               </div>
               <div class="panel-total" id="perda-tipo-total" hidden></div>
             </div>
@@ -1701,7 +1975,7 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
             <div class="panel-head">
               <div>
                 <h3 class="panel-title">Perda por máquina (kg)</h3>
-                <div class="panel-sub">Recursos ordenados por volume de refugo</div>
+                <div class="panel-sub" id="perda-maquina-sub">Toque numa máquina para ver os motivos dela</div>
               </div>
               <div class="panel-total" id="perda-maquina-total" hidden></div>
             </div>
@@ -1729,7 +2003,7 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
           <div class="panel-head">
             <div>
               <h3 class="panel-title">Ordens com maior refugo</h3>
-              <div class="panel-sub">OPs do período ordenadas por % de apara apontada (a confirmada não existe por OP)</div>
+              <div class="panel-sub" id="ops-sub">OPs do período ordenadas por % de apara apontada (a confirmada não existe por OP)</div>
             </div>
           </div>
           <div class="table-wrap">
@@ -1769,18 +2043,19 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
       <div class="view" id="view-performance">
         <h3 class="grupo-titulo">Velocidade</h3>
         <section class="kpi-row duas" id="perf-kpis"></section>
+        <section class="panel evolucao" id="evo-performance" data-pilar="performance"></section>
 
         <section class="panel">
           <div class="panel-head">
             <div>
               <h3 class="panel-title">Velocidade média por máquina</h3>
-              <div class="panel-sub">m/min &middot; medido contra o melhor mês da própria máquina nos últimos 12 meses</div>
+              <div class="panel-sub">m/min &middot; tracejado = melhor mês da máquina nos últimos 12 meses, traço cheio = meta &middot; toque numa máquina para ver a evolução</div>
             </div>
           </div>
           <div class="grafico" id="velocidade-chart"></div>
         </section>
         <h3 class="grupo-titulo">Aderência ao plano</h3>
-        <section class="kpi-row" id="ader-kpis"></section>
+        <section class="kpi-row cinco" id="ader-kpis"></section>
 
         <section class="panel">
           <div class="panel-head">
@@ -1790,6 +2065,25 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
             </div>
           </div>
           <div class="grafico" id="ader-chart"></div>
+        </section>
+
+        <section class="panel" id="exc-painel">
+          <div class="panel-head">
+            <div>
+              <h3 class="panel-title">Produção acima do programado</h3>
+              <div class="panel-sub" id="exc-sub">OPs que terminaram na máquina no período &middot; o produzido (a maior passada) contra a última programação da OP &middot; toque numa máquina para filtrar</div>
+            </div>
+            <div class="segmented" id="exc-faixa" role="group" aria-label="Quanto acima do programado"></div>
+          </div>
+          <div class="filtro-ativo" id="exc-filtro" hidden></div>
+          <div class="grafico" id="exc-chart"></div>
+          <div class="table-wrap" style="margin-top:14px">
+            <table id="exc-table">
+              <thead><tr><th>OP</th><th>Máquina</th><th>Produto</th><th class="num">Programado</th><th class="num">Produzido</th><th class="num">A mais</th><th class="num">%</th><th>Terminou</th></tr></thead>
+              <tbody></tbody>
+            </table>
+          </div>
+          <button type="button" class="icon-btn mais-btn" id="exc-mais" hidden></button>
         </section>
 
         <section class="panel">
@@ -1806,13 +2100,15 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
       <!-- ============ DISPONIBILIDADE (TMR, paradas, linha do tempo e setup) ============ -->
       <div class="view" id="view-disponibilidade">
         <section class="kpi-row duas" id="disp-kpis"></section>
+        <section class="panel evolucao" id="evo-disponibilidade" data-pilar="disponibilidade"></section>
+        <div class="filtro-ativo" id="disp-filtro" hidden></div>
 
         <section class="grid-2 uneven equal-cols">
           <div class="panel">
             <div class="panel-head">
               <div>
-                <h3 class="panel-title">TMR por máquina</h3>
-                <div class="panel-sub">Tempo de máquina rodando (%) &middot; horas produzindo ÷ horas totais</div>
+                <h3 class="panel-title" id="tmr-titulo">TMR por máquina</h3>
+                <div class="panel-sub" id="tmr-sub">Tempo de máquina rodando (%) &middot; traço = meta da máquina &middot; toque numa máquina para filtrar as paradas</div>
               </div>
             </div>
             <div class="grafico" id="tmr-chart"></div>
@@ -1832,7 +2128,7 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
           <div class="panel-head">
             <div>
               <h3 class="panel-title">Pareto de paradas</h3>
-              <div class="panel-sub">Horas acumuladas por motivo, sem fim de turno &middot; linha mostra o % acumulado</div>
+              <div class="panel-sub" id="pareto-sub">Horas acumuladas por motivo, sem fim de turno &middot; linha mostra o % acumulado &middot; toque num motivo para ver as máquinas</div>
             </div>
           </div>
           <div class="grafico" id="pareto-chart"></div>
@@ -2432,7 +2728,8 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
     const [hubMaqRes, hubParadasRes, hubGanttRes, hubMotivoRes, hubRefugoMaqRes, hubOpsRes, hubClasseRes, hubAparaRes,
            hubFontesRes, hubAparaPeriodoRes, hubMensalRes, hubPerdaMaqMotivoRes, listaRes, hubCodigosRes,
            bAgoraRes, bFilaRes, bWipRes, bCarteiraRes, bEntregasRes, bSetupRes, bLaudosRes, bMensalRes,
-           bDiasRes, bPlanoRes, bPlanoMesRes, bAparaAnoRes, bQualRes, hubExecRes, bQual30Res] = await Promise.all([
+           bDiasRes, bPlanoRes, bPlanoMesRes, bAparaAnoRes, bQualRes, hubExecRes, bQual30Res,
+           hubMetasRes, hubExcRes, hubParMaqRes] = await Promise.all([
       // Horas por máquina/código publicadas pelo hub (Machine Card) e o resto
       // dos cartões (002_cartoes.sql).
       client.rpc("rpc_hub_maquinas", { p_de: pDe, p_ate: pAte }),
@@ -2479,8 +2776,26 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
       // qualidade dos últimos 30 dias até o fim do período: vale quando a máquina não
       // tem OP pesada no período (ontem, hoje, uma semana)
       client.rpc("rpc_hub_qualidade_maquina", { p_de: pAte ? isoDate(new Date(periodoAte.getTime() - 30*86400000)) : null, p_ate: pAte }),
+      // 009_gestao.sql: metas por máquina, OPs acima do programado e paradas por máquina.
+      // Sem o 009 (função/view inexistente), o painel segue sem essas partes.
+      client.from("v_hub_meta_maquina").select("*"),
+      lerRpcTudo(client, "rpc_hub_op_excedente", { p_de: pDe, p_ate: pAte }),
+      lerRpcTudo(client, "rpc_hub_paradas_maquina", { p_de: pDe, p_ate: pAte }),
     ]);
     window.HUB_EXECUCAO = !hubExecRes.error && (hubExecRes.data||[]).length ? hubExecRes.data[0] : null;
+    // 009: metas (a linha FABRICA é a meta da fábrica), OPs acima do programado e paradas por máquina
+    window.TEM_009 = !hubMetasRes.error;
+    window.METAS = new Map();
+    const numOuNulo = v => v == null || v === "" || !Number.isFinite(Number(v)) ? null : Number(v);
+    (hubMetasRes.error ? [] : hubMetasRes.data || []).forEach(r=> window.METAS.set(String(r.maquina).trim().toUpperCase(), {
+      vel: numOuNulo(r.velocidade_m_min), tmr: numOuNulo(r.tmr_pct), qual: numOuNulo(r.qualidade_pct), oee: numOuNulo(r.oee_pct), em: r.atualizada_em }));
+    META_OEE = window.METAS.get("FABRICA") ? window.METAS.get("FABRICA").oee : null;
+    window.OP_EXCEDENTE = hubExcRes.error ? null : hubExcRes.data || [];
+    window.PARADAS_MAQ = hubParMaqRes.error ? null : (hubParMaqRes.data || []).map(r=>{
+      const c = classeDoCodigo(r.cod_apont);
+      return { maq: String(r.maquina).trim().toUpperCase(), cod: r.cod_apont, nome: prettyCodigo(r.cod_desc).replace(/^\d+\s*-\s*/, ""),
+               horas: Number(r.horas)||0, classe: c.chave, classeNome: c.nome, cor: c.cor };
+    }).filter(p=> p.classe !== "FIM TURNO");
     // Com o hub publicado (002), nenhuma consulta antiga é usada: todas têm
     // equivalente no hub. Elas somam centenas de milhares de linhas e, em
     // 30/09, estouraram o tempo do banco (statement timeout) e derrubaram o
@@ -2810,6 +3125,11 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
       }
       if(!hubOpsRes.error){
         // OP ainda sem peso bruto na REB não tem apara: "—", não 100%.
+        window.OPS_TODAS = (hubOpsRes.data||[]).map(r=>({
+          op: r.num_ordem, maq: r.maquina || "—", desc: r.descricao || "—",
+          peso: Math.round(n(r.peso_bruto)), refugo: Math.round(n(r.refugo)),
+          pct: n(r.peso_bruto)>0 ? n(r.apara_pct) : null, motivo: prettyCodigo(r.motivo_principal),
+        }));
         OPS = (hubOpsRes.data||[]).slice(0,12).map(r=>({
           op: r.num_ordem, maq: r.maquina || "—", desc: r.descricao || "—",
           peso: Math.round(n(r.peso_bruto)), refugo: Math.round(n(r.refugo)),
@@ -3238,11 +3558,13 @@ function tmrStatus(v){
 const statusMaquina = m => m.horasTot > 0 ? tmrStatus(m.tmr) : "none";
 // Meta de OEE (%): a definir pelos gestores. Sem meta, os cartões ficam neutros (sem
 // "Crítico" em tudo); com ela, verde na meta, âmbar até 85% dela, vermelho abaixo.
-const META_OEE = null;
+let META_OEE = null;   // a meta de OEE da linha FABRICA (009), quando gravada
 function statusOee(m){
   if(!(m.horasTot > 0)) return "none";
-  if(META_OEE == null || m.oee == null) return "neutro";
-  return m.oee >= META_OEE ? "good" : m.oee >= META_OEE * 0.85 ? "warning" : "critical";
+  // a meta da própria máquina; sem ela, a da fábrica
+  const meta = (metaDe(m.id) && metaDe(m.id).oee) ?? META_OEE;
+  if(meta == null || m.oee == null) return "neutro";
+  return m.oee >= meta ? "good" : m.oee >= meta * 0.85 ? "warning" : "critical";
 }
 // As três partes do OEE, na ordem do dono, com a maior perda (a mais baixa) marcada.
 // Sem o hub (m.disp/m.perf não calculados), vale o TMR e a velocidade ÷ melhor mês do cartão.
@@ -3323,9 +3645,112 @@ function clearTip(holder){
   if(t) t.remove();
 }
 
+/* ---- gestão por máquina (009_gestao.sql) ---- */
+// Metas de cada máquina, gravadas no painel por um administrador. Sem linha, a máquina
+// fica sem meta: nada de valor de referência inventado.
+function metaDe(id){ return (window.METAS && window.METAS.get(String(id ?? "").trim().toUpperCase())) || null; }
+// Contra a meta: verde na meta, âmbar até 10% abaixo, vermelho abaixo disso; sem meta, neutro.
+function estadoMeta(v, meta){
+  if(v == null || !Number.isFinite(v) || meta == null) return "neutro";
+  return v >= meta ? "good" : v >= meta * 0.9 ? "warning" : "critical";
+}
+const COR_ESTADO = { good:"var(--good)", warning:"var(--warning)", critical:"var(--critical)", neutro:"var(--series-3)" };
+// Função (rpc) que pode passar do limite do Supabase (1000 linhas por pedido): em páginas.
+async function lerRpcTudo(client, nome, args){
+  const PAGINA = 1000, linhas = [];
+  for(let i = 0; i < 50; i++){
+    const { data, error } = await client.rpc(nome, args).range(linhas.length, linhas.length + PAGINA - 1);
+    if(error) return { data:null, error };
+    if(!data || !data.length) break;
+    linhas.push(...data);
+    if(data.length < PAGINA) break;
+  }
+  return { data:linhas, error:null };
+}
+// Os indicadores de um conjunto de linhas de rpc_hub_maquina_serie (máquinas e dias somados):
+// TMR e velocidade como o BI, qualidade como a do OEE (007), aderência como o plano (006).
+function indicadoresSerie(linhas){
+  const s = k => linhas.reduce((a,r)=>a + (Number(r[k])||0), 0);
+  const tot = s("horas_totais"), prod = s("horas_produzindo"), metros = s("metros");
+  const comQ = linhas.filter(r=> r.refugo_kg != null || r.peso_ops_kg != null);
+  const ref = comQ.reduce((a,r)=>a+(Number(r.refugo_kg)||0),0), peso = comQ.reduce((a,r)=>a+(Number(r.peso_ops_kg)||0),0);
+  const plan = s("planejado"), real = s("realizado");
+  return { tot, prod, metros, plan, real, perda: s("perda_kg"), ref, peso,
+    tmr: tot > 0 ? prod / tot * 100 : null,
+    vel: prod > 0 && metros > 0 ? metros / prod / 60 : null,
+    qual: ref + peso > 0 ? 100 - ref / (ref + peso) * 100 : null,
+    ader: plan > 0 ? real / plan * 100 : null };
+}
+const SEM_009 = "Sem dados: esta parte chega com a atualização 009 do banco do painel.";
+const IC_X = `<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><path d="M3 3l6 6M9 3l-6 6"/></svg>`;
+// Chips do que está filtrando um grupo de gráficos ("Motivo: Marcas de Emenda ×  Limpar").
+function desenharChips(el, itens, aoLimparTudo){
+  if(!el) return;
+  const ativos = itens.filter(i=> i.valor != null);
+  el.hidden = !ativos.length;
+  if(!ativos.length){ el.innerHTML = ""; return; }
+  el.innerHTML = `<span>Filtrando</span>` + ativos.map((i,k)=>`<span class="chip-filtro"><small>${esc(i.rotulo)}</small>${esc(i.texto || i.valor)}` +
+    `<button type="button" data-k="${k}" aria-label="Tirar o filtro ${esc(i.rotulo)}: ${esc(i.texto || i.valor)}">${IC_X}</button></span>`).join("") +
+    (ativos.length > 1 ? `<button type="button" class="limpar">Limpar</button>` : "");
+  el.querySelectorAll(".chip-filtro button").forEach(b=> b.addEventListener("click", ()=> ativos[+b.dataset.k].tirar()));
+  const l = el.querySelector(".limpar");
+  if(l) l.addEventListener("click", aoLimparTudo);
+}
+// Colunas de uma série (dias ou meses) com a linha da meta: verde na meta, âmbar até 10%
+// abaixo, vermelho abaixo; sem meta, numa cor só. Toque numa coluna chama opts.aoEscolher.
+function colunasMeta(holder, itens, opts = {}){
+  if(!holder) return;
+  const vals = itens.map(i=>i.valor).filter(v=> v != null && Number.isFinite(v));
+  if(!vals.length){ semDados(holder, opts.vazio || "Sem dados no período."); return; }
+  const linhaMeta = opts.meta != null ? opts.meta : null;
+  const topoBruto = Math.max(...vals, linhaMeta ?? 0) * 1.08;
+  const passo = topoBruto > 500 ? 100 : topoBruto > 150 ? 50 : topoBruto > 60 ? 20 : topoBruto > 20 ? 5 : 1;
+  // percentual até 100 fica na escala de 0 a 100 (a meta de 97% não empurra o eixo para 120%)
+  const yMax = opts.unidade === "%" && Math.max(...vals, linhaMeta ?? 0) <= 100 ? 100 : Math.ceil(topoBruto / passo) * passo || 1;
+  const fmtV = opts.fmt || (v => fmtNum(v, opts.casas ?? 0) + (opts.unidade || ""));
+  const cor = v => opts.cor ? opts.cor(v) : linhaMeta != null ? COR_ESTADO[estadoMeta(v, linhaMeta)] : "var(--series-3)";
+  const resumo = itens.filter(i=>i.valor != null).slice(-6).map(i=>`${i.rotulo} ${fmtV(i.valor)}`).join("; ");
+  montarGrafico(holder, (W, animar)=>{
+    const H = opts.altura ?? 220, padT = 16, padB = 22, padL = opts.padL ?? 44, padR = linhaMeta != null && !opts.mini ? 56 : 8;
+    const plotH = H - padT - padB, plotW = Math.max(10, W - padL - padR);
+    const n = itens.length, colW = plotW / n, bw = Math.max(3, Math.min(opts.mini ? 14 : 30, colW * 0.64));
+    const y = v => padT + plotH * (1 - Math.min(v, yMax) / yMax);
+    const cabem = Math.max(2, Math.floor(plotW / (opts.mini ? 22 : 30)));
+    const pularRot = Math.max(1, Math.ceil(n / cabem));
+    const grade = [0, 0.5, 1].map(f=>`<line x1="${padL}" y1="${y(yMax*f)}" x2="${padL+plotW}" y2="${y(yMax*f)}" stroke="var(--border)" stroke-width="1"/>` +
+      (opts.mini && f === 0.5 ? "" : `<text x="${padL-7}" y="${y(yMax*f)+4}" text-anchor="end" class="eixo">${esc(fmtNum(yMax*f, 0))}${opts.unidade === "%" ? "%" : ""}</text>`)).join("");
+    const colunas = itens.map((it, i)=>{
+      const x = padL + i * colW, cx = x + colW / 2;
+      const tem = it.valor != null && Number.isFinite(it.valor);
+      const h = tem ? Math.max(1.5, plotH * Math.min(it.valor, yMax) / yMax) : 0;
+      const rot = i % pularRot === 0 || i === n - 1 ? `<text x="${cx}" y="${H-6}" text-anchor="middle" class="eixo"${it.destaque ? ` style="font-weight:700;fill:var(--text-primary)"` : ""}>${esc(it.rotulo)}</text>` : "";
+      const clic = opts.aoEscolher && tem;
+      return `<g class="col-barra${clic ? " clicavel" : ""}${opts.escolhido != null && opts.escolhido !== i ? " apagada" : ""}" data-i="${i}"${clic ? ` tabindex="0" role="button" aria-label="${esc(it.aria || `${it.rotulo}: ${fmtV(it.valor)}`)}"` : ""}>
+        <rect class="fundo-col" x="${(x+1).toFixed(1)}" y="${padT}" width="${Math.max(1, colW-2).toFixed(1)}" height="${plotH}" rx="6"/>
+        ${tem ? `<rect class="barra-v" style="--i:${i}" x="${(cx-bw/2).toFixed(1)}" y="${(padT+plotH-h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="${Math.min(4, bw/2).toFixed(1)}" fill="${cor(it.valor)}"/>`
+              : `<circle cx="${cx}" cy="${padT+plotH-3}" r="1.6" fill="var(--text-muted)" opacity=".5"/>`}
+        ${rot}
+      </g>`;
+    }).join("");
+    const meta = linhaMeta != null ? `<line x1="${padL}" y1="${y(linhaMeta).toFixed(1)}" x2="${padL+plotW}" y2="${y(linhaMeta).toFixed(1)}" stroke="var(--text-primary)" stroke-width="1.4" stroke-dasharray="5,4" opacity=".75"/>` +
+      (opts.mini ? "" : `<text x="${padL+plotW+6}" y="${(y(linhaMeta)+4).toFixed(1)}" class="eixo" style="fill:var(--text-primary);font-weight:650">meta ${esc(fmtNum(linhaMeta, opts.casas ?? 0))}${opts.unidade === "%" ? "%" : ""}</text>`) : "";
+    holder.innerHTML = `<svg class="${animar ? "anima" : ""}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc((opts.aria || "") + (resumo ? ": " + resumo : "") + (linhaMeta != null ? `; meta ${fmtV(linhaMeta)}` : ""))}">${grade}${colunas}${meta}</svg>`;
+    holder.querySelectorAll(".col-barra").forEach(g=>{
+      const it = itens[+g.dataset.i];
+      g.addEventListener("mousemove", e=> attachTip(holder, it.tip || `<b>${esc(it.rotulo)}</b><br>${it.valor == null ? "sem dado" : esc(fmtV(it.valor))}`, e));
+      g.addEventListener("mouseleave", ()=> clearTip(holder));
+      if(g.classList.contains("clicavel")){
+        const ir = ()=>{ clearTip(holder); opts.aoEscolher(it, +g.dataset.i); };
+        g.addEventListener("click", ir);
+        g.addEventListener("keydown", e=>{ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); ir(); } });
+      }
+    });
+  });
+}
+
 /* Total ao lado do título de um gráfico ("12,3 t · no período"), com a mesma contagem
    dos cartões. Sem valor, some (não vira 0). */
-function pintarTotal(id, valor, casas, unidade, rotulo = "no período"){
+function pintarTotal(id, valor, casas, unidade, rotulo = "no período", animar = true){
   const el = document.getElementById(id);
   if(!el) return;
   if(valor == null || !Number.isFinite(valor)){ el.hidden = true; el.innerHTML = ""; return; }
@@ -3333,6 +3758,7 @@ function pintarTotal(id, valor, casas, unidade, rotulo = "no período"){
   el.innerHTML = `<span class="panel-total-valor"><span class="kpi-num">${fmtNum(valor, casas)}</span><span class="panel-total-un">${esc(unidade)}</span></span>`
                + ` <span class="panel-total-rot">${esc(rotulo)}</span>`;
   const num = el.querySelector(".kpi-num");
+  if(!animar) return;
   if(el.closest(".view.active")) animateCount(num, valor, casas, 220);
   else{ num.dataset.alvo = String(valor); num.dataset.casas = String(casas); }
 }
@@ -3436,20 +3862,25 @@ function desenharBarras(holder, rows, W, animar, opts={}){
     const H = rows.length*(rowH+gap) - gap;
     const barX = labelW + 10;
     const barMax = Math.max(10, W - barX - valueW - 8);
-    const max = Math.max(...rows.map(r=>r.value||0), opts.min ?? 0) || 1;
+    const max = Math.max(...rows.map(r=>Math.max(r.value||0, r.marca||0)), opts.min ?? 0) || 1;
     const target = opts.target;
     const targetX = target != null ? barX + (target/max)*barMax : null;
     const bh = Math.min(16, rowH - 12);
 
+    const algumEscolhido = opts.escolhido ? rows.some(r=> opts.escolhido(r)) : false;
     const barras = rows.map((r,i)=>{
       const y = i*(rowH+gap);
       const w = Math.max(0, (r.value||0)/max*barMax);
       const rotulo = cortarTexto(r.label, labelW, 12);
-      return `<g class="linha-barra" data-i="${i}">
+      const escolhido = algumEscolhido && opts.escolhido(r);
+      const classes = "linha-barra" + (opts.aoEscolher && !r.semDado ? " clicavel" : "") + (algumEscolhido ? (escolhido ? " escolhida" : " apagada") : "");
+      const xm = r.marca != null ? barX + Math.min(r.marca, max)/max*barMax : null;
+      return `<g class="${classes}" data-i="${i}"${opts.aoEscolher && !r.semDado ? ` tabindex="0" role="button" aria-pressed="${escolhido}" aria-label="${esc(`${r.label}: ${r.display}`)}"` : ""}>
         <rect class="fundo-hover" x="-6" y="${y-2}" width="${W+12}" height="${rowH+4}" rx="8"/>
         <text x="0" y="${y+rowH/2+4}" font-size="12" fill="${r.semDado ? "var(--text-muted)" : "var(--text-secondary)"}">${rotulo !== r.label ? `<title>${esc(r.label)}</title>` : ""}${esc(rotulo)}</text>
         <rect x="${barX}" y="${y+(rowH-bh)/2}" width="${barMax}" height="${bh}" rx="${bh/2}" fill="var(--surface-sunken)"/>
         ${w > 0 ? `<rect class="barra-h" style="--i:${i}" x="${barX}" y="${y+(rowH-bh)/2}" width="${w.toFixed(1)}" height="${bh}" rx="${Math.min(bh/2, w/2).toFixed(1)}" fill="${r.color || "var(--series-3)"}"/>` : ""}
+        ${xm != null ? `<line x1="${xm.toFixed(1)}" y1="${(y+(rowH-bh)/2-4).toFixed(1)}" x2="${xm.toFixed(1)}" y2="${(y+(rowH+bh)/2+4).toFixed(1)}" stroke="var(--text-primary)" stroke-width="2" stroke-linecap="round"/>` : ""}
         <text x="${W}" y="${y+rowH/2+4}" font-size="12" font-weight="600" text-anchor="end" class="num" fill="${r.semDado ? "var(--text-muted)" : "var(--text-primary)"}">${esc(r.display)}</text>
       </g>`;
     }).join("");
@@ -3463,6 +3894,11 @@ function desenharBarras(holder, rows, W, animar, opts={}){
 
     holder.querySelectorAll(".linha-barra").forEach(g=>{
       const r = rows[+g.dataset.i];
+      if(g.classList.contains("clicavel")){
+        const ir = ()=>{ clearTip(holder); opts.aoEscolher(r, +g.dataset.i); };
+        g.addEventListener("click", ir);
+        g.addEventListener("keydown", e=>{ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); ir(); } });
+      }
       if(!r.tip) return;
       g.addEventListener("mousemove", e=> attachTip(holder, r.tip, e));
       g.addEventListener("mouseleave", ()=> clearTip(holder));
@@ -4364,28 +4800,56 @@ renderKpis(document.getElementById("aparas-kpis"), [
   { label:"Apara apontada", value: aparasMedia, suffix:"%", decimals:1,
     nota:"apontada pelo operador · sem meta", spark: APARAS_MENSAL.apontado.slice(), sparkRotulos: rotulosAparas() },
 ]);
-pintarTotal("perda-tipo-total", refugoApontT, 1, "t", "total no período");
-
-hBarChart(document.getElementById("perda-tipo-chart"), TIPOS_PERDA.map(t=>({
-  label: t.cod ? `${t.cod} · ${t.nome}` : t.nome,
-  value:t.kg, display: fmt(t.kg)+" kg",
-  tip:`<b>${esc(t.nome)}</b><br>${fmt(t.kg)} kg · ${fmt1(t.kg/perdaTotalKg*100)}% do total`
-})), { labelW:170, valueW:78, rowH:28, aria:"Perda por motivo" });
-
+/* Perda por motivo x perda por máquina x OPs (pedido de 15/10/2026): tocar num motivo
+   mostra as máquinas que mais tiveram esse motivo no período (e as OPs com ele como
+   motivo principal); tocar numa máquina mostra os motivos dela. Os dois juntos se cruzam. */
 (function(){
-  // Com o hub: os kg de perda apontados em cada máquina no período (os do
-  // BI). Sem ele não há kg por máquina (a divisão antiga do total pela apara
-  // era inventada): sem dados.
-  const kgReal = window.PERDA_POR_MAQ;
-  const porMaq = !kgReal ? [] : MAQUINAS.map(m=>({
-    nome:m.nome, kg: Math.round(kgReal.get(String(m.id).trim().toUpperCase()) || 0),
-  })).sort((a,b)=>b.kg-a.kg);
-  const totalMaq = porMaq.reduce((a,m)=>a+m.kg,0);
-  pintarTotal("perda-maquina-total", kgReal ? totalMaq/1000 : null, 1, "t", "total no período");
-  hBarChart(document.getElementById("perda-maquina-chart"), porMaq.map(m=>({
-    label:m.nome, value:m.kg, display: fmt(m.kg)+" kg",
-    tip:`<b>${esc(m.nome)}</b><br>${fmt(m.kg)} kg` + (totalMaq>0 ? ` · ${fmt1(m.kg/totalMaq*100)}% do refugo das máquinas` : "")
-  })), { labelW:100, valueW:78, rowH:28, aria:"Perda por máquina" });
+  const F = { motivo:null, maquina:null };
+  const kgReal = window.PERDA_POR_MAQ, PMM = window.PERDA_MAQ_MOTIVO;
+  const nomeMaq = id => (MAQUINAS.find(m=> chaveMaq(m.id) === id) || { nome:id }).nome;
+  let primeira = true;
+  function motivos(){
+    if(F.maquina && PMM) return (PMM.get(F.maquina) || []).slice().sort((a,b)=>b.kg - a.kg);
+    return TIPOS_PERDA.map(t=>({ nome:t.nome, kg:t.kg, cod:t.cod }));
+  }
+  function maquinas(){
+    if(!kgReal) return [];
+    return MAQUINAS.map(m=>{
+      const id = chaveMaq(m.id);
+      const kg = F.motivo ? (PMM && (PMM.get(id) || []).find(x=> x.nome === F.motivo) || { kg:0 }).kg : kgReal.get(id) || 0;
+      return { id, nome:m.nome, kg: Math.round(kg) };
+    }).filter(x=> !F.motivo || x.kg > 0).sort((a,b)=>b.kg - a.kg);
+  }
+  function desenhar(){
+    const ms = motivos(), totM = ms.reduce((a,x)=>a+x.kg,0);
+    const sufixoMaq = F.maquina ? ` na ${nomeMaq(F.maquina)}` : "";
+    hBarChart(document.getElementById("perda-tipo-chart"), ms.map(t=>({
+      chave: t.nome, label: t.cod ? `${t.cod} · ${t.nome}` : t.nome, value:t.kg, display: fmt(t.kg)+" kg",
+      tip:`<b>${esc(t.nome)}</b>${esc(sufixoMaq)}<br>${fmt(t.kg)} kg · ${totM > 0 ? fmt1(t.kg/totM*100) : "0"}% do total` +
+          `<br><span style="color:var(--text-muted)">${F.motivo === t.nome ? "toque para tirar o filtro" : "toque para ver as máquinas"}</span>`,
+    })), { labelW:170, valueW:78, rowH:28, aria:"Perda por motivo" + sufixoMaq, vazio: F.maquina ? "Sem perda apontada nessa máquina no período." : undefined,
+      aoEscolher: r=>{ F.motivo = F.motivo === r.chave ? null : r.chave; desenhar(); }, escolhido: r=> r.chave === F.motivo });
+    pintarTotal("perda-tipo-total", ms.length || TIPOS_PERDA.length ? totM/1000 : null, 1, "t", F.maquina ? `na ${nomeMaq(F.maquina)}` : "total no período", primeira);
+
+    const mq = maquinas(), totQ = mq.reduce((a,x)=>a+x.kg,0);
+    hBarChart(document.getElementById("perda-maquina-chart"), mq.map(m=>({
+      chave: m.id, label:m.nome, value:m.kg, display: fmt(m.kg)+" kg",
+      tip:`<b>${esc(m.nome)}</b><br>${fmt(m.kg)} kg${F.motivo ? ` de ${esc(F.motivo)}` : ""}` + (totQ>0 ? ` · ${fmt1(m.kg/totQ*100)}%` : "") +
+          `<br><span style="color:var(--text-muted)">${F.maquina === m.id ? "toque para tirar o filtro" : "toque para ver os motivos dela"}</span>`,
+    })), { labelW:100, valueW:78, rowH:28, aria:"Perda por máquina" + (F.motivo ? ` de ${F.motivo}` : ""),
+      vazio: F.motivo ? "Nenhuma máquina com esse motivo no período." : undefined,
+      aoEscolher: r=>{ F.maquina = F.maquina === r.chave ? null : r.chave; desenhar(); }, escolhido: r=> r.chave === F.maquina });
+    pintarTotal("perda-maquina-total", kgReal ? totQ/1000 : null, 1, "t", F.motivo ? `de ${F.motivo}` : "total no período", primeira);
+    primeira = false;
+    desenharOps(F);
+    desenharChips(document.getElementById("qual-filtro"), [
+      { rotulo:"Motivo", valor:F.motivo, tirar:()=>{ F.motivo = null; desenhar(); } },
+      { rotulo:"Máquina", valor:F.maquina, texto: F.maquina ? nomeMaq(F.maquina) : null, tirar:()=>{ F.maquina = null; desenhar(); } },
+    ], ()=>{ F.motivo = null; F.maquina = null; desenhar(); });
+    // a evolução da qualidade acompanha a máquina escolhida
+    if(window.EVOLUCAO) window.EVOLUCAO.focar("qualidade", F.maquina, false);
+  }
+  desenhar();
 })();
 
 // Produção mensal: o ano do período escolhido, de janeiro ao último mês com produção
@@ -4417,12 +4881,20 @@ hBarChart(document.getElementById("perda-tipo-chart"), TIPOS_PERDA.map(t=>({
   );
 })();
 
-(function(){
+// OPs com maior refugo: com o filtro dos gráficos acima, só as da máquina e as que têm o
+// motivo como principal (a lista inteira do período, não só as 12 do topo).
+function desenharOps(f = {}){
   const tbody = document.querySelector("#ops-table tbody");
+  const sub = document.getElementById("ops-sub");
+  const base = window.OPS_TODAS || OPS;
+  const filtrando = !!(f.motivo || f.maquina);
   // Com o hub a apara da OP já vem na regra do BI (refugo ÷ (refugo + peso
   // bruto das REBs)); OP sem peso bruto na REB fica com "—" e vai pro fim.
-  const rows = OPS.map(o=>({ ...o, pct: "pct" in o ? o.pct : o.refugo/o.peso*100 }))
-    .sort((a,b)=>(b.pct ?? -1)-(a.pct ?? -1));
+  const rows = base.filter(o=> (!f.maquina || chaveMaq(o.maq) === f.maquina) && (!f.motivo || o.motivo === f.motivo))
+    .map(o=>({ ...o, pct: "pct" in o ? o.pct : o.refugo/o.peso*100 }))
+    .sort((a,b)=>(b.pct ?? -1)-(a.pct ?? -1)).slice(0, 12);
+  if(sub) sub.textContent = filtrando ? `OPs do período${f.maquina ? " na máquina escolhida" : ""}${f.motivo ? ` com ${f.motivo} como motivo principal` : ""}, por % de apara apontada`
+                                      : "OPs do período ordenadas por % de apara apontada (a confirmada não existe por OP)";
   tbody.innerHTML = rows.length ? rows.map(o=>{
     return `<tr>
       <td class="mono">${esc(o.op)}</td>
@@ -4433,8 +4905,8 @@ hBarChart(document.getElementById("perda-tipo-chart"), TIPOS_PERDA.map(t=>({
       <td class="num">${o.pct == null ? `<span title="OP sem peso bruto na rebobinadeira no período">—</span>` : `${fmt1(o.pct)}%`}</td>
       <td class="quebra">${esc(o.motivo)}</td>
     </tr>`;
-  }).join("") : `<tr><td colspan="7"><div class="empty-state">Sem OPs com refugo no período.</div></td></tr>`;
-})();
+  }).join("") : `<tr><td colspan="7"><div class="empty-state">${filtrando ? "Nenhuma OP com esse filtro no período." : "Sem OPs com refugo no período."}</div></td></tr>`;
+}
 
 /* Laudos do CQ (view_usr_LaudoAnalise): cada laudo pelo resultado. */
 const STATUS_LAUDO = [
@@ -4504,40 +4976,81 @@ const STATUS_LAUDO = [
       nota: velDisponivel ? "metros ÷ horas produzindo, todas as máquinas" : "sem velocidade medida no período", spark: serieMensal("vel") },
   ]);
 
-  // Máquina sem hora no período vai pro fim, com "—" e sem barra (não 0% vermelho).
-  const comHoras = MAQUINAS.filter(m=>m.horasTot > 0).sort((a,b)=>b.tmr-a.tmr);
-  const semHoras = MAQUINAS.filter(m=>!(m.horasTot > 0));
-  hBarChart(document.getElementById("tmr-chart"), [
-    ...comHoras.map(m=>({
-      label:m.nome, value:m.tmr, display: m.tmr+"%", color: statusCor[tmrStatus(m.tmr)],
-      tip:`<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br>TMR ${m.tmr}% · ${fmt(m.horasProd)} h de ${fmt(m.horasTot)} h`
-    })),
-    ...semHoras.map(m=>({ label:m.nome, value:0, display:"—", semDado:true,
-      tip:`<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br>Sem apontamento no período` })),
-  ], { labelW:100, valueW:48, rowH:28, min:100, aria:"TMR por máquina" });
+  // TMR por máquina x paradas (pedido de 15/10/2026): tocar numa máquina filtra as horas por
+  // classe e o Pareto pelas paradas dela; tocar num motivo do Pareto troca este gráfico pelas
+  // horas daquele motivo em cada máquina. O traço de cada barra é a meta de TMR da máquina.
+  const FD = window.FILTRO_DISP = { maquina:null, cod:null, nome:null, ouvintes:[] };
+  FD.mudar = ()=>{ FD.ouvintes.forEach(f=>f()); };
+  const PMQ = window.PARADAS_MAQ;
+  const nomeMaqD = id => (MAQUINAS.find(m=> chaveMaq(m.id) === id) || { nome:id }).nome;
+  const titTmr = document.getElementById("tmr-titulo"), subTmr = document.getElementById("tmr-sub");
+  function desenharTmr(){
+    const holderTmr = document.getElementById("tmr-chart");
+    const clicar = PMQ ? r=>{ FD.maquina = FD.maquina === r.chave ? null : r.chave; FD.mudar(); } : null;
+    if(FD.cod && PMQ){
+      // horas do motivo escolhido em cada máquina
+      const porMaq = new Map();
+      PMQ.filter(p=> p.cod === FD.cod).forEach(p=> porMaq.set(p.maq, (porMaq.get(p.maq)||0) + p.horas));
+      const tot = [...porMaq.values()].reduce((a,b)=>a+b,0);
+      if(titTmr) titTmr.textContent = `${FD.nome} por máquina`;
+      if(subTmr) subTmr.textContent = `Horas de ${FD.nome} no período · toque numa máquina para ver as paradas dela`;
+      hBarChart(holderTmr, [...porMaq].filter(([,h])=>h>0).sort((a,b)=>b[1]-a[1]).map(([id,h])=>({
+        chave:id, label:nomeMaqD(id), value:h, display: fmt1(h)+" h", color:"var(--series-3)",
+        tip:`<b>${esc(nomeMaqD(id))}</b><br>${fmt1(h)} h de ${esc(FD.nome)} · ${fmt1(h/tot*100)}% dessa parada`,
+      })), { labelW:100, valueW:58, rowH:28, aria:`Horas de ${FD.nome} por máquina`, aoEscolher:clicar, escolhido: r=> r.chave === FD.maquina });
+      return;
+    }
+    if(titTmr) titTmr.textContent = "TMR por máquina";
+    if(subTmr) subTmr.textContent = "Tempo de máquina rodando (%) · traço = meta da máquina" + (PMQ ? " · toque numa máquina para filtrar as paradas" : "");
+    // Máquina sem hora no período vai pro fim, com "—" e sem barra (não 0% vermelho).
+    const comHoras = MAQUINAS.filter(m=>m.horasTot > 0).sort((a,b)=>b.tmr-a.tmr);
+    const semHoras = MAQUINAS.filter(m=>!(m.horasTot > 0));
+    hBarChart(holderTmr, [
+      ...comHoras.map(m=>{
+        const meta = metaDe(m.id) && metaDe(m.id).tmr;
+        return { chave: chaveMaq(m.id), label:m.nome, value:m.tmr, display: m.tmr+"%", marca: meta ?? null,
+          color: meta != null ? COR_ESTADO[estadoMeta(m.tmr, meta)] : statusCor[tmrStatus(m.tmr)],
+          tip:`<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br>TMR ${m.tmr}% · ${fmt(m.horasProd)} h de ${fmt(m.horasTot)} h` +
+              (meta != null ? `<br>Meta ${fmtNum(meta, 0)}%` : "") };
+      }),
+      ...semHoras.map(m=>({ chave: chaveMaq(m.id), label:m.nome, value:0, display:"—", semDado:true,
+        tip:`<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br>Sem apontamento no período` })),
+    ], { labelW:100, valueW:48, rowH:28, min:100, aria:"TMR por máquina", aoEscolher:clicar, escolhido: r=> r.chave === FD.maquina });
+  }
 
   // Com a classificação oficial publicada, as horas de parada somam por
   // classe (é o que o título diz); sem ela, os maiores códigos.
   const holderDt = document.getElementById("downtime-chart");
   const subDt = holderDt && holderDt.closest(".panel").querySelector(".panel-sub");
-  if(window.CLASSE_POR_COD){
-    const porClasse = new Map();
-    PARADAS_TODAS.forEach(p=> porClasse.set(p.classe, (porClasse.get(p.classe)||0) + p.horas));
-    const totParadas = [...porClasse.values()].reduce((a,b)=>a+b,0);
-    const linhas = [...porClasse].filter(([,h])=>h>0).sort((a,b)=>b[1]-a[1]).map(([chave,h])=>{
-      const c = CLASSES_PARADA[chave] || CLASSES_PARADA["SEM CLASSIFICACAO"];
-      return { label:c.nome, value:h, display: fmt(h)+" h", color:c.cor,
-        tip:`<b>${esc(c.nome)}</b><br>${fmt1(h)} h · ${fmt1(h/totParadas*100)}% das horas sem produzir` };
-    });
-    if(subDt) subDt.textContent = "Classificação oficial do código de apontamento · horas no período, sem fim de turno";
-    hBarChart(holderDt, linhas, { labelW:140, valueW:64, rowH:28, aria:"Horas de parada por classificação", vazio:"Sem paradas apontadas no período." });
-  }else{
-    if(subDt) subDt.textContent = "Maiores códigos de parada no período";
-    hBarChart(holderDt, DOWNTIME.map(d=>({
-      label:d.nome, value:d.horas, display: fmt(d.horas)+" h", color:d.cor,
-      tip:`<b>${esc(d.nome)}</b><br>${fmt(d.horas)} h de parada`
-    })), { labelW:150, valueW:64, rowH:28, aria:"Horas por código de parada", vazio:"Sem paradas apontadas no período." });
+  function desenharDowntime(){
+    const fonte = FD.maquina && PMQ ? PMQ.filter(p=> p.maq === FD.maquina) : PARADAS_TODAS;
+    const deQuem = FD.maquina ? ` na ${nomeMaqD(FD.maquina)}` : "";
+    if(window.CLASSE_POR_COD){
+      const porClasse = new Map();
+      fonte.forEach(p=> porClasse.set(p.classe, (porClasse.get(p.classe)||0) + p.horas));
+      const totParadas = [...porClasse.values()].reduce((a,b)=>a+b,0);
+      const linhas = [...porClasse].filter(([,h])=>h>0).sort((a,b)=>b[1]-a[1]).map(([chave,h])=>{
+        const c = CLASSES_PARADA[chave] || CLASSES_PARADA["SEM CLASSIFICACAO"];
+        return { label:c.nome, value:h, display: fmt(h)+" h", color:c.cor,
+          tip:`<b>${esc(c.nome)}</b>${esc(deQuem)}<br>${fmt1(h)} h · ${fmt1(h/totParadas*100)}% das horas sem produzir` };
+      });
+      if(subDt) subDt.textContent = `Classificação oficial do código de apontamento · horas no período${deQuem}, sem fim de turno`;
+      hBarChart(holderDt, linhas, { labelW:140, valueW:64, rowH:28, aria:"Horas de parada por classificação" + deQuem, vazio:"Sem paradas apontadas no período." });
+    }else{
+      if(subDt) subDt.textContent = "Maiores códigos de parada no período";
+      hBarChart(holderDt, DOWNTIME.map(d=>({
+        label:d.nome, value:d.horas, display: fmt(d.horas)+" h", color:d.cor,
+        tip:`<b>${esc(d.nome)}</b><br>${fmt(d.horas)} h de parada`
+      })), { labelW:150, valueW:64, rowH:28, aria:"Horas por código de parada", vazio:"Sem paradas apontadas no período." });
+    }
   }
+  const chipsDisp = ()=> desenharChips(document.getElementById("disp-filtro"), [
+    { rotulo:"Máquina", valor:FD.maquina, texto: FD.maquina ? nomeMaqD(FD.maquina) : null, tirar:()=>{ FD.maquina = null; FD.mudar(); } },
+    { rotulo:"Parada", valor:FD.cod, texto:FD.nome, tirar:()=>{ FD.cod = null; FD.nome = null; FD.mudar(); } },
+  ], ()=>{ FD.maquina = null; FD.cod = null; FD.nome = null; FD.mudar(); });
+  FD.ouvintes.push(desenharTmr, desenharDowntime, chipsDisp, ()=>{ if(window.EVOLUCAO) window.EVOLUCAO.focar("disponibilidade", FD.maquina, false); });
+  desenharTmr();
+  desenharDowntime();
 
   const holder = document.getElementById("velocidade-chart");
   if(!velDisponivel){
@@ -4549,29 +5062,39 @@ const STATUS_LAUDO = [
     const rowH=30, gap=6, H=MAQ_VEL.length*(rowH+gap)-gap;
     const labelW = Math.min(110, Math.round(W*0.28)), valW = W < 420 ? 82 : 110;
     const barX = labelW + 10, barMax = Math.max(10, W-barX-valW-8), bh = 14;
-    const maxVel = Math.max(...MAQ_VEL.map(m=>Math.max(m.velRef||0, m.vel||0))) || 1;
+    const metaVel = m => (metaDe(m.id) && metaDe(m.id).vel) ?? null;
+    const maxVel = Math.max(...MAQ_VEL.map(m=>Math.max(m.velRef||0, m.vel||0, metaVel(m)||0))) || 1;
     holder.innerHTML = `<svg class="${animar ? "anima" : ""}" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}" role="img" aria-label="${esc("Velocidade média por máquina contra o melhor mês de cada uma: " + resumoVel)}">
       ${MAQ_VEL.map((m,i)=>{
         const y=i*(rowH+gap), yb = y+(rowH-bh)/2;
         const wRef=(m.velRef/maxVel)*barMax, wVel=(m.vel/maxVel)*barMax;
         const ating = m.velRef > 0 ? m.vel/m.velRef*100 : null;
-        const cor = ating == null ? "var(--series-3)" : ating>=90 ? "var(--good)" : ating>=75 ? "var(--warning)" : "var(--critical)";
+        const meta = metaVel(m), xMeta = meta != null ? barX + meta/maxVel*barMax : null;
+        // com meta, a cor é contra a meta; sem ela, contra o melhor mês, como antes
+        const cor = meta != null ? COR_ESTADO[estadoMeta(m.vel, meta)]
+                  : ating == null ? "var(--series-3)" : ating>=90 ? "var(--good)" : ating>=75 ? "var(--warning)" : "var(--critical)";
         const rotulo = cortarTexto(m.nome, labelW, 12);
-        return `<g class="linha-barra" data-i="${i}">
+        return `<g class="linha-barra clicavel" data-i="${i}" tabindex="0" role="button" aria-label="${esc(`${m.nome}: ${m.vel} m/min` + (meta != null ? `, meta ${fmt(meta)}` : "") + ". Ver a evolução")}">
           <rect class="fundo-hover" x="-6" y="${y-2}" width="${W+12}" height="${rowH+4}" rx="8"/>
           <text x="0" y="${y+rowH/2+4}" font-size="12" fill="var(--text-secondary)">${esc(rotulo)}</text>
           <rect x="${barX}" y="${yb}" width="${wRef.toFixed(1)}" height="${bh}" rx="${bh/2}" fill="var(--surface-sunken)"/>
           ${wVel > 0 ? `<rect class="barra-h" style="--i:${i}" x="${barX}" y="${yb}" width="${wVel.toFixed(1)}" height="${bh}" rx="${Math.min(bh/2, wVel/2).toFixed(1)}" fill="${cor}"/>` : ""}
           <line x1="${(barX+wRef).toFixed(1)}" y1="${y+4}" x2="${(barX+wRef).toFixed(1)}" y2="${y+rowH-4}" stroke="var(--text-muted)" stroke-width="1.5" stroke-dasharray="2,2"/>
+          ${xMeta != null ? `<line x1="${xMeta.toFixed(1)}" y1="${y+3}" x2="${xMeta.toFixed(1)}" y2="${y+rowH-3}" stroke="var(--text-primary)" stroke-width="2.2" stroke-linecap="round"/>` : ""}
           <text x="${W}" y="${y+rowH/2+4}" font-size="12" text-anchor="end" class="num" fill="var(--text-primary)" font-weight="600">${m.vel} <tspan fill="var(--text-muted)" font-weight="400">/ ${m.velRef}</tspan></text>
         </g>`;
       }).join("")}
     </svg>`;
     holder.querySelectorAll(".linha-barra").forEach(g=>{
       const m = MAQ_VEL[+g.dataset.i];
+      const meta = metaVel(m);
       g.addEventListener("mousemove", e=> attachTip(holder,
-        `<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br>${m.vel} m/min · melhor mês ${m.velRef} m/min` + (m.velRef > 0 ? `<br>${fmt1(m.vel/m.velRef*100)}% do melhor mês` : ""), e));
+        `<b>${esc(m.nome)}</b> · ${esc(m.processo)}<br>${m.vel} m/min · melhor mês ${m.velRef} m/min` + (m.velRef > 0 ? `<br>${fmt1(m.vel/m.velRef*100)}% do melhor mês` : "") +
+        (meta != null ? `<br>Meta ${fmt(meta)} m/min · ${fmt1(m.vel/meta*100)}% da meta` : "") + `<br><span style="color:var(--text-muted)">toque para ver a evolução</span>`, e));
       g.addEventListener("mouseleave", ()=> clearTip(holder));
+      const ir = ()=>{ clearTip(holder); if(window.EVOLUCAO) window.EVOLUCAO.focar("performance", chaveMaq(m.id), true); };
+      g.addEventListener("click", ir);
+      g.addEventListener("keydown", e=>{ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); ir(); } });
     });
   });
 })();
@@ -4643,9 +5166,17 @@ const STATUS_LAUDO = [
   // período sem programação (ex.: antes da base de aderência começar): "—", não 0 km
   const semPlano = !(planTot > 0);
   const aderPeriodo = planBase > 0 ? realTot/planBase*100 : null;
+  // Produção acima do programado (009, pedido de 15/10/2026: o estoque de PA estava
+  // descontrolado). OPs que terminaram na máquina no período: a maior passada contra a
+  // última programação da OP.
+  const exc = window.OP_EXCEDENTE;
+  const excProg = exc ? exc.reduce((a,r)=>a+(Number(r.planejado)||0),0) : 0;
+  const excMais = exc ? exc.reduce((a,r)=>a+Math.max(0,(Number(r.produzido)||0)-(Number(r.planejado)||0)),0) : 0;
+  const excOps = exc ? exc.filter(r=>Number(r.produzido) > Number(r.planejado)).length : 0;
   renderKpis(document.getElementById("ader-kpis"), [
     { label:"Aderência ao plano", value: aderPeriodo, suffix:"%", decimals:1, comp: comparaMesAnterior(aderPeriodo, "ader"),
-      nota: comHoje ? "realizado ÷ planejado até hoje" : "km realizados ÷ planejados", spark: serieMensal("ader") },
+      nota: (comHoje ? "realizado ÷ planejado até hoje" : "km realizados ÷ planejados") +
+            (aderPeriodo != null && aderPeriodo > 100 ? ` · ${fmt1(aderPeriodo - 100)}% acima do plano` : ""), spark: serieMensal("ader") },
     { label:"Planejado", value: semPlano ? null : planTot, suffix:" km", decimals:0,
       nota: comHoje ? `${window.PLANO.mesAberto ? "no mês" : "no período"} · ${fmt(tot.planHojeKm)} km até hoje` : "programação do período",
       spark: serieMensal("planKm") },
@@ -4653,6 +5184,9 @@ const STATUS_LAUDO = [
     { label:"GAP", value: semPlano ? null : planTot-realTot, suffix:" km", decimals:0,
       nota: comHoje ? `o que falta para o planejado ${window.PLANO.mesAberto ? "do mês" : "do período"}` : "o que faltou para o plano",
       spark: serieMensal("gapKm") },
+    { label:"Acima do programado", value: exc && excProg > 0 ? excMais/1000 : null, suffix:" km", decimals:1,
+      nota: !exc ? "chega com a atualização 009" : excProg > 0 ? `${fmt1(excMais/excProg*100)}% do programado · ${fmt(excOps)} de ${fmt(exc.length)} OPs passaram`
+                                                            : "sem OPs terminadas no período" },
   ]);
   const subAder = document.getElementById("ader-chart-sub");
   if(subAder) subAder.textContent = window.PLANO
@@ -5086,24 +5620,36 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
 (function(){
   const holder = document.getElementById("pareto-chart");
   if(!holder) return;
-  const dados = DOWNTIME.map(d=>({ nome:d.nome, horas:d.horas, cor:d.cor, classeNome:d.classeNome }));
+  const FD = window.FILTRO_DISP || { ouvintes:[] };
+  const sub = document.getElementById("pareto-sub");
+  function desenharPareto(){
+  const fonte = FD.maquina && window.PARADAS_MAQ ? window.PARADAS_MAQ.filter(p=> p.maq === FD.maquina) : null;
+  const nomeM = FD.maquina ? (MAQUINAS.find(m=> chaveMaq(m.id) === FD.maquina) || { nome:FD.maquina }).nome : "";
+  const dados = (fonte ? [...fonte].sort((a,b)=>b.horas - a.horas).slice(0, 8) : DOWNTIME)
+    .map(d=>({ nome:d.nome, horas:d.horas, cor:d.cor, classeNome:d.classeNome, cod:d.cod }));
+  if(sub) sub.textContent = (FD.maquina ? `As 8 maiores paradas da ${nomeM} no período` : "Horas acumuladas por motivo, sem fim de turno") +
+    " · linha mostra o % acumulado" + (window.PARADAS_MAQ ? " · toque num motivo para ver as máquinas" : "");
+  const clicavel = !!window.PARADAS_MAQ;
+  const escolher = d=>{ if(FD.cod === d.cod){ FD.cod = null; FD.nome = null; } else { FD.cod = d.cod; FD.nome = d.nome; } FD.mudar(); };
   const tot = dados.reduce((a,d)=>a+d.horas,0);
   // período sem parada apontada: sem isso os eixos viram "-Infinityh"
   if(!(tot > 0)){
-    holder.innerHTML = `<div class="empty-state">Sem paradas apontadas no período.</div>`;
+    semDados(holder, FD.maquina ? "Sem paradas apontadas nessa máquina no período." : "Sem paradas apontadas no período.");
     return;
   }
   let acc = 0;
   dados.forEach(d=>{ acc += d.horas; d.acum = acc/tot*100; });
   const resumo = dados.slice(0,5).map(d=>`${d.nome} ${fmt1(d.horas)} h, acumulado ${Math.round(d.acum)}%`).join("; ");
   const tip = d => `<b>${esc(d.nome)}</b>` + (d.classeNome && d.classeNome !== d.nome ? ` <span style="color:var(--text-muted)">· ${esc(d.classeNome)}</span>` : "") +
-    `<br>${fmt1(d.horas)} h · ${fmt1(d.horas/tot*100)}% das 8 maiores paradas<br>Acumulado ${fmt1(d.acum)}%`;
+    `<br>${fmt1(d.horas)} h · ${fmt1(d.horas/tot*100)}% das 8 maiores paradas<br>Acumulado ${fmt1(d.acum)}%` +
+    (clicavel ? `<br><span style="color:var(--text-muted)">${FD.cod === d.cod ? "toque para tirar o filtro" : "toque para ver as máquinas"}</span>` : "");
 
   montarGrafico(holder, (W, animar)=>{
     // tela estreita: lista com a barra e o acumulado em texto
     if(W < 560){
-      desenharBarras(holder, dados.map(d=>({ label:d.nome, value:d.horas, display:`${fmt(d.horas)} h · ${Math.round(d.acum)}%`, color:d.cor, tip: tip(d) })),
-        W, animar, { labelW:130, valueW:92, rowH:28, aria:"Pareto de horas de parada por motivo" });
+      desenharBarras(holder, dados.map(d=>({ chave:d.cod, label:d.nome, value:d.horas, display:`${fmt(d.horas)} h · ${Math.round(d.acum)}%`, color:d.cor, tip: tip(d), d })),
+        W, animar, { labelW:130, valueW:92, rowH:28, aria:"Pareto de horas de parada por motivo",
+          aoEscolher: clicavel ? r=> escolher(r.d) : null, escolhido: FD.cod ? r=> r.chave === FD.cod : null });
       return;
     }
     const H=270, padT=16, padB=44, padL=44, padR=44;
@@ -5116,7 +5662,8 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     const barras = dados.map((d,i)=>{
       const h=(d.horas/maxH)*plotH;
       const linhas = quebrarTexto(d.nome, colW-8, 2, 11.5);
-      return `<g class="col-barra pcol" data-i="${i}">
+      const marcado = FD.cod ? (d.cod === FD.cod ? "" : " apagada") : "";
+      return `<g class="col-barra pcol${clicavel ? " clicavel" : ""}${marcado}" data-i="${i}"${clicavel ? ` tabindex="0" role="button" aria-pressed="${d.cod === FD.cod}" aria-label="${esc(`${d.nome}: ${fmt1(d.horas)} h`)}"` : ""}>
         <rect x="${padL+i*colW}" y="${padT}" width="${colW}" height="${plotH+padB}" fill="transparent"/>
         <rect class="barra-v" style="--i:${i}" x="${(px(i)-bw/2).toFixed(1)}" y="${(padT+plotH-h).toFixed(1)}" width="${bw.toFixed(1)}" height="${h.toFixed(1)}" rx="4" fill="${d.cor}"/>
         <text x="${px(i)}" y="${H-padB+17}" text-anchor="middle" font-size="11.5" fill="var(--text-secondary)"><title>${esc(d.nome)}</title>${linhas.map((l,k)=>`<tspan x="${px(i)}" dy="${k===0?0:14}">${esc(l)}</tspan>`).join("")}</text>
@@ -5139,8 +5686,16 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
       const d = dados[+g.dataset.i];
       g.addEventListener("mousemove", e=> attachTip(holder, tip(d), e));
       g.addEventListener("mouseleave", ()=> clearTip(holder));
+      if(clicavel){
+        const ir = ()=>{ clearTip(holder); escolher(d); };
+        g.addEventListener("click", ir);
+        g.addEventListener("keydown", e=>{ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); ir(); } });
+      }
     });
   });
+  }
+  FD.ouvintes.push(desenharPareto);
+  desenharPareto();
 })();
 
 /* ============ VIEW: WIP & CARTEIRA ============
@@ -5326,18 +5881,22 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   const views = document.querySelectorAll(".view");
   const titulo = document.getElementById("view-title");
   const ind = document.getElementById("rail-indicator");
-  // As três partes do OEE: no computador, três abas; no celular, uma aba "OEE" que
-  // abre a última parte vista, com o seletor no topo da tela.
-  const PILARES = ["qualidade", "performance", "disponibilidade"];
-  const oeeBtn = document.getElementById("rail-oee");
-  const oeeSeg = document.getElementById("oee-seg");
-  let ultimoPilar = "qualidade";
+  // Grupos de abas: no computador, cada tela tem a sua aba; no celular, o grupo vira uma
+  // aba só ("Fábrica", "OEE") que abre a última tela vista, com o seletor no topo.
+  const GRUPOS = [
+    { vistas:["agora", "d1", "pe"], btn: document.getElementById("rail-fab"), seg: document.getElementById("fab-seg"),
+      classe:"em-fab", ultimo:"agora", opcoes:[["agora","Agora"], ["d1","D-1"], ["pe","Pé de máquina"]] },
+    { vistas:["qualidade", "performance", "disponibilidade"], btn: document.getElementById("rail-oee"), seg: document.getElementById("oee-seg"),
+      classe:"em-oee", ultimo:"qualidade", opcoes:[["qualidade","Qualidade"], ["performance","Performance"], ["disponibilidade","Disponibilidade"]] },
+  ];
+  const grupoDe = v => GRUPOS.find(g=> g.vistas.includes(v)) || null;
   const botaoDa = v => buttons.find(b=> b.dataset.view === v);
 
   function moverIndicador(){
     let b = buttons.find(x=>x.classList.contains("active"));
-    // parte do OEE com a aba escondida (celular): a seleção fica na aba "OEE"
-    if(b && !b.offsetWidth && oeeBtn && oeeBtn.offsetWidth && PILARES.includes(b.dataset.view)) b = oeeBtn;
+    // tela de um grupo com a aba escondida (celular): a seleção fica na aba do grupo
+    const g = b && grupoDe(b.dataset.view);
+    if(b && !b.offsetWidth && g && g.btn && g.btn.offsetWidth) b = g.btn;
     if(!b || !ind || !b.offsetWidth) return;
     ind.style.width = b.offsetWidth + "px";
     ind.style.height = b.offsetHeight + "px";
@@ -5363,36 +5922,41 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     });
     views.forEach(v=> v.classList.toggle("active", v.id === `view-${alvo}`));
     if(titulo) titulo.textContent = btn.getAttribute("aria-label");
-    const pilar = PILARES.includes(alvo);
-    if(pilar) ultimoPilar = alvo;
-    if(oeeBtn){
-      oeeBtn.classList.toggle("active", pilar);
-      if(pilar) oeeBtn.setAttribute("aria-current", "page"); else oeeBtn.removeAttribute("aria-current");
-    }
-    document.body.classList.toggle("em-oee", pilar);
-    if(pilar) sincronizarSeg(alvo);
+    GRUPOS.forEach(g=>{
+      const on = g.vistas.includes(alvo);
+      if(on) g.ultimo = alvo;
+      if(g.btn){
+        g.btn.classList.toggle("active", on);
+        if(on) g.btn.setAttribute("aria-current", "page"); else g.btn.removeAttribute("aria-current");
+      }
+      document.body.classList.toggle(g.classe, on);
+      if(on) sincronizarSeg(g, alvo);
+    });
     window.scrollTo({ top: 0 });
     moverIndicador();
     const v = document.getElementById(`view-${alvo}`);
     if(v) primeiraVez(v);
     // a maquete do WIP (three.js) só carrega quando a aba abre pela primeira vez
     if(alvo === "wip" && window.abrirMaquete) window.abrirMaquete();
+    // D-1, pé de máquina e evolução buscam os dados quando a tela abre
+    document.dispatchEvent(new CustomEvent("gualapack:tela", { detail: alvo }));
   }
-  // seletor das partes do OEE (celular): a seleção desliza como nos outros controles
-  function sincronizarSeg(alvo){
-    if(!oeeSeg) return;
-    const b = oeeSeg.querySelector(`button[data-v="${alvo}"]`);
+  // seletor do grupo (celular): a seleção desliza como nos outros controles
+  function sincronizarSeg(g, alvo){
+    if(!g.seg) return;
+    const b = g.seg.querySelector(`button[data-v="${alvo}"]`);
     if(!b || b.classList.contains("active")) return;
-    oeeSeg.querySelectorAll("button").forEach(x=>{ const on = x === b; x.classList.toggle("active", on); x.setAttribute("aria-pressed", String(on)); });
-    const t = oeeSeg.querySelector(".segmented-thumb");
+    g.seg.querySelectorAll("button").forEach(x=>{ const on = x === b; x.classList.toggle("active", on); x.setAttribute("aria-pressed", String(on)); });
+    const t = g.seg.querySelector(".segmented-thumb");
     if(t && b.offsetWidth){ t.style.width = b.offsetWidth + "px"; t.style.transform = `translateX(${b.offsetLeft}px)`; }
   }
-  if(oeeSeg) segmentado(oeeSeg, [["qualidade","Qualidade"], ["performance","Performance"], ["disponibilidade","Disponibilidade"]],
-    "qualidade", v=>{ const b = botaoDa(v); if(b) b.click(); });
-  if(oeeBtn) oeeBtn.addEventListener("click", ()=>{
-    if(oeeBtn.classList.contains("active")) return;
-    const b = botaoDa(ultimoPilar);
-    if(b) b.click();
+  GRUPOS.forEach(g=>{
+    if(g.seg) segmentado(g.seg, g.opcoes, g.ultimo, v=>{ const b = botaoDa(v); if(b) b.click(); });
+    if(g.btn) g.btn.addEventListener("click", ()=>{
+      if(g.btn.classList.contains("active")) return;
+      const b = botaoDa(g.ultimo);
+      if(b) b.click();
+    });
   });
   buttons.forEach(btn=>{
     btn.addEventListener("click", ()=>{
@@ -6282,6 +6846,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   const IC_MAQ = svg(`<rect x="3.5" y="7" width="17" height="10" rx="2.5"/><circle cx="8.5" cy="12" r="1.6"/><path d="M13 12h4.5"/>`);
   // telas: as da barra lateral, com palavras que levam a cada uma
   const EXTRAS = { overview:"geral oee resumo inicio", agora:"agora chao fabrica paradas rodando",
+    d1:"d-1 d1 ontem dia anterior resumo metas maquinas", pe:"pe de maquina quadro tv tela lideranca metas gestao",
     qualidade:"qualidade aparas refugo laudos perda motivo", performance:"performance velocidade produtividade aderencia plano realizado",
     disponibilidade:"disponibilidade tmr paradas pareto linha tempo gantt apontamentos setup",
     carteira:"carteira pedidos entregas prazo fila programacao faturamento", wip:"wip pallets etiqueta estoque maquete planta" };
@@ -6572,6 +7137,717 @@ if(footerNote){
     : `Painel interno de Produção &middot; Gualapack Jaguariúna &middot; pré-visualização local com valores de referência (sem Supabase configurado).`;
 }
 
+
+/* =========================================================================
+   GESTÃO POR MÁQUINA (pedido da gerência em 15/10/2026). Tudo daqui para baixo
+   lê o 009_gestao.sql; sem ele, cada parte diz que falta a atualização.
+   ========================================================================= */
+const MESES_NOMES = ["janeiro","fevereiro","março","abril","maio","junho","julho","agosto","setembro","outubro","novembro","dezembro"];
+const erroDe009 = e => e && (e.code === "PGRST202" || e.code === "PGRST205");
+const msgFalha = e => !window.gualapackAuth ? "Sem dados na pré-visualização." : erroDe009(e) ? SEM_009 : "Sem dados: não consegui carregar agora. Tente de novo em instantes.";
+const rotuloDia = (iso, hoje) => {
+  const d = dataLocal(iso), n = Math.round((dataLocal(hoje) - d) / 86400000);
+  return `${DIAS_SEMANA[d.getDay()]}, ${fmtDM(d)}<small>${n === 0 ? "hoje · parcial" : n === 1 ? "D-1 · ontem" : `D-${n}`}</small>`;
+};
+const irPraTela = v => { const b = document.querySelector(`.rail-btn[data-view="${v}"]`); if(b && !b.classList.contains("active")) b.click(); else window.scrollTo({ top:0 }); };
+const porChave = (linhas, campo = "maquina") => {
+  const m = new Map();
+  linhas.forEach(r=>{ const k = chaveMaq(r[campo]); if(!m.has(k)) m.set(k, []); m.get(k).push(r); });
+  return m;
+};
+// opções de máquina agrupadas pela etapa da rota
+function opcoesMaquina(sel, maquinas, valor, primeira){
+  const etapas = ORDEM_ETAPAS.filter(p=> maquinas.some(m=> m.processo === p));
+  const outras = maquinas.filter(m=> !ORDEM_ETAPAS.includes(m.processo));
+  sel.innerHTML = (primeira ? `<option value="all">${esc(primeira)}</option>` : "") +
+    etapas.map(p=>`<optgroup label="${esc(p)}">${maquinas.filter(m=>m.processo === p).map(m=>`<option value="${esc(chaveMaq(m.id))}">${esc(m.nome)}</option>`).join("")}</optgroup>`).join("") +
+    (outras.length ? `<optgroup label="Outros">${outras.map(m=>`<option value="${esc(chaveMaq(m.id))}">${esc(m.nome)}</option>`).join("")}</optgroup>` : "");
+  sel.value = valor;
+  if(sel.value !== valor && sel.options.length) sel.selectedIndex = 0;
+}
+// paradas de um conjunto de linhas de rpc_hub_paradas_maquina, por código (sem fim de turno)
+function paradasPorCodigo(linhas){
+  const m = new Map();
+  linhas.forEach(r=>{
+    const c = classeDoCodigo(r.cod_apont);
+    if(c.chave === "FIM TURNO") return;
+    const k = String(r.cod_apont);
+    const g = m.get(k) || { nome: prettyCodigo(r.cod_desc).replace(/^\d+\s*-\s*/, ""), horas:0, cor:c.cor, classe:c.nome };
+    g.horas += Number(r.horas)||0;
+    m.set(k, g);
+  });
+  return [...m.values()].filter(g=>g.horas > 0).sort((a,b)=>b.horas - a.horas);
+}
+function perdasPorMotivo(linhas){
+  const m = new Map();
+  linhas.forEach(r=>{ const k = prettyCodigo(r.tipo); m.set(k, (m.get(k)||0) + (Number(r.kg)||0)); });
+  return [...m].filter(([,kg])=>kg > 0).sort((a,b)=>b[1] - a[1]).map(([nome,kg])=>({ nome, kg }));
+}
+
+/* ---- Produção acima do programado, por máquina e OP (Performance) ---- */
+(function(){
+  const holder = document.getElementById("exc-chart");
+  if(!holder) return;
+  const tbody = document.querySelector("#exc-table tbody"), mais = document.getElementById("exc-mais"), faixa = document.getElementById("exc-faixa");
+  const exc = window.OP_EXCEDENTE;
+  if(!exc){
+    faixa.hidden = true;
+    semDados(holder, window.gualapackAuth ? SEM_009 : "Sem dados na pré-visualização.");
+    tabelaComMais(tbody, mais, [], { colunas:8, vazio: window.gualapackAuth ? SEM_009 : "Sem dados na pré-visualização." });
+    return;
+  }
+  const F = { minimo:0, maquina:null };
+  const linhas = exc.map(r=>{
+    const pl = Number(r.planejado)||0, pr = Number(r.produzido)||0;
+    return { op: limpaTexto(r.num_ordem), maq: limpaTexto(r.maquina), chave: chaveMaq(r.maquina), produto: limpaTexto(r.produto) || "—",
+             pl, pr, mais: Math.max(0, pr - pl), pct: pl > 0 ? (pr - pl) / pl * 100 : null, dia: r.dia, passadas: Number(r.passadas)||1 };
+  });
+  segmentado(faixa, [["0","Acima do programado"], ["5","Mais de 5%"], ["10","Mais de 10%"]], "0", v=>{ F.minimo = Number(v); desenhar(); });
+  function desenhar(){
+    const acima = linhas.filter(l=> l.mais > 0 && l.pct > F.minimo);
+    const porMaq = new Map();
+    linhas.forEach(l=>{
+      const g = porMaq.get(l.chave) || { nome:l.maq, chave:l.chave, pl:0, mais:0, ops:0, total:0 };
+      g.pl += l.pl; g.total++;
+      if(l.mais > 0 && l.pct > F.minimo){ g.mais += l.mais; g.ops++; }
+      porMaq.set(l.chave, g);
+    });
+    const grupos = [...porMaq.values()].filter(g=>g.mais > 0).sort((a,b)=>b.mais - a.mais);
+    hBarChart(holder, grupos.map(g=>({ chave:g.chave, label:g.nome, value:g.mais/1000, display:`${fmt1(g.mais/1000)} km · ${fmt1(g.mais/g.pl*100)}%`,
+      color: g.mais/g.pl > 0.1 ? "var(--critical)" : "var(--warning)",
+      tip:`<b>${esc(g.nome)}</b><br>${fmt1(g.mais/1000)} km acima do programado · ${fmt1(g.mais/g.pl*100)}% de ${fmt(g.pl/1000)} km programados` +
+          `<br>${fmt(g.ops)} de ${fmt(g.total)} OPs passaram<br><span style="color:var(--text-muted)">${F.maquina === g.chave ? "toque para tirar o filtro" : "toque para ver as OPs"}</span>`,
+    })), { labelW:100, valueW:122, rowH:28, aria:"Km produzidos acima do programado por máquina", vazio:"Nenhuma OP acima do programado no período.",
+      aoEscolher: r=>{ F.maquina = F.maquina === r.chave ? null : r.chave; desenhar(); }, escolhido: r=> r.chave === F.maquina });
+    const lista = acima.filter(l=> !F.maquina || l.chave === F.maquina).sort((a,b)=> b.mais - a.mais);
+    tabelaComMais(tbody, mais, lista.map(l=>`<tr>
+      <td class="mono">${esc(l.op)}</td><td>${esc(l.maq)}</td><td class="quebra">${esc(l.produto)}</td>
+      <td class="num">${fmt(l.pl)} m</td>
+      <td class="num">${fmt(l.pr)} m${l.passadas > 1 ? ` <small class="sem-dado" title="A OP passou ${l.passadas} vezes na máquina; vale a maior passada">${l.passadas}×</small>` : ""}</td>
+      <td class="num"><b>${fmt(l.mais)} m</b></td>
+      <td class="num" style="color:${l.pct > 10 ? "var(--critical)" : "var(--warning)"};font-weight:650">+${fmt1(l.pct)}%</td>
+      <td>${esc(l.dia ? fmtDM(dataLocal(l.dia)) : "—")}</td></tr>`),
+      { colunas:8, vazio: linhas.length ? "Nenhuma OP acima do programado com esse filtro." : "Sem OPs terminadas no período." });
+    desenharChips(document.getElementById("exc-filtro"),
+      [{ rotulo:"Máquina", valor:F.maquina, texto: F.maquina ? (porMaq.get(F.maquina) || {}).nome : null, tirar:()=>{ F.maquina = null; desenhar(); } }],
+      ()=>{ F.maquina = null; desenhar(); });
+  }
+  desenhar();
+})();
+
+/* ---- Evolução de cada parte do OEE: dias do mês ou meses do ano (o drill do BI) ----
+   "Como está a performance da L04 nos dias desse mês ou nos meses do ano": fábrica, setor
+   ou máquina, com a meta tracejada. Tocar num mês abre os dias dele; tocar num dia abre o
+   D-1 daquele dia (ou o pé de máquina, quando o recorte é uma máquina). */
+(function(){
+  const MET = {
+    tmr:  { nome:"TMR", titulo:"Evolução da disponibilidade (TMR)", unidade:"%", casas:1, meta: m=> m ? m.tmr : null,
+            explica:"horas produzindo ÷ horas totais, sem fim de turno e inatividade" },
+    vel:  { nome:"Velocidade", titulo:"Evolução da velocidade", unidade:" m/min", casas:0, meta: m=> m ? m.vel : null,
+            explica:"metros ÷ horas produzindo" },
+    ader: { nome:"Aderência", titulo:"Evolução da aderência ao plano", unidade:"%", casas:0, metaFixa:100,
+            explica:"km realizados ÷ planejados · acima de 105%, em âmbar, produziu mais que o plano" },
+    qual: { nome:"Qualidade", titulo:"Evolução da qualidade", unidade:"%", casas:1, meta: m=> m ? m.qual : null,
+            explica:"100 − refugo ÷ (refugo + peso das OPs pesadas nas rebobinadeiras), a qualidade do OEE" },
+  };
+  const PILAR_METRICAS = { qualidade:["qual"], performance:["vel", "ader"], disponibilidade:["tmr"] };
+  const cache = new Map();
+  function serie(de, ate, grao){
+    const k = `${de}|${ate}|${grao}`;
+    if(!window.gualapackAuth) return Promise.reject(null);
+    if(!cache.has(k)) cache.set(k, lerRpcTudo(window.gualapackAuth, "rpc_hub_maquina_serie", { p_de:de, p_ate:ate, p_grao:grao })
+      .then(r=>{ if(r.error){ cache.delete(k); throw r.error; } return r.data || []; }));
+    return cache.get(k);
+  }
+  const fimDoPeriodo = ()=>{ const d = new Date(periodoDaUrl().ate); d.setDate(d.getDate() - 1); return d; };
+  const amanha = ()=> isoDate(addDaysGlobal(new Date(), 1));
+  const estados = {};
+  const nomeRecorte = r => r === "fab" ? "fábrica" : r.startsWith("setor:") ? r.slice(6)
+                         : (MAQUINAS.find(m=> chaveMaq(m.id) === r.slice(4)) || { nome:r.slice(4) }).nome;
+  function filtrar(linhas, recorte){
+    if(recorte === "fab") return linhas;
+    if(recorte.startsWith("setor:")){
+      const ids = new Set(MAQUINAS.filter(m=> m.processo === recorte.slice(6)).map(m=> chaveMaq(m.id)));
+      return linhas.filter(r=> ids.has(chaveMaq(r.maquina)));
+    }
+    return linhas.filter(r=> chaveMaq(r.maquina) === recorte.slice(4));
+  }
+  function metaDoRecorte(met, recorte){
+    if(met.metaFixa != null) return met.metaFixa;
+    if(recorte === "fab") return met.meta(metaDe("FABRICA")) ?? null;
+    if(recorte.startsWith("maq:")) return met.meta(metaDe(recorte.slice(4))) ?? null;
+    return null;
+  }
+  function clicarModo(pilar, v){
+    const b = document.querySelector(`#evo-${pilar}-modo button[data-v="${v}"]`);
+    if(b && !b.classList.contains("active")) b.click(); else desenhar(pilar);
+  }
+  function montar(pilar){
+    const sec = document.getElementById("evo-" + pilar);
+    if(!sec) return;
+    const fim = fimDoPeriodo();
+    const E = estados[pilar] = { recorte:"fab", modo:"dia", mes: isoDate(fim).slice(0, 7), ano: fim.getFullYear(),
+                                 metrica: PILAR_METRICAS[pilar][0], pronto:false, pedido:0, veioDoMes:false };
+    const varias = PILAR_METRICAS[pilar].length > 1;
+    sec.innerHTML = `
+      <div class="panel-head">
+        <div><h3 class="panel-title" id="evo-${pilar}-titulo"></h3><div class="panel-sub" id="evo-${pilar}-sub"></div></div>
+        <div class="evo-controles">
+          ${varias ? `<div class="segmented" id="evo-${pilar}-met" role="group" aria-label="Indicador"></div>` : ""}
+          <label class="select-wrap"><span class="sr-only">Fábrica, setor ou máquina</span>
+            <select id="evo-${pilar}-rec" aria-label="Fábrica, setor ou máquina"></select>
+            <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M3 4.5l3 3 3-3"/></svg></label>
+          <div class="segmented" id="evo-${pilar}-modo" role="group" aria-label="Dias do mês ou meses do ano"></div>
+        </div>
+      </div>
+      <nav class="evo-trilha" id="evo-${pilar}-trilha" aria-label="Voltar" hidden></nav>
+      <div class="evo-resumo" id="evo-${pilar}-resumo" aria-live="polite"></div>
+      <div class="grafico" id="evo-${pilar}-chart"></div>`;
+    const sel = document.getElementById(`evo-${pilar}-rec`);
+    const setores = ORDEM_ETAPAS.filter(p=> MAQUINAS.some(m=> m.processo === p));
+    sel.innerHTML = `<option value="fab">Fábrica inteira</option>` +
+      `<optgroup label="Setores">${setores.map(p=>`<option value="setor:${esc(p)}">${esc(p)}</option>`).join("")}</optgroup>` +
+      setores.map(p=>`<optgroup label="${esc(p)}">${MAQUINAS.filter(m=> m.processo === p).map(m=>`<option value="maq:${esc(chaveMaq(m.id))}">${esc(m.nome)}</option>`).join("")}</optgroup>`).join("");
+    sel.value = E.recorte;
+    sel.addEventListener("change", ()=>{ E.recorte = sel.value; desenhar(pilar); });
+    segmentado(document.getElementById(`evo-${pilar}-modo`), [["dia","Dias do mês"], ["mes","Meses do ano"]], E.modo, v=>{
+      E.modo = v;
+      if(v === "mes"){ E.ano = Number(E.mes.slice(0, 4)); E.veioDoMes = false; }
+      desenhar(pilar);
+    });
+    if(varias) segmentado(document.getElementById(`evo-${pilar}-met`), PILAR_METRICAS[pilar].map(k=>[k, MET[k].nome]), E.metrica, v=>{ E.metrica = v; desenhar(pilar); });
+  }
+  async function desenhar(pilar){
+    const E = estados[pilar];
+    if(!E || !E.pronto) return;
+    const met = MET[E.metrica];
+    const holder = document.getElementById(`evo-${pilar}-chart`);
+    const resumo = document.getElementById(`evo-${pilar}-resumo`), trilha = document.getElementById(`evo-${pilar}-trilha`);
+    const nome = nomeRecorte(E.recorte);
+    const [ano, mes] = E.mes.split("-").map(Number);
+    let de, ate;
+    if(E.modo === "dia"){ de = isoDate(new Date(ano, mes - 1, 1)); ate = isoDate(new Date(ano, mes, 1)); }
+    else{ de = `${E.ano}-01-01`; ate = `${E.ano + 1}-01-01`; }
+    if(ate > amanha()) ate = amanha();
+    const grao = E.modo;
+    document.getElementById(`evo-${pilar}-titulo`).textContent = met.titulo;
+    document.getElementById(`evo-${pilar}-sub`).textContent =
+      `${grao === "dia" ? `Dias de ${MESES_NOMES[mes - 1]} de ${ano}` : `Meses de ${E.ano}`} · ${nome} · ${met.explica}`;
+    trilha.hidden = !(grao === "dia" && E.veioDoMes);
+    if(!trilha.hidden){
+      trilha.innerHTML = `<button type="button">‹ Meses de ${ano}</button><span>/ ${MESES_NOMES[mes - 1]}</span>`;
+      trilha.querySelector("button").addEventListener("click", ()=>{ E.ano = ano; clicarModo(pilar, "mes"); });
+    }
+    const pedido = ++E.pedido;
+    holder.classList.add("carregando");
+    let linhas;
+    try{ linhas = await serie(de, ate, grao); }
+    catch(e){
+      if(pedido !== E.pedido) return;
+      holder.classList.remove("carregando");
+      resumo.innerHTML = "";
+      semDados(holder, msgFalha(e));
+      return;
+    }
+    if(pedido !== E.pedido) return;
+    holder.classList.remove("carregando");
+    const doRecorte = filtrar(linhas, E.recorte);
+    const periodos = [];
+    if(grao === "dia"){ for(let d = dataLocal(de); isoDate(d) < ate; d = addDaysGlobal(d, 1)) periodos.push(isoDate(d)); }
+    else{ for(let m = 0; m < 12; m++){ const iso = isoDate(new Date(E.ano, m, 1)); if(iso < ate) periodos.push(iso); } }
+    const porPeriodo = new Map();
+    doRecorte.forEach(r=>{ const k = String(r.periodo).slice(0, 10); if(!porPeriodo.has(k)) porPeriodo.set(k, []); porPeriodo.get(k).push(r); });
+    const meta = metaDoRecorte(met, E.recorte);
+    const fmtV = v => fmtNum(v, met.casas) + met.unidade;
+    const hojeIso = diaDeProducao(new Date());
+    const itens = periodos.map(p=>{
+      const ind = indicadoresSerie(porPeriodo.get(p) || []);
+      const v = ind[E.metrica];
+      const d = dataLocal(p);
+      const quando = grao === "dia" ? `${DIAS_SEMANA[d.getDay()]}, ${fmtDM(d)}` : `${MESES_NOMES[d.getMonth()]} de ${d.getFullYear()}`;
+      const det = v == null ? "" : E.metrica === "tmr" ? `${fmt1(ind.prod)} h produzindo de ${fmt1(ind.tot)} h`
+        : E.metrica === "vel" ? `${fmt1(ind.metros/1000)} km em ${fmt1(ind.prod)} h` : E.metrica === "ader" ? `${fmt1(ind.real/1000)} de ${fmt1(ind.plan/1000)} km`
+        : `${fmt(ind.ref)} kg de refugo em ${fmt(ind.ref + ind.peso)} kg`;
+      const acao = grao === "mes" ? "toque para ver os dias" : E.recorte.startsWith("maq:") ? "toque para abrir o pé de máquina" : "toque para abrir o D-1 desse dia";
+      return { periodo:p, rotulo: grao === "dia" ? String(d.getDate()) : MESES_CURTOS[d.getMonth()], valor:v, destaque: p === hojeIso,
+        aria: `${quando}: ${v == null ? "sem dado" : fmtV(v)}. ${acao}`, quando,
+        tip: `<b>${esc(quando)}</b><br>${v == null ? "sem dado" : `${esc(met.nome)} <b>${esc(fmtV(v))}</b>`}${det ? `<br>${esc(det)}` : ""}` +
+             (meta != null && v != null ? `<br>Meta ${esc(fmtV(meta))}` : "") + (v != null ? `<br><span style="color:var(--text-muted)">${acao}</span>` : "") };
+    });
+    const total = indicadoresSerie(doRecorte)[E.metrica];
+    const comValor = itens.filter(i=> i.valor != null);
+    const naMeta = meta != null ? comValor.filter(i=> E.metrica === "ader" ? i.valor >= 95 : i.valor >= meta).length : null;
+    const melhor = comValor.length ? comValor.reduce((a,b)=> b.valor > a.valor ? b : a) : null;
+    resumo.innerHTML = comValor.length ? [
+      `${grao === "dia" ? "No mês" : "No ano"}: <b>${esc(total == null ? "—" : fmtV(total))}</b>`,
+      meta != null && met.metaFixa == null ? `Meta: <b>${esc(fmtV(meta))}</b>` : "",
+      meta == null && E.recorte.startsWith("maq:") ? `<span class="dica-painel">sem meta cadastrada para ${esc(nome)}</span>` : "",
+      naMeta != null ? `<b>${naMeta}</b> de ${comValor.length} ${grao === "dia" ? "dias" : "meses"} ${E.metrica === "ader" ? "com 95% do plano ou mais" : "na meta"}` : "",
+      melhor && E.metrica !== "ader" ? `Melhor: <b>${esc(melhor.quando)}</b> (${esc(fmtV(melhor.valor))})` : "",
+    ].filter(Boolean).map(t=>`<span>${t}</span>`).join("") : "";
+    colunasMeta(holder, itens, { meta, unidade: met.unidade === "%" ? "%" : "", casas: met.casas, fmt: fmtV,
+      cor: E.metrica === "ader" ? (v=> v > 105 ? "var(--warning)" : v >= 95 ? "var(--good)" : "var(--critical)") : null,
+      aria: `${met.nome} por ${grao === "dia" ? "dia" : "mês"}, ${nome}`,
+      vazio: `Sem ${met.nome.toLowerCase()} medida ${grao === "dia" ? "nesse mês" : "nesse ano"} para ${nome}.`,
+      aoEscolher: it=>{
+        if(grao === "mes"){ E.mes = it.periodo.slice(0, 7); E.veioDoMes = true; clicarModo(pilar, "dia"); return; }
+        if(E.recorte.startsWith("maq:") && window.PE){ window.PE.mostrar(E.recorte.slice(4), it.periodo); irPraTela("pe"); }
+        else if(window.D1){ window.D1.mostrar(it.periodo, E.recorte.startsWith("setor:") ? E.recorte.slice(6) : "all"); irPraTela("d1"); }
+      } });
+  }
+  Object.keys(PILAR_METRICAS).forEach(montar);
+  const abrir = v=>{ const E = estados[v]; if(E && !E.pronto){ E.pronto = true; desenhar(v); } };
+  document.addEventListener("gualapack:tela", e=> abrir(e.detail));
+  const ativa = document.querySelector(".view.active");
+  if(ativa) abrir(ativa.id.replace(/^view-/, ""));
+  window.EVOLUCAO = {
+    // leva o recorte para uma máquina (ou volta à fábrica); com rolar, desce até o gráfico
+    focar(pilar, id, rolar){
+      const E = estados[pilar];
+      if(!E) return;
+      const novo = id ? "maq:" + id : "fab";
+      const sel = document.getElementById(`evo-${pilar}-rec`);
+      if(E.recorte !== novo){
+        E.recorte = novo;
+        if(sel){ sel.value = novo; if(sel.value !== novo){ E.recorte = "fab"; sel.value = "fab"; } }
+        desenhar(pilar);
+      }
+      if(rolar) document.getElementById("evo-" + pilar).scrollIntoView({ behavior: reduzMovimento() ? "auto" : "smooth", block:"start" });
+    },
+  };
+})();
+
+/* ---- D-1: o dia anterior, máquina a máquina, contra as metas ----
+   Por setor e por máquina. O dia de produção vai das 06:00 às 06:00; dá para voltar dias. */
+(function(){
+  const view = document.getElementById("view-d1");
+  if(!view) return;
+  const $ = id => document.getElementById(id);
+  const hojeProd = diaDeProducao(new Date());
+  const S = { dia: isoDate(addDaysGlobal(dataLocal(hojeProd), -1)), setor:"all", maq:"all", pronto:false, pedido:0 };
+  const cache = new Map();
+  function carregar(d){
+    if(!window.gualapackAuth) return Promise.reject(null);
+    if(!cache.has(d)){
+      const c = window.gualapackAuth, prox = isoDate(addDaysGlobal(dataLocal(d), 1));
+      cache.set(d, Promise.all([
+        lerRpcTudo(c, "rpc_hub_maquina_serie", { p_de:d, p_ate:prox, p_grao:"dia" }),
+        lerRpcTudo(c, "rpc_hub_paradas_maquina", { p_de:d, p_ate:prox }),
+        c.rpc("rpc_hub_perda_maquina_motivo", { p_de:d, p_ate:prox }),
+      ]).then(([s, p, m])=>{
+        if(s.error) throw s.error;
+        return { serie: s.data || [], paradas: p.error ? [] : p.data || [], perdas: m.error ? [] : m.data || [] };
+      }).catch(e=>{ cache.delete(d); throw e; }));
+    }
+    return cache.get(d);
+  }
+  const setores = ()=> ORDEM_ETAPAS.filter(p=> MAQUINAS.some(m=> m.processo === p));
+  function controles(){
+    segmentado($("d1-setor"), [["all", "Todos os setores"], ...setores().map(p=>[p, p])], S.setor, v=>{ S.setor = v; S.maq = "all"; opcoesMaq(); desenhar(); });
+    opcoesMaq();
+  }
+  function opcoesMaq(){
+    const maqs = MAQUINAS.filter(m=> !maqForaDoPainel(m.id, S.dia) && (S.setor === "all" || m.processo === S.setor));
+    opcoesMaquina($("d1-maquina"), maqs, S.maq, "Todas as máquinas");
+  }
+  $("d1-maquina").addEventListener("change", e=>{ S.maq = e.target.value; desenhar(); });
+  $("d1-ant").addEventListener("click", ()=>{ S.dia = isoDate(addDaysGlobal(dataLocal(S.dia), -1)); opcoesMaq(); desenhar(); });
+  $("d1-prox").addEventListener("click", ()=>{ if(S.dia < hojeProd){ S.dia = isoDate(addDaysGlobal(dataLocal(S.dia), 1)); opcoesMaq(); desenhar(); } });
+  const cel = (v, meta, st, fmtV) => v == null
+    ? `<div class="cel"><b class="sem-dado">—</b><small>${meta != null ? "meta " + esc(fmtV(meta)) : "sem meta"}</small></div>`
+    : `<div class="cel st-${meta != null ? st : "neutro"}"><b>${esc(fmtV(v))}</b><small>${meta != null ? "meta " + esc(fmtV(meta)) : "sem meta"}</small></div>`;
+  const NOME_IND = { tmr:"TMR", vel:"velocidade", qual:"qualidade" };
+  async function desenhar(){
+    const pedido = ++S.pedido;
+    $("d1-dia").innerHTML = rotuloDia(S.dia, hojeProd);
+    $("d1-prox").disabled = S.dia >= hojeProd;
+    const tbody = $("d1-tabela").querySelector("tbody");
+    const amanhaDoDia = dataLocal(S.dia); amanhaDoDia.setDate(amanhaDoDia.getDate() + 1);
+    $("d1-sub").textContent = `Dia de produção de ${fmtDM(dataLocal(S.dia))}, das 06:00 às 06:00 do dia ${fmtDM(amanhaDoDia)} · toque numa máquina para abrir o pé de máquina`;
+    [tbody, $("d1-paradas"), $("d1-perdas")].forEach(el=> el.classList.add("carregando"));
+    let dados;
+    try{ dados = await carregar(S.dia); }
+    catch(e){
+      if(pedido !== S.pedido) return;
+      [tbody, $("d1-paradas"), $("d1-perdas")].forEach(el=> el.classList.remove("carregando"));
+      const msg = msgFalha(e);
+      renderKpis($("d1-kpis"), [{ label:"TMR", value:null }, { label:"Velocidade média", value:null }, { label:"Produzido", value:null }, { label:"Refugo apontado", value:null, nota: msg }]);
+      tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">${esc(msg)}</div></td></tr>`;
+      semDados($("d1-paradas"), msg); semDados($("d1-perdas"), msg);
+      pintarTotal("d1-paradas-total", null); pintarTotal("d1-perdas-total", null);
+      return;
+    }
+    if(pedido !== S.pedido) return;
+    [tbody, $("d1-paradas"), $("d1-perdas")].forEach(el=> el.classList.remove("carregando"));
+    const maqs = MAQUINAS.filter(m=> !maqForaDoPainel(m.id, S.dia) && (S.setor === "all" || m.processo === S.setor) && (S.maq === "all" || chaveMaq(m.id) === S.maq));
+    const ids = new Set(maqs.map(m=> chaveMaq(m.id)));
+    const serieMaq = porChave(dados.serie), parMaq = porChave(dados.paradas);
+    const linhas = maqs.map(m=>{
+      const id = chaveMaq(m.id), ind = indicadoresSerie(serieMaq.get(id) || []), meta = metaDe(m.id) || {};
+      const par = paradasPorCodigo(parMaq.get(id) || [])[0] || null;
+      return { m, id, ind, meta, par, st: { tmr: estadoMeta(ind.tmr, meta.tmr), vel: estadoMeta(ind.vel, meta.vel), qual: estadoMeta(ind.qual, meta.qual) } };
+    }).sort((a,b)=> (b.ind.tot > 0) - (a.ind.tot > 0) || ORDEM_ETAPAS.indexOf(a.m.processo) - ORDEM_ETAPAS.indexOf(b.m.processo) || a.m.nome.localeCompare(b.m.nome, "pt-BR", { numeric:true }));
+    const tot = indicadoresSerie(linhas.flatMap(l=> serieMaq.get(l.id) || []));
+    const notaMeta = k =>{
+      const c = linhas.filter(l=> l.meta[k] != null && l.ind[k] != null);
+      return c.length ? `${c.filter(l=> l.ind[k] >= l.meta[k]).length} de ${c.length} máquinas na meta` : "nenhuma meta cadastrada";
+    };
+    const acima = tot.plan > 0 && tot.real > tot.plan * 1.05;
+    renderKpis($("d1-kpis"), [
+      { label:"TMR", value: tot.tmr, suffix:"%", decimals:1, nota: tot.tot > 0 ? `${fmt1(tot.prod)} de ${fmt1(tot.tot)} h · ${notaMeta("tmr")}` : "sem horas apontadas no dia" },
+      { label:"Velocidade média", value: tot.vel, suffix:" m/min", decimals:0, nota: notaMeta("vel") },
+      { label:"Produzido", value: tot.plan > 0 || tot.real > 0 ? tot.real/1000 : null, suffix:" km", decimals:1,
+        comp: acima ? { tom:"ruim", seta:"sobe", texto:`${fmt1((tot.real/tot.plan - 1)*100)}% acima do plano` } : null,
+        nota: tot.plan > 0 ? `de ${fmt1(tot.plan/1000)} km planejados · ${fmt(tot.real/tot.plan*100)}%` : "sem programação no dia" },
+      { label:"Refugo apontado", value: linhas.length ? tot.perda : null, suffix:" kg", decimals:0, nota: "qualidade: " + notaMeta("qual") },
+    ]);
+    const fV = { tmr: v=> fmtNum(v, 1) + "%", vel: v=> fmt(v) + " m/min", qual: v=> fmtNum(v, 1) + "%" };
+    tbody.innerHTML = linhas.length ? linhas.map(l=>{
+      const i = l.ind, semHoras = !(i.tot > 0);
+      const pctPlan = i.plan > 0 ? i.real / i.plan * 100 : null;
+      const corPlan = pctPlan == null ? "" : pctPlan > 105 ? "st-warning" : pctPlan >= 95 ? "st-good" : "st-critical";
+      const metas = ["tmr", "vel", "qual"].map(k=>`<i class="${l.meta[k] != null && i[k] != null ? l.st[k] : ""}" title="${esc(`${NOME_IND[k]}: ${l.meta[k] == null ? "sem meta" : i[k] == null ? "sem dado" : l.st[k] === "good" ? "na meta" : "abaixo da meta"}`)}"></i>`).join("");
+      return `<tr class="clicavel" tabindex="0" data-id="${esc(l.id)}" aria-label="${esc(`${l.m.nome}: abrir o pé de máquina`)}">
+        <td class="maq"><b>${esc(l.m.nome)}</b><small>${esc(l.m.processo)}${semHoras ? " · sem apontamento" : ""}</small></td>
+        <td class="num">${cel(i.tmr, l.meta.tmr, l.st.tmr, fV.tmr)}</td>
+        <td class="num">${cel(i.vel, l.meta.vel, l.st.vel, fV.vel)}</td>
+        <td class="num">${cel(i.qual, l.meta.qual, l.st.qual, fV.qual)}</td>
+        <td class="num">${i.plan > 0 || i.real > 0 ? `<div class="cel ${corPlan}"><b>${fmt1(i.real/1000)} / ${fmt1(i.plan/1000)} km</b><small>${pctPlan == null ? "sem plano" : `${fmt(pctPlan)}% do plano`}</small></div>` : `<div class="cel"><b class="sem-dado">—</b></div>`}</td>
+        <td class="num">${i.perda > 0 ? `${fmt(i.perda)} kg` : `<span class="sem-dado">—</span>`}</td>
+        <td>${l.par ? `${esc(l.par.nome)} <span class="sem-dado">· ${fmt1(l.par.horas)} h</span>` : `<span class="sem-dado">—</span>`}</td>
+        <td><span class="metas-batidas" aria-label="${esc(["tmr","vel","qual"].map(k=>`${NOME_IND[k]} ${l.meta[k] == null ? "sem meta" : l.st[k] === "good" ? "na meta" : "abaixo"}`).join(", "))}">${metas}</span></td>
+      </tr>`;
+    }).join("") : `<tr><td colspan="8"><div class="empty-state">Nenhuma máquina com esse filtro.</div></td></tr>`;
+    tbody.querySelectorAll("tr.clicavel").forEach(tr=>{
+      const ir = ()=>{ if(window.PE){ window.PE.mostrar(tr.dataset.id, S.dia); irPraTela("pe"); } };
+      tr.addEventListener("click", ir);
+      tr.addEventListener("keydown", e=>{ if(e.key === "Enter" || e.key === " "){ e.preventDefault(); ir(); } });
+    });
+    const par = paradasPorCodigo(dados.paradas.filter(r=> ids.has(chaveMaq(r.maquina))));
+    const totPar = par.reduce((a,p)=>a+p.horas,0);
+    hBarChart($("d1-paradas"), par.slice(0, 8).map(p=>({ label:p.nome, value:p.horas, display: fmt1(p.horas)+" h", color:p.cor,
+      tip:`<b>${esc(p.nome)}</b> · ${esc(p.classe)}<br>${fmt1(p.horas)} h · ${fmt1(p.horas/totPar*100)}% das paradas do dia` })),
+      { labelW:150, valueW:58, rowH:28, aria:"Paradas do dia por motivo", vazio:"Sem paradas apontadas no dia." });
+    pintarTotal("d1-paradas-total", par.length ? totPar : null, 1, "h", "no dia", false);
+    const per = perdasPorMotivo(dados.perdas.filter(r=> ids.has(chaveMaq(r.maquina))));
+    const totPer = per.reduce((a,p)=>a+p.kg,0);
+    hBarChart($("d1-perdas"), per.slice(0, 8).map(p=>({ label:p.nome, value:p.kg, display: fmt(p.kg)+" kg", color:"var(--series-3)",
+      tip:`<b>${esc(p.nome)}</b><br>${fmt(p.kg)} kg · ${fmt1(p.kg/totPer*100)}% do refugo do dia` })),
+      { labelW:150, valueW:68, rowH:28, aria:"Perda por motivo do dia", vazio:"Sem perda apontada no dia." });
+    pintarTotal("d1-perdas-total", per.length ? totPer : null, 0, "kg", "no dia", false);
+  }
+  controles();
+  window.D1 = {
+    mostrar(dia, setor){
+      S.dia = dia > hojeProd ? hojeProd : dia;
+      if(setor && setor !== S.setor){ S.setor = setor; segmentado($("d1-setor"), [["all", "Todos os setores"], ...setores().map(p=>[p, p])], S.setor, v=>{ S.setor = v; S.maq = "all"; opcoesMaq(); desenhar(); }); }
+      S.maq = "all"; opcoesMaq();
+      if(S.pronto) desenhar();
+    },
+  };
+  const abrir = v=>{ if(v === "d1" && !S.pronto){ S.pronto = true; desenhar(); } };
+  document.addEventListener("gualapack:tela", e=> abrir(e.detail));
+  if(view.classList.contains("active")) abrir("d1");
+})();
+
+/* ---- Pé de máquina: o quadro de uma máquina contra as metas ----
+   Para a liderança na rotina de pé de máquina, ou numa TV ao lado dela (tela cheia; o
+   endereço com #pe=L04 abre direto nessa máquina). O dia vai das 06:00 às 06:00. */
+(function(){
+  const view = document.getElementById("view-pe");
+  if(!view) return;
+  const $ = id => document.getElementById(id);
+  const hojeProd = diaDeProducao(new Date());
+  const lista = MAQUINAS.filter(m=> !maqForaDoPainel(m.id, hojeProd));
+  let lembrada = null;
+  try{ lembrada = localStorage.getItem("gualapack-pe-maquina"); }catch(e){}
+  const primeira = lista.find(m=> chaveMaq(m.id) === lembrada) || lista.find(m=> m.horasTot > 0) || lista[0];
+  const S = { maq: primeira ? chaveMaq(primeira.id) : null, dia: hojeProd, pronto:false, pedido:0 };
+  const cache = new Map();
+  function carregar(d){
+    if(!window.gualapackAuth) return Promise.reject(null);
+    if(!cache.has(d)){
+      const c = window.gualapackAuth, base = dataLocal(d);
+      const prox = isoDate(addDaysGlobal(base, 1)), ini = isoDate(addDaysGlobal(base, -13)), ini30 = isoDate(addDaysGlobal(base, -29));
+      cache.set(d, Promise.all([
+        lerRpcTudo(c, "rpc_hub_maquina_serie", { p_de:ini, p_ate:prox, p_grao:"dia" }),
+        lerRpcTudo(c, "rpc_hub_paradas_maquina", { p_de:d, p_ate:prox }),
+        c.rpc("rpc_hub_perda_maquina_motivo", { p_de:d, p_ate:prox }),
+        c.rpc("rpc_hub_maquinas", { p_de:d, p_ate:prox }),
+        c.rpc("rpc_hub_qualidade_maquina", { p_de:ini30, p_ate:prox }),
+      ]).then(([s, p, m, h, q])=>{
+        if(s.error) throw s.error;
+        return { serie: s.data || [], paradas: p.error ? [] : p.data || [], perdas: m.error ? [] : m.data || [],
+                 maquinas: h.error ? [] : h.data || [], qual30: q.error ? [] : q.data || [] };
+      }).catch(e=>{ cache.delete(d); throw e; }));
+    }
+    return cache.get(d);
+  }
+  const sel = $("pe-maquina");
+  opcoesMaquina(sel, lista, S.maq);
+  sel.addEventListener("change", ()=>{ S.maq = sel.value; lembrar(); desenhar(); });
+  $("pe-ant").addEventListener("click", ()=>{ S.dia = isoDate(addDaysGlobal(dataLocal(S.dia), -1)); desenhar(); });
+  $("pe-prox").addEventListener("click", ()=>{ if(S.dia < hojeProd){ S.dia = isoDate(addDaysGlobal(dataLocal(S.dia), 1)); desenhar(); } });
+  function lembrar(){
+    try{ localStorage.setItem("gualapack-pe-maquina", S.maq); }catch(e){}
+    if(view.classList.contains("active") && S.maq) history.replaceState(null, "", location.pathname + location.search + "#pe=" + encodeURIComponent(S.maq));
+  }
+  // tela cheia: a TV ao lado da máquina
+  const btnTela = $("pe-tela-cheia");
+  if(!document.fullscreenEnabled) btnTela.hidden = true;
+  btnTela.addEventListener("click", ()=>{
+    if(document.fullscreenElement) document.exitFullscreen().catch(()=>{});
+    else view.requestFullscreen().catch(()=>{});
+  });
+  document.addEventListener("fullscreenchange", ()=>{
+    const cheia = document.fullscreenElement === view;
+    btnTela.querySelector("span").textContent = cheia ? "Sair da tela cheia" : "Tela cheia";
+  });
+  function cabecalho(m){
+    const ehHoje = S.dia === hojeProd;
+    const r = ehHoje ? bancoLinhas("agora").find(x=> chaveMaq(x.maquina) === S.maq) : null;
+    let agora = `<span>Dia de produção de ${esc(fmtDM(dataLocal(S.dia)))}, das 06:00 às 06:00</span>`;
+    if(r){
+      const e = estadoAgora(r), desde = dataLocal(r.terminou_em || r.desde);
+      const produto = limpaTexto(r.produto), op = limpaTexto(r.num_ordem);
+      agora = `<span class="pe-estado vivo" style="--c:${e.cor}"><i></i>${esc(e.nome)}${desde ? ` <span class="sem-dado" style="font-weight:500">há ${esc(fmtDuracao((new Date() - desde) / 60000))}</span>` : ""}</span>` +
+        (op ? `<span>OP ${esc(op)}${produto ? ` · ${esc(produto.length > 70 ? produto.slice(0, 68) + "…" : produto)}` : ""}</span>` : "") +
+        (Number(r.qtd_planejada) > 0 ? `<span>${fmt(Number(r.qtd_boa)||0)} de ${fmt(Number(r.qtd_planejada))} na OP</span>` : "");
+    }else if(ehHoje) agora = `<span>Hoje, até agora · sem apontamento aberto</span>`;
+    $("pe-cabeca").innerHTML = `<div><div class="pe-nome">${esc(m ? m.nome : S.maq || "—")}</div>
+      <div class="pe-setor">${esc(m ? m.processo + (m.rota && m.rota !== "—" ? " · " + m.rota : "") : "")}</div></div>
+      <div class="pe-agora">${agora}</div>`;
+  }
+  function bloco(t){
+    const st = estadoMeta(t.v, t.meta);
+    const tem = t.v != null && Number.isFinite(t.v);
+    const cor = !tem ? "var(--border-strong)" : t.meta == null ? "var(--series-3)" : COR_ESTADO[st];
+    const fV = v => fmtNum(v, t.casas) + t.un;
+    const abaixo = tem && t.meta != null ? t.meta - t.v : null;
+    const selo = t.meta == null ? `<span class="selo" style="color:var(--text-muted)">sem meta</span>` : !tem ? "" :
+      st === "good" ? `<span class="selo">na meta</span>` : `<span class="selo">${esc(fmtNum(abaixo, t.casas) + (t.un === "%" ? " p.p." : t.un))} abaixo</span>`;
+    const w = tem ? Math.max(0, Math.min(100, t.v / t.escala * 100)) : 0;
+    const xm = t.meta != null ? Math.min(100, t.meta / t.escala * 100) : null;
+    return `<div class="pe-ind" style="--c:${cor}" role="group" aria-label="${esc(`${t.rot}: ${tem ? fV(t.v) : "sem dado"}` + (t.meta != null ? `, meta ${fV(t.meta)}` : ", sem meta"))}">
+      <div class="rot"><span>${esc(t.rot)}</span>${selo}</div>
+      <div class="val">${tem ? `<span class="kpi-num">${fmtNum(t.v, t.casas)}</span><small>${esc(t.un.trim())}</small>` : `<span class="sem-dado">—</span>`}</div>
+      <div class="pe-trilho" aria-hidden="true"><b style="width:${w.toFixed(1)}%"></b>${xm != null ? `<i style="left:${xm.toFixed(1)}%"></i>` : ""}</div>
+      <div class="meta"><span>${t.meta != null ? `meta ${esc(fV(t.meta))}` : "cadastre em Metas"}</span><span>${esc(t.nota || "")}</span></div>
+    </div>`;
+  }
+  async function desenhar(){
+    if(!S.pronto) return;
+    const pedido = ++S.pedido;
+    const m = MAQUINAS.find(x=> chaveMaq(x.id) === S.maq) || null;
+    $("pe-dia").innerHTML = rotuloDia(S.dia, hojeProd);
+    $("pe-prox").disabled = S.dia >= hojeProd;
+    cabecalho(m);
+    const alvos = [$("pe-indicadores"), $("pe-paradas"), $("pe-plano"), $("pe-perdas"), $("pe-tendencia")];
+    alvos.forEach(el=> el.classList.add("carregando"));
+    let dados;
+    try{ dados = await carregar(S.dia); }
+    catch(e){
+      if(pedido !== S.pedido) return;
+      alvos.forEach(el=> el.classList.remove("carregando"));
+      const msg = msgFalha(e);
+      $("pe-indicadores").innerHTML = `<div class="empty-state" style="grid-column:1/-1">${esc(msg)}</div>`;
+      ["pe-paradas", "pe-plano", "pe-perdas"].forEach(id=> semDados($(id), msg));
+      $("pe-tendencia").innerHTML = "";
+      pintarTotal("pe-paradas-total", null); pintarTotal("pe-perdas-total", null);
+      return;
+    }
+    if(pedido !== S.pedido) return;
+    alvos.forEach(el=> el.classList.remove("carregando"));
+    const daMaq = dados.serie.filter(r=> chaveMaq(r.maquina) === S.maq);
+    const dia = indicadoresSerie(daMaq.filter(r=> String(r.periodo).slice(0, 10) === S.dia));
+    const meta = metaDe(S.maq) || {};
+    const h = dados.maquinas.find(r=> chaveMaq(r.maquina) === S.maq) || {};
+    const velRef = Number(h.velocidade_ref_m_min) || null;
+    // qualidade: a do dia; sem OP pesada no dia, a dos últimos 30 dias (como o OEE do painel)
+    let qual = dia.qual, qualJanela = false;
+    if(qual == null){
+      const q = dados.qual30.find(r=> chaveMaq(r.maquina) === S.maq);
+      const base = q ? (Number(q.refugo_kg)||0) + (Number(q.peso_ops_kg)||0) : 0;
+      if(base > 0){ qual = 100 - 100 * (Number(q.refugo_kg)||0) / base; qualJanela = true; }
+    }
+    const perf = dia.vel != null && velRef ? Math.min(100, dia.vel / velRef * 100) : null;
+    const oee = dia.tmr != null && perf != null && qual != null ? dia.tmr * perf * qual / 10000 : null;
+    const metaOee = meta.oee ?? META_OEE;
+    $("pe-indicadores").innerHTML = [
+      { rot:"TMR", v: dia.tmr, un:"%", casas:1, meta: meta.tmr ?? null, escala:100,
+        nota: dia.tot > 0 ? `${fmt1(dia.prod)} de ${fmt1(dia.tot)} h` : "sem horas apontadas" },
+      { rot:"Velocidade", v: dia.vel, un:" m/min", casas:0, meta: meta.vel ?? null,
+        escala: Math.max(meta.vel || 0, velRef || 0, dia.vel || 0) * 1.12 || 1, nota: velRef ? `melhor mês ${fmt(velRef)}` : "" },
+      { rot:"Qualidade", v: qual, un:"%", casas:1, meta: meta.qual ?? null, escala:100,
+        nota: qualJanela ? "últimos 30 dias" : qual != null ? "OPs pesadas no dia" : "sem OP pesada" },
+      { rot:"OEE", v: oee, un:"%", casas:1, meta: metaOee ?? null, escala:100,
+        nota: oee != null ? `${fmt(dia.tmr)} × ${fmt(perf)} × ${fmt(qual)}` : "falta uma das três partes" },
+    ].map(bloco).join("");
+    if(view.classList.contains("active") && !reduzMovimento()){
+      $("pe-indicadores").querySelectorAll(".kpi-num").forEach((el, i)=>{
+        const v = Number(el.textContent.replace(/\./g, "").replace(",", "."));
+        if(Number.isFinite(v)) animateCount(el, v, el.textContent.includes(",") ? 1 : 0, 80 + i*70);
+      });
+    }
+    // produzido x programado do dia
+    const pct = dia.plan > 0 ? dia.real / dia.plan * 100 : null;
+    $("pe-plano-sub").textContent = dia.plan > 0 ? `Km lineares do dia · ${fmt(pct)}% do planejado` + (pct > 105 ? " · acima do programado" : "")
+                                                 : dia.real > 0 ? "Km lineares do dia · sem programação no dia" : "Km lineares do dia";
+    hBarChart($("pe-plano"), dia.plan > 0 || dia.real > 0 ? [
+      { label:"Planejado", value: dia.plan/1000, display: fmt1(dia.plan/1000)+" km", color:"var(--border-strong)", tip:`<b>Planejado</b><br>${fmt1(dia.plan/1000)} km` },
+      { label:"Produzido", value: dia.real/1000, display: fmt1(dia.real/1000)+" km",
+        color: pct == null ? "var(--series-3)" : pct > 105 ? "var(--warning)" : pct >= 95 ? "var(--good)" : "var(--critical)",
+        tip:`<b>Produzido</b><br>${fmt1(dia.real/1000)} km` + (pct != null ? ` · ${fmt(pct)}% do planejado` : "") },
+    ] : [], { labelW:90, valueW:74, rowH:30, aria:"Produzido contra planejado no dia", vazio:"Sem programação nem produção no dia." });
+    const par = paradasPorCodigo(dados.paradas.filter(r=> chaveMaq(r.maquina) === S.maq));
+    const totPar = par.reduce((a,p)=>a+p.horas,0);
+    hBarChart($("pe-paradas"), par.slice(0, 8).map(p=>({ label:p.nome, value:p.horas, display: fmt1(p.horas)+" h", color:p.cor,
+      tip:`<b>${esc(p.nome)}</b> · ${esc(p.classe)}<br>${fmt1(p.horas)} h · ${fmt1(p.horas/totPar*100)}% das paradas` })),
+      { labelW:150, valueW:58, rowH:28, aria:"Paradas do dia por motivo", vazio:"Sem paradas apontadas no dia." });
+    pintarTotal("pe-paradas-total", par.length ? totPar : null, 1, "h", "no dia", false);
+    const per = perdasPorMotivo(dados.perdas.filter(r=> chaveMaq(r.maquina) === S.maq));
+    const totPer = per.reduce((a,p)=>a+p.kg,0);
+    hBarChart($("pe-perdas"), per.slice(0, 6).map(p=>({ label:p.nome, value:p.kg, display: fmt(p.kg)+" kg", color:"var(--series-3)",
+      tip:`<b>${esc(p.nome)}</b><br>${fmt(p.kg)} kg · ${fmt1(p.kg/totPer*100)}% do refugo do dia` })),
+      { labelW:150, valueW:68, rowH:28, aria:"Refugo do dia por motivo", vazio:"Sem refugo apontado no dia." });
+    pintarTotal("pe-perdas-total", per.length ? totPer : null, 0, "kg", "no dia", false);
+    // últimos 14 dias: TMR, velocidade e qualidade, cada um com a meta
+    const dias = [];
+    for(let i = 13; i >= 0; i--) dias.push(isoDate(addDaysGlobal(dataLocal(S.dia), -i)));
+    const porDia = new Map();
+    daMaq.forEach(r=>{ const k = String(r.periodo).slice(0, 10); if(!porDia.has(k)) porDia.set(k, []); porDia.get(k).push(r); });
+    const mini = [["tmr", "TMR", "%", 1, meta.tmr], ["vel", "Velocidade", " m/min", 0, meta.vel], ["qual", "Qualidade", "%", 1, meta.qual]];
+    $("pe-tendencia").innerHTML = mini.map(([k, nome])=>`<div><h4>${esc(nome)}</h4><div class="grafico" id="pe-mini-${k}"></div></div>`).join("");
+    mini.forEach(([k, nome, un, casas, mt])=>{
+      const fV = v => fmtNum(v, casas) + un;
+      colunasMeta($(`pe-mini-${k}`), dias.map(d=>{
+        const v = indicadoresSerie(porDia.get(d) || [])[k], dd = dataLocal(d);
+        return { periodo:d, rotulo: String(dd.getDate()), valor: v, destaque: d === S.dia,
+          aria: `${DIAS_SEMANA[dd.getDay()]}, ${fmtDM(dd)}: ${v == null ? "sem dado" : fV(v)}`,
+          tip: `<b>${DIAS_SEMANA[dd.getDay()]}, ${fmtDM(dd)}</b><br>${v == null ? "sem dado" : `${esc(nome)} ${esc(fV(v))}`}` + (mt != null ? `<br>Meta ${esc(fV(mt))}` : "") };
+      }), { meta: mt ?? null, unidade: un === "%" ? "%" : "", casas, fmt: fV, altura:130, mini:true, padL:34,
+        aria: `${nome} dos últimos 14 dias`, vazio: `Sem ${nome.toLowerCase()} nos últimos 14 dias.`,
+        aoEscolher: it=>{ S.dia = it.periodo; desenhar(); } });
+    });
+  }
+  window.PE = {
+    mostrar(id, dia){
+      const k = chaveMaq(id);
+      if(!lista.some(m=> chaveMaq(m.id) === k)) return;
+      S.maq = k; sel.value = k;
+      if(dia) S.dia = dia > hojeProd ? hojeProd : dia;
+      lembrar();
+      desenhar();
+    },
+    // dado novo do hub com a TV em tela cheia: busca de novo, sem recarregar a página
+    async atualizar(){
+      cache.clear();
+      try{
+        const { data, error } = await window.gualapackAuth.from("v_hub_agora").select("*");
+        if(!error && Array.isArray(data) && window.BANCO){ window.BANCO.agora = data; window.BANCO.estado.agora = "ok"; }
+      }catch(e){ /* fica o último estado */ }
+      desenhar();
+    },
+  };
+  document.addEventListener("gualapack:tela", e=>{
+    if(e.detail === "pe"){
+      lembrar();
+      if(!S.pronto){ S.pronto = true; desenhar(); }
+    }else if(/^#pe=/.test(location.hash)) history.replaceState(null, "", location.pathname + location.search);
+  });
+  if(view.classList.contains("active")){ S.pronto = true; desenhar(); }
+  // o "há quanto tempo" do estado de agora anda sozinho
+  setInterval(()=>{ if(view.classList.contains("active") && S.dia === hojeProd && document.visibilityState === "visible")
+    cabecalho(MAQUINAS.find(x=> chaveMaq(x.id) === S.maq) || null); }, 60000);
+})();
+
+/* ---- Metas por máquina: só administrador grava (009) ---- */
+(function(){
+  const folha = document.getElementById("metas-folha");
+  if(!folha || !folha.showModal) return;
+  const botoes = [...document.querySelectorAll("[data-abrir-metas]")];
+  const tbody = document.getElementById("metas-linhas"), msg = document.getElementById("metas-msg"), salvar = document.getElementById("metas-salvar");
+  const CAMPOS = [["vel", "velocidade", 2000], ["tmr", "TMR", 100], ["qual", "qualidade", 100], ["oee", "OEE", 100]];
+  const mostrarBotoes = ()=>{ const pode = window.PERFIL_PAPEL === "admin" && !!window.TEM_009; botoes.forEach(b=> b.hidden = !pode); };
+  mostrarBotoes();
+  document.addEventListener("gualapack:perfil", mostrarBotoes);
+  const ref = (m, k)=>{
+    if(!m) return "";
+    if(k === "vel") return m.vel != null ? `período ${fmt(m.vel)}${m.velRef ? ` · melhor mês ${fmt(m.velRef)}` : ""}` : "";
+    if(k === "tmr") return m.horasTot > 0 ? `período ${m.tmr}%` : "";
+    if(k === "qual") return m.qual != null ? `período ${fmt1(m.qual)}%` : "";
+    return m.oee != null ? `período ${fmt1(m.oee)}%` : "";
+  };
+  const refFab = k =>{
+    const o = window.OEE || {}, t = window.HUB_TOTAIS || {};
+    const v = k === "tmr" ? t.tmr : k === "qual" ? o.qual : k === "oee" ? o.oee : null;
+    return v != null ? `período ${fmt1(v)}%` : "";
+  };
+  const valor = inp =>{ const t = inp.value.trim().replace(",", "."); return t === "" ? null : Number(t); };
+  function conferir(){
+    let mudou = 0, ruim = 0;
+    tbody.querySelectorAll("input:not(:disabled)").forEach(inp=>{
+      const v = valor(inp), max = Number(inp.dataset.max);
+      const invalido = v != null && !(Number.isFinite(v) && v > 0 && v <= max);
+      const alterado = (inp.value.trim().replace(",", ".") || "") !== (inp.dataset.orig || "");
+      inp.classList.toggle("invalido", invalido);
+      inp.classList.toggle("mudou", alterado && !invalido);
+      inp.setAttribute("aria-invalid", String(invalido));
+      if(invalido) ruim++; else if(alterado) mudou++;
+    });
+    salvar.disabled = !mudou || !!ruim;
+    msg.className = "metas-msg" + (ruim ? " erro" : "");
+    msg.textContent = ruim ? "Velocidade até 2.000 m/min; percentuais entre 0 e 100." : mudou ? `${mudou} ${mudou === 1 ? "meta alterada" : "metas alteradas"}` : "";
+  }
+  function abrir(){
+    const hoje = isoDate(new Date());
+    const linhas = [{ id:"FABRICA", nome:"Fábrica", fabrica:true },
+      ...MAQUINAS.filter(m=> !maqForaDoPainel(m.id, hoje)).map(m=>({ id: chaveMaq(m.id), nome:m.nome, m }))];
+    tbody.innerHTML = linhas.map(l=>{
+      const meta = metaDe(l.id) || {};
+      return `<tr data-id="${esc(l.id)}"><td>${esc(l.nome)}</td>${CAMPOS.map(([k, nome, max])=>{
+        const desab = l.fabrica && k === "vel";
+        const v = meta[k] != null ? String(meta[k]) : "";
+        const r = l.fabrica ? refFab(k) : ref(l.m, k);
+        return `<td><input type="text" inputmode="decimal" autocomplete="off" data-k="${k}" data-max="${max}" data-orig="${esc(v)}" value="${esc(desab ? "" : v.replace(".", ","))}"
+          ${desab ? `disabled placeholder="—" title="A fábrica não tem meta de velocidade: cada máquina tem a sua"` : ""} aria-label="${esc(`Meta de ${nome} ${l.fabrica ? "da fábrica" : "da " + l.nome}`)}">` +
+          (r && !desab ? `<span class="ref">${esc(r)}</span>` : "") + `</td>`;
+      }).join("")}</tr>`;
+    }).join("");
+    tbody.querySelectorAll("input").forEach(inp=>{ inp.dataset.orig = (inp.dataset.orig || ""); inp.addEventListener("input", conferir); });
+    conferir();
+    folha.showModal();
+    const primeiro = tbody.querySelector("input:not(:disabled)");
+    if(primeiro) primeiro.focus();
+  }
+  botoes.forEach(b=> b.addEventListener("click", abrir));
+  document.getElementById("metas-cancelar").addEventListener("click", ()=> folha.close());
+  folha.addEventListener("click", e=>{ if(e.target === folha) folha.close(); });   // toque fora da folha
+  salvar.addEventListener("click", async ()=>{
+    const mudadas = [...tbody.querySelectorAll("tr")].filter(tr=> tr.querySelector("input.mudou"));
+    if(!mudadas.length) return;
+    salvar.disabled = true;
+    for(let i = 0; i < mudadas.length; i++){
+      const tr = mudadas[i];
+      msg.className = "metas-msg";
+      msg.textContent = `Salvando ${i + 1} de ${mudadas.length}…`;
+      const v = k =>{ const inp = tr.querySelector(`input[data-k="${k}"]`); return inp && !inp.disabled ? valor(inp) : null; };
+      const { error } = await window.gualapackAuth.rpc("meta_maquina_salvar",
+        { p_maquina: tr.dataset.id, p_velocidade: v("vel"), p_tmr: v("tmr"), p_qualidade: v("qual"), p_oee: v("oee") });
+      if(error){
+        msg.className = "metas-msg erro";
+        msg.textContent = /administrador/i.test(error.message || "") ? "Só administradores alteram metas."
+                        : `Não deu para salvar ${tr.cells[0].textContent}: ${error.message || "erro"}`;
+        salvar.disabled = false;
+        return;
+      }
+    }
+    msg.textContent = "Metas salvas. Atualizando o painel…";
+    setTimeout(()=>{ folha.close(); if(window.recarregarNaMesmaTela) window.recarregarNaMesmaTela(); else location.reload(); }, 700);
+  });
+  window.abrirMetas = abrir;
+})();
+
 } // fim de renderDashboard()
 
 /* ============ troca de tema claro/escuro, com transição em círculo ============ */
@@ -6720,7 +7996,7 @@ const CHAVE_RETOMAR = "gualapack:retomar";
     if(document.body.classList.contains("no-scroll")) return true;
     const a = document.activeElement;
     if(a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable)) return true;
-    if(document.querySelector(".open, .aberta, [aria-haspopup][aria-expanded='true'], [role='combobox'][aria-expanded='true']")) return true;
+    if(document.querySelector(".open, .aberta, dialog[open], [aria-haspopup][aria-expanded='true'], [role='combobox'][aria-expanded='true']")) return true;
     return !!(window.MAQUETE && window.MAQUETE.ocupada && window.MAQUETE.ocupada());
   }
   function recarregar(){
@@ -6738,7 +8014,16 @@ const CHAVE_RETOMAR = "gualapack:retomar";
         const { data, error } = await window.gualapackAuth.from("v_hub_execucao").select("publicada_em,terminada_em");
         if(error || !Array.isArray(data) || !data.length) return;
         const nova = publicada(data[0]);
-        if(nova && nova !== publicada(window.HUB_EXECUCAO)) pendente = true;
+        if(nova && nova !== publicada(window.HUB_EXECUCAO)){
+          // pé de máquina em tela cheia (a TV ao lado da máquina): atualiza no lugar, sem
+          // recarregar (recarregar sairia da tela cheia, que só volta com um toque)
+          if(document.fullscreenElement && window.PE && window.PE.atualizar){
+            window.HUB_EXECUCAO = data[0];
+            window.PE.atualizar();
+            return;
+          }
+          pendente = true;
+        }
       }
       if(pendente && !ocupado()) recarregar();
     }catch(e){ /* sem rede: olha de novo no próximo minuto */ }
@@ -6747,6 +8032,7 @@ const CHAVE_RETOMAR = "gualapack:retomar";
   setInterval(olhar, 60000);
   document.addEventListener("visibilitychange", olhar);
   window.olharAtualizacao = olhar;
+  window.recarregarNaMesmaTela = recarregar;
 })();
 // Volta de uma atualização automática: a tela e a altura em que a pessoa estava (vale
 // por 2 min; depois disso é uma abertura nova).
@@ -6760,8 +8046,18 @@ function lerRetomada(){
 }
 function retomarTela(r){
   if(r.tela && window.irParaTela) window.irParaTela(r.tela);
-  const rolar = ()=> window.scrollTo({ top: r.y || 0 });
-  rolar(); requestAnimationFrame(rolar); setTimeout(rolar, 350);
+  // a página cresce enquanto os gráficos que buscam dados terminam: tenta de novo até ela
+  // ter a altura, por até 3 s ou até a pessoa mexer
+  const alvo = r.y || 0, inicio = Date.now();
+  let mexeu = false;
+  const parar = ()=>{ mexeu = true; };
+  ["pointerdown", "keydown", "wheel", "touchstart"].forEach(t=> window.addEventListener(t, parar, { capture:true, once:true, passive:true }));
+  const rolar = ()=>{
+    if(mexeu) return;
+    window.scrollTo({ top: alvo });
+    if(Math.abs(window.scrollY - alvo) > 2 && Date.now() - inicio < 3000) setTimeout(rolar, 120);
+  };
+  rolar(); requestAnimationFrame(rolar);
   // o silêncio vale até o primeiro gesto (a maquete pode demorar a montar)
   const GESTOS = ["pointerdown", "keydown", "wheel", "touchstart"];
   const acordar = ()=>{ window.ATUALIZACAO_SILENCIOSA = false; GESTOS.forEach(t=>window.removeEventListener(t, acordar, true)); };
@@ -7123,6 +8419,12 @@ async function boot(){
     const labelEl = document.getElementById("period-label");
     if(labelEl && window.rotuloPeriodo) labelEl.textContent = window.rotuloPeriodo(de, ate);
     if(retomada) retomarTela(retomada);
+    // "#pe=L04": o pé de máquina dessa máquina (endereço salvo na TV ao lado dela)
+    const peNoEndereco = /^#pe=(.+)$/.exec(location.hash);
+    if(peNoEndereco && window.PE){
+      window.PE.mostrar(decodeURIComponent(peNoEndereco[1]));
+      if(!retomada && window.irParaTela) window.irParaTela("pe");
+    }
   }catch(err){
     // Erro aqui não pode deixar a página presa atrás do "auth-pending" pra
     // sempre — melhor mostrar o painel (mesmo que incompleto) do que uma

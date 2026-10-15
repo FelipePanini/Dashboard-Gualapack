@@ -342,6 +342,13 @@ Uma vez só, nesta ordem:
     `uv run --with pillow --with numpy python scripts/gerar_planta.py "<planta.png>"`
     e depois `uv run python scripts/publicar_planta.py` (a imagem fica em
     `data/planta`, fora do git). Sem o 008, o hub publica o resto e avisa.
+12. No **SQL Editor** → rodar `sql/supabase/009_gestao.sql` (gestão por
+    máquina: as metas de cada máquina, gravadas no painel por um
+    administrador, com histórico; a série por máquina e dia ou mês do D-1, do
+    pé de máquina e da evolução; as paradas por máquina; o programado x
+    produzido por OP; e o `hub_publicar` versão 7, com o conjunto
+    `op_plano_dia`). Tem de mostrar `gestao_ok = true`. A próxima rodada do
+    hub publica as OPs. Sem o 009, o hub publica o resto e avisa.
 
 Feitos: 1 a 3 em 25/09, 4 a 6 em 30/09, o 8 (que já faz o 7) em 07/10, o 9
 em 08/10.
