@@ -46,3 +46,28 @@ def test_op_plano_vai_no_pacote_so_com_o_009():
     assert publicacao.SQL_DO_CONJUNTO["op_plano_dia"] == "009_gestao.sql"
     tabela, consulta = publicacao.CONJUNTOS["op_plano_dia"]
     assert tabela == "clean.op_plano_dia" and "passadas" in consulta
+
+
+def test_mp_maquina_traz_as_bandeiras_e_a_maquina_do_painel():
+    """Pé de máquina (010): o local vira a máquina do painel e só as bandeiras de 1 a 5 entram."""
+    con = duckdb.connect()
+    con.execute("create schema if not exists raw; create schema if not exists clean")
+    con.execute("""create table raw.banco__mp_maquina as select * from (values
+        ('PI01.00021', 'BOBINA PET + AL', 'MATRIZ - L04', 3, '94307', 27.705, timestamp '2026-10-13 10:00'),
+        ('BP23.018', 'BOPP MATTE', 'MATRIZ - ROTO 01', 2, '93987', 183.474, timestamp '2026-09-23 08:00'),
+        ('PL22.056', 'PAPEL', 'MATRIZ - REB10', 4, '94185', 638.0, timestamp '2026-10-14 06:00'),
+        ('PL22.056', 'PAPEL', 'MATRIZ - REB10L', 5, '94186', 600.0, timestamp '2026-10-14 06:00'),
+        ('XX', 'PROCESSADO', 'MATRIZ - L04', 6, '1', 1.0, timestamp '2026-10-01 06:00'),
+        ('YY', 'SEM BANDEIRA', 'MATRIZ - MATÉRIA PRIMA', 0, '2', 1.0, timestamp '2026-10-01 06:00')
+        ) t(cod_item, descricao, local_estoque, transfer_status, id_volume, quantidade, data_entrada)""")
+    con.execute((SQL / "clean" / "240_mp_maquina.sql").read_text(encoding="utf-8"))
+    linhas = {r[0]: r for r in con.execute(
+        "select id_volume, maquina, bandeira, quantidade from clean.mp_maquina").fetchall()}
+    assert sorted(linhas) == ["93987", "94185", "94186", "94307"]
+    assert linhas["93987"][1] == "RT01" and linhas["94185"][1] == "REB 10" and linhas["94186"][1] == "REB 10L"
+    assert linhas["94307"][1:3] == ("L04", 3)
+
+
+def test_mp_maquina_vai_no_pacote():
+    tabela, consulta = publicacao.FOTOS["mp_maquina"]
+    assert tabela == "clean.mp_maquina" and "bandeira" in consulta

@@ -328,6 +328,10 @@ FOTOS: dict[str, tuple[str, str]] = {
         select * from clean.carteira_aberta
         order by coalesce(entrega_pcp, entrega_cliente) nulls last, num_pedido, item"""),
     "carteira_mes": ("clean.carteira_mes", "select * from clean.carteira_mes order by mes"),
+    # pé de máquina: a MP em cada máquina pelas bandeiras (010_pe_de_maquina.sql)
+    "mp_maquina": ("clean.mp_maquina", """
+        select maquina, local, cod_item, descricao, bandeira, id_volume, round(quantidade, 3) as quantidade, data_entrada
+        from clean.mp_maquina order by maquina, bandeira, id_volume"""),
 }
 # Pallets do WIP um a um (008_wip_maquete.sql): vão numa chamada própria, só
 # quando mudam (a assinatura fica em publicacao_mes com uma data fixa no lugar do mês).

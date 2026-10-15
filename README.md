@@ -139,6 +139,7 @@ alternativas, e o motivo continua valendo enquanto a situação não mudar.
 | Maquete do WIP (aba WIP) | idem, pallet a pallet (`v_hub_wip_pallet`, 008) | a mesma regra; o `LocalEstoque` dá a área na planta; a cor é a idade da OP, nas faixas do gráfico "Idade do WIP" (até 30 dias, 31 a 90, mais de 90) |
 | D-1, pé de máquina e evolução por dia ou mês (009) | os mesmos de TMR, velocidade, qualidade do OEE e aderência, por máquina e dia | as mesmas contas, num dia ou mês; o dia de produção vai das 06:00 às 06:00; a meta é a da máquina, gravada no painel por um administrador (sem meta, nada de cor de status) |
 | Produção acima do programado (009) | planilha Histórico Aderência Programação + apontamentos | por OP e máquina: a última programação da OP (a planilha repete a OP a cada reprogramação) contra a maior passada (a L04 passa a mesma OP 2 a 3 vezes); entra no período em que a OP terminou na máquina. Em set/2026: 317 km acima em 9.543 km programados (3,3%) |
+| Pé de máquina (010) | volumes de MP (`stkTCVolume`, com item, local de estoque e lote), a consulta da planilha "Pé de Máquina" | cada volume com a bandeira do `TransferStatus`: 1 Aguardando, 2 Aceito, 3 Aguardando remoção, 4 Em uso, 5 Aguardando finalização; só os locais de máquina com bandeira (o almoxarifado e o Processado ficam fora); o local vira a máquina do painel ("MATRIZ - ROTO 01" é a RT01) |
 | Carteira | `View_usr_ListaPedidosVenda` + estrutura do produto | um item por linha; kg = a quantidade em KG, ou m² × gramatura da estrutura ÷ 1000 |
 | Faturado | `view_usr_notas_saida_entrada_custo` | notas de produto acabado; kg = m² × gramatura ÷ 1000, como o BI |
 | Laudos do CQ | `view_usr_LaudoAnalise` | por resultado |
@@ -344,7 +345,7 @@ vale daqui pra frente em `demo/index.html`:
   qualidade e OEE da fábrica) no botão "Metas" do D-1 e do pé de máquina.
   Sem meta, os cartões e gráficos ficam neutros (nada de cor de status
   inventada). Com ela: verde na meta, âmbar até 10% abaixo, vermelho abaixo.
-- **SQL do Supabase:** 9 arquivos, de `001` a `009_gestao.sql`;
+- **SQL do Supabase:** 10 arquivos, de `001` a `010_pe_de_maquina.sql`;
   num Supabase novo, rodar em ordem (`hub/README.md`). Sem o 005, as telas do
   banco mostram "Sem dados". Sem o 006, a linha do tempo mostra só o dia mais
   recente e a aderência fica na conta antiga (ADERÊNCIA DIÁRIA). Sem o 007, os

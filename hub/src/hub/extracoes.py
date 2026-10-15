@@ -95,6 +95,15 @@ EXTRACOES: list[Extracao] = [
              """SELECT OP, ID, OP_HoraInicio, CodAtiv, LocalEstoque, OP_Cliente, OP_QtdPlanejado, OP_QtdProduzido_Ativ,
                        QtdMetroLinear, QtdKg, StatusWIP, StatusOP
                 FROM dbo.view_usr_pallet_wip_disponiveis"""),
+    Extracao("mp_maquina", "Matéria-prima no pé de cada máquina pelo sistema de bandeiras: os volumes (bobinas) "
+             "com TransferStatus de 1 a 5 nos locais de estoque, a consulta da planilha Pé de Máquina.",
+             """SELECT IT.ExtRef AS CodItem, IT.Name AS Descricao, Loc.Name AS LocalEstoque, Vol.TransferStatus,
+                       Vol.IdVolume, Vol.AvailableQtd AS Quantidade, Vol.InsDt AS DataEntrada
+                FROM dbo.stkTCVolume Vol
+                INNER JOIN dbo.stkTCVolumeItem IT ON IT.IdVolumeItem = Vol.IdVolumeItem
+                LEFT OUTER JOIN dbo.stkTCStockPlace Loc ON Loc.IdStockPlace = Vol.IdStockPlace
+                WHERE Vol.AvailableQtd <> 0 AND IT.ExtRef NOT LIKE '%SC01%' AND Vol.TransferStatus BETWEEN 1 AND 5
+                  AND Loc.Name NOT LIKE '%OURO FINO%'"""),
     Extracao("gramatura_produto", "Gramatura de cada produto pela estrutura (EstrComponentes e EstruturasOp), a mesma "
              "\"Gramatura Total\" das notas: converte em kg a carteira vendida em m².",
              """SELECT ec.CodItem,

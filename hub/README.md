@@ -349,6 +349,12 @@ Uma vez só, nesta ordem:
     produzido por OP; e o `hub_publicar` versão 7, com o conjunto
     `op_plano_dia`). Tem de mostrar `gestao_ok = true`. A próxima rodada do
     hub publica as OPs. Sem o 009, o hub publica o resto e avisa.
+13. No **SQL Editor** → rodar `sql/supabase/010_pe_de_maquina.sql` (o pé de
+    máquina: a matéria-prima em cada máquina pelo sistema de bandeiras, a
+    mesma consulta da planilha "Pé de Máquina", e o `hub_publicar` versão 8,
+    com a foto `mp_maquina`). Tem de mostrar `pe_de_maquina_ok = true`. A
+    próxima rodada do hub publica os volumes. Sem o 010, a tela Pé de máquina
+    diz que ainda não foi ativada.
 
 Feitos: 1 a 3 em 25/09, 4 a 6 em 30/09, o 8 (que já faz o 7) em 07/10, o 9
 em 08/10.

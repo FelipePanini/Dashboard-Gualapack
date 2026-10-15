@@ -1,4 +1,4 @@
-/* Abertura da tela de login (16/10/2026; prévia em login.html?intro=1, aprovada e padrão).
+/* Abertura da tela de login (15/10/2026; prévia em login.html?intro=1, aprovada e padrão).
 
    1. A marca Gualapack acende conforme a página rola: uma sequência de quadros no
       canvas, presa à rolagem pelo ScrollTrigger (scrub), como a demo "Image Sequence"

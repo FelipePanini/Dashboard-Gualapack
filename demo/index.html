@@ -622,6 +622,58 @@ body.no-scroll{ overflow:hidden; }
 .botao-pri:active{ transform: scale(.97); }
 .botao-pri:disabled{ opacity:.45; cursor:default; }
 
+
+/* =========================================================================
+   PÉ DE MÁQUINA (15/10/2026): a matéria-prima no pé de cada máquina pelo
+   sistema de bandeiras. A cor nunca vem sozinha: sempre com o nome da bandeira.
+   ========================================================================= */
+:root{
+  --bd-aceito: #12864e; --bd-uso: #1f6fc4; --bd-final: #c08a00; --bd-remover: #c62f3e; --bd-aguardando: #7b8794;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bd-aceito: #33c47a; --bd-uso: #5aa7ec; --bd-final: #f0c33c; --bd-remover: #ef6b74; --bd-aguardando: #9aa6b4; } }
+:root[data-theme="dark"]{ --bd-aceito: #33c47a; --bd-uso: #5aa7ec; --bd-final: #f0c33c; --bd-remover: #ef6b74; --bd-aguardando: #9aa6b4; }
+.bandeira-ic{ width:14px; height:16px; flex:none; color: var(--c); }
+.mp-hora{ font-size:12.5px; color: var(--text-muted); }
+.mp-bandeiras{ display:grid; grid-template-columns: repeat(5, minmax(0,1fr)); gap:12px; margin-bottom:16px; }
+.mp-band{ position:relative; overflow:hidden; display:flex; flex-direction:column; align-items:flex-start; gap:6px; text-align:left;
+  padding:14px 16px 13px; border-radius:16px; border:1px solid var(--border); background: var(--surface-1); color: var(--text-primary);
+  font: inherit; cursor:pointer; box-shadow: var(--shadow-card); transition: transform .25s var(--spring), opacity .2s, box-shadow .2s; }
+.mp-band::before{ content:""; position:absolute; inset:0 auto 0 0; width:4px; background: var(--c); }
+.mp-band .nome{ display:flex; align-items:center; gap:7px; font-size:12.5px; font-weight:650; color: var(--text-secondary); }
+.mp-band .n{ font-size:30px; font-weight:750; letter-spacing:-0.03em; line-height:1; font-variant-numeric: tabular-nums; }
+.mp-band .n small{ font-size:.42em; font-weight:600; color: var(--text-secondary); margin-left:4px; letter-spacing:0; }
+.mp-band .kg{ font-size:12px; color: var(--text-muted); font-variant-numeric: tabular-nums; }
+.mp-band[aria-pressed="false"]{ opacity:.42; box-shadow:none; }
+.mp-band:hover{ transform: translateY(-2px); }
+.mp-band:focus-visible{ outline:2px solid var(--accent); outline-offset:2px; }
+.mp-retirar .vol-lista{ display:grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap:8px 18px; }
+.mp-grade{ display:grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap:14px; margin-bottom:12px; align-items:start; }
+.mp-card{ background: var(--surface-1); border:1px solid var(--border); border-radius:18px; box-shadow: var(--shadow-card); padding:16px 18px 14px; min-width:0; }
+.mp-card-cab{ display:flex; align-items:flex-start; justify-content:space-between; gap:10px; margin-bottom:10px; }
+.mp-card-cab b{ display:block; font-size:18px; font-weight:750; letter-spacing:-0.02em; }
+.mp-card-cab small{ font-size:12px; color: var(--text-muted); }
+.mp-contas{ display:flex; gap:6px; flex-wrap:wrap; justify-content:flex-end; }
+.mp-conta{ display:inline-flex; align-items:center; gap:4px; height:22px; padding:0 8px; border-radius:11px; font-size:12px; font-weight:650;
+  color: var(--c); background: color-mix(in srgb, var(--c) 12%, transparent); font-variant-numeric: tabular-nums; }
+.mp-conta .bandeira-ic{ width:11px; height:12px; }
+.vol-grupo + .vol-grupo{ margin-top:8px; }
+.vol-grupo-nome{ font-size:11.5px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; color: var(--c); margin:0 0 4px; display:flex; align-items:center; gap:6px; }
+.vol{ display:grid; grid-template-columns: auto minmax(0,1fr) auto; align-items:center; gap:10px; padding:6px 0; border-top:1px solid var(--border); }
+.vol:first-of-type{ border-top:0; }
+.vol .item{ min-width:0; }
+.vol .item b{ display:block; font-size:12.5px; font-weight:650; font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; }
+.vol .item span{ display:block; font-size:12px; color: var(--text-secondary); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.vol .qtd{ text-align:right; font-size:12.5px; font-weight:650; font-variant-numeric: tabular-nums; white-space:nowrap; }
+.vol .qtd small{ display:block; font-size:11px; font-weight:500; color: var(--text-muted); }
+.mp-card-pe{ margin-top:10px; display:flex; justify-content:flex-end; }
+.mp-card-pe button{ border:0; background:none; color: var(--accent); font: inherit; font-size:12.5px; font-weight:650; cursor:pointer; padding:4px 6px; border-radius:8px; }
+.mp-card-pe button:hover{ background: var(--surface-sunken); }
+.mp-vazias{ font-size:12.5px; color: var(--text-muted); margin:4px 2px 0; }
+@media (max-width: 1080px){ .mp-bandeiras{ grid-template-columns: repeat(3, minmax(0,1fr)); } }
+@media (max-width: 768px){ .mp-bandeiras{ grid-template-columns: repeat(2, minmax(0,1fr)); } .mp-band .n{ font-size:24px; }
+  .mp-grade{ grid-template-columns: minmax(0,1fr); } .fab-seg button{ font-size:12px; padding:8px 2px; } }
+
 /* selo do topo depois de uma atualização automática: um brilho curto */
 @keyframes renovado{ 0%{ box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 45%, transparent); } 100%{ box-shadow: 0 0 0 9px transparent; } }
 .status-chip.renovado{ animation: renovado 1.1s var(--ease-out) 2; }
@@ -1569,7 +1621,7 @@ html.vidro .rail-foot:hover, html.vidro .conta-topo:hover, html.vidro .rail-foot
 }
 
 /* =========================================================================
-   BARRAS FLUTUANTES (16/10/2026, pedido do dono: "a barra lateral fica bugada
+   BARRAS FLUTUANTES (15/10/2026, pedido do dono: "a barra lateral fica bugada
    na tela" e "não gostei daquela borda branca"). Com o grupo Fábrica, a barra
    lateral passou da altura da tela e os últimos botões ficavam fora do fundo.
    - Barra lateral: um painel de vidro solto da borda, com cantos e sombra suave,
@@ -1598,7 +1650,7 @@ body.rolou .topbar::before{ opacity:1; }
 @media (min-width: 769px){
   .shell{ grid-template-columns: 120px minmax(0,1fr); }
   /* o desfoque do topo vai até a borda da janela, por baixo da barra lateral: começar na
-     coluna do conteúdo deixava um degrau claro colado na barra (16/10) */
+     coluna do conteúdo deixava um degrau claro colado na barra (15/10) */
   .topbar::before{ left:-120px; }
   .rail, html.vidro .rail{
     top:12px; height:calc(100vh - 24px); height:calc(100dvh - 24px); margin:12px 0 0 12px;
@@ -1718,7 +1770,7 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
 <dialog class="metas-folha" id="metas-folha" aria-labelledby="metas-titulo">
   <div class="metas-cab">
     <h3 id="metas-titulo">Metas por máquina</h3>
-    <p>A referência para o D-1, o pé de máquina, a evolução e os gráficos por máquina. Em branco, a máquina fica sem meta.
+    <p>A referência para o D-1, o detalhado das máquinas, a evolução e os gráficos por máquina. Em branco, a máquina fica sem meta.
       Embaixo de cada campo, o resultado do período escolhido no topo e o melhor mês, para ajudar a definir.</p>
   </div>
   <div class="metas-corpo">
@@ -1747,6 +1799,7 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
       </button>
       <!-- Chão de fábrica (15/10): o agora, o dia anterior (D-1) e o pé de máquina. No celular,
            uma aba só ("Fábrica") com o seletor no topo, como o OEE. -->
+      <span class="rail-sep" aria-hidden="true"></span>
       <div class="rail-grupo" role="group" aria-label="Chão de fábrica">
         <span class="rail-grupo-nome" aria-hidden="true">FÁBRICA</span>
         <button class="rail-btn" data-view="agora" title="Agora no chão de fábrica" aria-label="Agora no chão de fábrica">
@@ -1757,17 +1810,22 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="5" width="17" height="15.5" rx="2.5"/><path d="M3.5 9.5h17M8 3v4M16 3v4"/><path d="M9 15h6"/></svg>
           <span class="rail-label" aria-hidden="true">D-1</span>
         </button>
-        <button class="rail-btn" data-view="pe" title="Pé de máquina: o quadro de cada máquina contra as metas" aria-label="Pé de máquina">
+        <button class="rail-btn" data-view="pe" title="Detalhado das máquinas: cada máquina no dia contra as metas" aria-label="Detalhado das máquinas">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="4" width="18" height="12.5" rx="2.5"/><path d="M8 20.5h8M12 16.5v4"/><path d="M7 12.5V10M10.5 12.5V8M14 12.5V9.5M17.5 12.5V7.5"/></svg>
+          <span class="rail-label" aria-hidden="true">Detalhado</span>
+        </button>
+        <button class="rail-btn" data-view="mp" title="Pé de máquina: a matéria-prima em cada máquina pelas bandeiras" aria-label="Pé de máquina">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M5.5 21V4"/><path d="M5.5 4.5h11l-2.2 3.6 2.2 3.6h-11"/></svg>
           <span class="rail-label" aria-hidden="true">Pé de máquina</span>
         </button>
       </div>
-      <button class="rail-btn rail-oee" type="button" id="rail-fab" title="Chão de fábrica: agora, D-1 e pé de máquina" aria-label="Chão de fábrica: agora, D-1 e pé de máquina">
+      <button class="rail-btn rail-oee" type="button" id="rail-fab" title="Chão de fábrica: agora, D-1, detalhado das máquinas e pé de máquina" aria-label="Chão de fábrica: agora, D-1, detalhado das máquinas e pé de máquina">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 12h4l2.5-6 5 12 2.5-6H21"/></svg>
         <span class="rail-label" aria-hidden="true">Fábrica</span>
       </button>
       <!-- As três partes do OEE. No celular viram uma aba só ("OEE") com um seletor
            no topo: sete abas não cabem na barra de baixo (tab-bars.md, "Avoid overflow tabs"). -->
+      <span class="rail-sep" aria-hidden="true"></span>
       <div class="rail-grupo" role="group" aria-label="OEE">
         <span class="rail-grupo-nome" aria-hidden="true">OEE</span>
         <button class="rail-btn" data-view="qualidade" title="Qualidade: aparas, perdas e laudos" aria-label="Qualidade">
@@ -1948,7 +2006,7 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
           <div class="panel-head">
             <div>
               <h3 class="panel-title">Máquinas x metas</h3>
-              <div class="panel-sub" id="d1-sub">Dia de produção, das 06:00 às 06:00 &middot; toque numa máquina para abrir o pé de máquina</div>
+              <div class="panel-sub" id="d1-sub">Dia de produção, das 06:00 às 06:00 &middot; toque numa máquina para abrir o detalhado dela</div>
             </div>
           </div>
           <div class="table-wrap">
@@ -2022,6 +2080,25 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
           </div>
           <div class="pe-mini" id="pe-tendencia"></div>
         </section>
+      </div>
+
+      <!-- ============ PÉ DE MÁQUINA: a matéria-prima em cada máquina pelas bandeiras ============ -->
+      <div class="view" id="view-mp">
+        <div class="barra-filtros">
+          <div class="segmented" id="mp-setor" role="group" aria-label="Setor"></div>
+          <span class="espaco"></span>
+          <span class="mp-hora" id="mp-hora" aria-live="polite"></span>
+        </div>
+        <section class="mp-bandeiras" id="mp-bandeiras" role="group" aria-label="Bandeiras: toque para mostrar ou esconder"></section>
+        <section class="panel mp-retirar" id="mp-retirar-painel">
+          <div class="panel-head">
+            <div><h3 class="panel-title">Para a logística retirar</h3><div class="panel-sub" id="mp-retirar-sub">Volumes com bandeira vermelha (aguardando remoção) no pé das máquinas</div></div>
+            <div class="panel-total" id="mp-retirar-total" hidden></div>
+          </div>
+          <div id="mp-retirar"></div>
+        </section>
+        <section class="mp-grade" id="mp-grade" aria-label="Máquinas"></section>
+        <p class="mp-vazias" id="mp-vazias"></p>
       </div>
 
       <!-- ============ QUALIDADE (aparas, perdas e laudos) ============ -->
@@ -2411,9 +2488,6 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
         </section>
       </div>
 
-      <footer id="footer-note">
-        Painel interno de Produção &middot; Gualapack Jaguariúna.
-      </footer>
     </main>
   </div>
 </div>
@@ -5954,8 +6028,8 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   // Grupos de abas: no computador, cada tela tem a sua aba; no celular, o grupo vira uma
   // aba só ("Fábrica", "OEE") que abre a última tela vista, com o seletor no topo.
   const GRUPOS = [
-    { vistas:["agora", "d1", "pe"], btn: document.getElementById("rail-fab"), seg: document.getElementById("fab-seg"),
-      classe:"em-fab", ultimo:"agora", opcoes:[["agora","Agora"], ["d1","D-1"], ["pe","Pé de máquina"]] },
+    { vistas:["agora", "d1", "pe", "mp"], btn: document.getElementById("rail-fab"), seg: document.getElementById("fab-seg"),
+      classe:"em-fab", ultimo:"agora", opcoes:[["agora","Agora"], ["d1","D-1"], ["pe","Detalhado"], ["mp","Pé de máquina"]] },
     { vistas:["qualidade", "performance", "disponibilidade"], btn: document.getElementById("rail-oee"), seg: document.getElementById("oee-seg"),
       classe:"em-oee", ultimo:"qualidade", opcoes:[["qualidade","Qualidade"], ["performance","Performance"], ["disponibilidade","Disponibilidade"]] },
   ];
@@ -6298,14 +6372,14 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   }
   // Embaixo da resposta, o botão que abre a tela de onde ela saiu ("pe:L04" = pé de máquina da L04).
   const NOME_TELA = { overview:"Geral", agora:"Agora", qualidade:"Qualidade", performance:"Performance", disponibilidade:"Disponibilidade",
-    carteira:"Carteira", wip:"WIP", pe:"Pé de máquina" };
+    carteira:"Carteira", wip:"WIP", pe:"Detalhado das máquinas", mp:"Pé de máquina" };
   function botaoTela(tela){
     if(!tela) return null;
     const [v, maq] = tela.split(":");
     if(!NOME_TELA[v] || !document.querySelector(`.rail-btn[data-view="${v}"]`)) return null;
     const c = document.createElement("button");
     c.type = "button"; c.className = "chip chip-tela";
-    c.textContent = maq ? `Abrir o pé de máquina da ${maq}` : `Abrir ${NOME_TELA[v]}`;
+    c.textContent = maq ? `Abrir o detalhado da ${maq}` : `Abrir ${NOME_TELA[v]}`;
     c.addEventListener("click", ()=>{
       if(maq && window.PE) window.PE.mostrar(maq);
       const b = document.querySelector(`.rail-btn[data-view="${v}"]`);
@@ -6969,7 +7043,8 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   const IC_MAQ = svg(`<rect x="3.5" y="7" width="17" height="10" rx="2.5"/><circle cx="8.5" cy="12" r="1.6"/><path d="M13 12h4.5"/>`);
   // telas: as da barra lateral, com palavras que levam a cada uma
   const EXTRAS = { overview:"geral oee resumo inicio", agora:"agora chao fabrica paradas rodando",
-    d1:"d-1 d1 ontem dia anterior resumo metas maquinas", pe:"pe de maquina quadro tv tela lideranca metas gestao",
+    d1:"d-1 d1 ontem dia anterior resumo metas maquinas", pe:"detalhado das maquinas detalhe quadro tv tela lideranca metas gestao",
+    mp:"pe de maquina materia prima mp bandeiras bobinas volumes rastreabilidade logistica remocao",
     qualidade:"qualidade aparas refugo laudos perda motivo", performance:"performance velocidade produtividade aderencia plano realizado",
     disponibilidade:"disponibilidade tmr paradas pareto linha tempo gantt apontamentos setup",
     carteira:"carteira pedidos entregas prazo fila programacao faturamento", wip:"wip pallets etiqueta estoque maquete planta" };
@@ -7253,12 +7328,6 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   window.matchMedia("(max-width: 768px)").addEventListener("change", ()=>{ if(aberto){ if(compacto()) entrarCheia(); else sairCheia(); } });
 })();
 
-const footerNote = document.getElementById("footer-note");
-if(footerNote){
-  footerNote.innerHTML = USANDO_DADOS_REAIS
-    ? `Painel interno de Produção &middot; Gualapack Jaguariúna &middot; os números vêm do banco da fábrica (Metrics), lido pelo data hub; a apara confirmada (balança) e o planejado da aderência ainda vêm das planilhas do PCP.`
-    : `Painel interno de Produção &middot; Gualapack Jaguariúna &middot; pré-visualização local com valores de referência (sem Supabase configurado).`;
-}
 
 
 /* =========================================================================
@@ -7491,7 +7560,7 @@ function perdasPorMotivo(linhas){
       const det = v == null ? "" : E.metrica === "tmr" ? `${fmt1(ind.prod)} h produzindo de ${fmt1(ind.tot)} h`
         : E.metrica === "vel" ? `${fmt1(ind.metros/1000)} km em ${fmt1(ind.prod)} h` : E.metrica === "ader" ? `${fmt1(ind.real/1000)} de ${fmt1(ind.plan/1000)} km`
         : `${fmt(ind.ref)} kg de refugo em ${fmt(ind.ref + ind.peso)} kg`;
-      const acao = grao === "mes" ? "toque para ver os dias" : E.recorte.startsWith("maq:") ? "toque para abrir o pé de máquina" : "toque para abrir o D-1 desse dia";
+      const acao = grao === "mes" ? "toque para ver os dias" : E.recorte.startsWith("maq:") ? "toque para abrir o detalhado da máquina" : "toque para abrir o D-1 desse dia";
       return { periodo:p, rotulo: grao === "dia" ? String(d.getDate()) : MESES_CURTOS[d.getMonth()], valor:v, destaque: p === hojeIso,
         aria: `${quando}: ${v == null ? "sem dado" : fmtV(v)}. ${acao}`, quando,
         tip: `<b>${esc(quando)}</b><br>${v == null ? "sem dado" : `${esc(met.nome)} <b>${esc(fmtV(v))}</b>`}${det ? `<br>${esc(det)}` : ""}` +
@@ -7586,7 +7655,7 @@ function perdasPorMotivo(linhas){
     $("d1-prox").disabled = S.dia >= hojeProd;
     const tbody = $("d1-tabela").querySelector("tbody");
     const amanhaDoDia = dataLocal(S.dia); amanhaDoDia.setDate(amanhaDoDia.getDate() + 1);
-    $("d1-sub").textContent = `Dia de produção de ${fmtDM(dataLocal(S.dia))}, das 06:00 às 06:00 do dia ${fmtDM(amanhaDoDia)} · toque numa máquina para abrir o pé de máquina`;
+    $("d1-sub").textContent = `Dia de produção de ${fmtDM(dataLocal(S.dia))}, das 06:00 às 06:00 do dia ${fmtDM(amanhaDoDia)} · toque numa máquina para abrir o detalhado dela`;
     [tbody, $("d1-paradas"), $("d1-perdas")].forEach(el=> el.classList.add("carregando"));
     let dados;
     try{ dados = await carregar(S.dia); }
@@ -7630,7 +7699,7 @@ function perdasPorMotivo(linhas){
       const pctPlan = i.plan > 0 ? i.real / i.plan * 100 : null;
       const corPlan = pctPlan == null ? "" : pctPlan > 105 ? "st-warning" : pctPlan >= 95 ? "st-good" : "st-critical";
       const metas = ["tmr", "vel", "qual"].map(k=>`<i class="${l.meta[k] != null && i[k] != null ? l.st[k] : ""}" title="${esc(`${NOME_IND[k]}: ${l.meta[k] == null ? "sem meta" : i[k] == null ? "sem dado" : l.st[k] === "good" ? "na meta" : "abaixo da meta"}`)}"></i>`).join("");
-      return `<tr class="clicavel" tabindex="0" data-id="${esc(l.id)}" aria-label="${esc(`${l.m.nome}: abrir o pé de máquina`)}">
+      return `<tr class="clicavel" tabindex="0" data-id="${esc(l.id)}" aria-label="${esc(`${l.m.nome}: abrir o detalhado da máquina`)}">
         <td class="maq"><b>${esc(l.m.nome)}</b><small>${esc(l.m.processo)}${semHoras ? " · sem apontamento" : ""}</small></td>
         <td class="num">${cel(i.tmr, l.meta.tmr, l.st.tmr, fV.tmr)}</td>
         <td class="num">${cel(i.vel, l.meta.vel, l.st.vel, fV.vel)}</td>
@@ -7882,6 +7951,126 @@ function perdasPorMotivo(linhas){
   // o "há quanto tempo" do estado de agora anda sozinho
   setInterval(()=>{ if(view.classList.contains("active") && S.dia === hojeProd && document.visibilityState === "visible")
     cabecalho(MAQUINAS.find(x=> chaveMaq(x.id) === S.maq) || null); }, 60000);
+})();
+
+
+/* ---- Pé de máquina: a matéria-prima no pé de cada máquina pelas bandeiras (010) ----
+   O painel de rastreabilidade de MP que fica em cada máquina: cada volume (bobina) com a
+   bandeira. A logística vê o que retirar (vermelho); a operação, o que está em uso, aceito,
+   aguardando finalização ou aguardando. Atualiza com o hub (a cada 10 min) e a cada 5 min aqui. */
+const BANDEIRAS = [
+  { k:4, nome:"Em uso",                  cor:"var(--bd-uso)" },
+  { k:2, nome:"Aceito",                  cor:"var(--bd-aceito)" },
+  { k:5, nome:"Aguardando finalização",  cor:"var(--bd-final)" },
+  { k:1, nome:"Aguardando",              cor:"var(--bd-aguardando)" },
+  { k:3, nome:"Aguardando remoção",      cor:"var(--bd-remover)" },
+];
+const bandeiraIc = cor => `<svg class="bandeira-ic" style="--c:${cor}" viewBox="0 0 14 16" aria-hidden="true"><path d="M2 15.5V1" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/><path d="M2.6 1.6h9.2l-1.9 3.1 1.9 3.1H2.6z" fill="currentColor"/></svg>`;
+(function(){
+  const view = document.getElementById("view-mp");
+  if(!view) return;
+  const $ = id => document.getElementById(id);
+  const S = { setor:"all", mostrar: new Set(BANDEIRAS.map(b=>b.k)), linhas:null, erro:null, pronto:false, em:null };
+  const kgTxt = v => (v >= 1000 ? fmt1(v / 1000) + " t" : fmt(v) + " kg");
+  const nomeMaq = id => (MAQUINAS.find(m=> chaveMaq(m.id) === chaveMaq(id)) || { nome: limpaTexto(id) }).nome;
+  const processoDe = id => (MAQUINAS.find(m=> chaveMaq(m.id) === chaveMaq(id)) || { processo:"Outros" }).processo;
+  async function carregar(){
+    if(!window.gualapackAuth){ S.erro = "Sem dados na pré-visualização."; return; }
+    const r = await lerTudo(window.gualapackAuth, "v_hub_mp_maquina", ["maquina", "bandeira", "id_volume"]);
+    if(r.error){ S.erro = erroDe009(r.error) ? "Sem dados: esta parte ainda não foi ativada no banco do painel." : "Sem dados: não consegui carregar agora. Tente de novo em instantes."; return; }
+    S.erro = null;
+    S.linhas = (r.data || []).map(x=>({ maq: chaveMaq(x.maquina), local: limpaTexto(x.local), cod: limpaTexto(x.cod_item), desc: limpaTexto(x.descricao),
+      b: Number(x.bandeira), vol: limpaTexto(x.id_volume), kg: Number(x.quantidade) || 0, entrada: dataLocal(x.data_entrada) }))
+      .filter(x=> BANDEIRAS.some(b=> b.k === x.b));
+    S.em = new Date();
+  }
+  const volHtml = (v, cor, comMaq) => `<div class="vol">${bandeiraIc(cor)}
+      <div class="item"><b>${esc(v.cod)}</b><span title="${esc(v.desc)}">${esc(v.desc)}</span></div>
+      <div class="qtd">${esc(kgTxt(v.kg))}<small>${comMaq ? esc(nomeMaq(v.maq)) + " · " : ""}vol. ${esc(v.vol)}</small></div></div>`;
+  function desenhar(){
+    const setores = ORDEM_ETAPAS.filter(p=> MAQUINAS.some(m=> m.processo === p));
+    if(!$("mp-setor").dataset.pronto){
+      $("mp-setor").dataset.pronto = "1";
+      segmentado($("mp-setor"), [["all", "Todos os setores"], ...setores.map(p=>[p, p])], S.setor, v=>{ S.setor = v; desenhar(); });
+    }
+    $("mp-hora").textContent = S.em ? `Atualizado às ${fmtHM(S.em)}` : "";
+    if(S.erro || !S.linhas){
+      const msg = S.erro || "Carregando…";
+      $("mp-bandeiras").innerHTML = "";
+      $("mp-retirar").innerHTML = `<div class="empty-state">${esc(msg)}</div>`;
+      $("mp-grade").innerHTML = ""; $("mp-vazias").textContent = "";
+      pintarTotal("mp-retirar-total", null);
+      return;
+    }
+    const doSetor = S.linhas.filter(x=> S.setor === "all" || processoDe(x.maq) === S.setor);
+    // as cinco bandeiras: quantos volumes e kg; tocar mostra ou esconde a bandeira nos cartões
+    $("mp-bandeiras").innerHTML = BANDEIRAS.map(b=>{
+      const l = doSetor.filter(x=> x.b === b.k), kg = l.reduce((a,x)=>a+x.kg, 0);
+      return `<button type="button" class="mp-band" style="--c:${b.cor}" data-k="${b.k}" aria-pressed="${S.mostrar.has(b.k)}"
+        aria-label="${esc(`${b.nome}: ${l.length} ${l.length === 1 ? "volume" : "volumes"}, ${kgTxt(kg)}`)}">
+        <span class="nome">${bandeiraIc(b.cor)}${esc(b.nome)}</span>
+        <span class="n"><span class="kpi-num">${fmt(l.length)}</span><small>${l.length === 1 ? "volume" : "volumes"}</small></span>
+        <span class="kg">${l.length ? esc(kgTxt(kg)) : "nenhum agora"}</span></button>`;
+    }).join("");
+    $("mp-bandeiras").querySelectorAll(".mp-band").forEach(bt=> bt.addEventListener("click", ()=>{
+      const k = Number(bt.dataset.k);
+      if(S.mostrar.has(k)) S.mostrar.delete(k); else S.mostrar.add(k);
+      if(!S.mostrar.size) BANDEIRAS.forEach(b=> S.mostrar.add(b.k));   // nenhuma marcada: volta a mostrar todas
+      desenhar();
+    }));
+    // a logística: o que está aguardando remoção, por máquina
+    const remover = doSetor.filter(x=> x.b === 3).sort((a,b)=> nomeMaq(a.maq).localeCompare(nomeMaq(b.maq), "pt-BR", { numeric:true }) || b.kg - a.kg);
+    const kgRem = remover.reduce((a,x)=>a+x.kg, 0);
+    pintarTotal("mp-retirar-total", remover.length ? kgRem / 1000 : null, 1, "t", `${remover.length} ${remover.length === 1 ? "volume" : "volumes"}`, false);
+    $("mp-retirar").innerHTML = remover.length
+      ? `<div class="vol-lista">${remover.map(v=> volHtml(v, "var(--bd-remover)", true)).join("")}</div>`
+      : `<div class="empty-state">Nada aguardando remoção${S.setor === "all" ? "" : " nesse setor"} agora.</div>`;
+    // um cartão por máquina com MP, na ordem da rota; as sem MP numa linha só
+    const maqs = MAQUINAS.filter(m=> !maqForaDoPainel(m.id, isoDate(new Date())) && (S.setor === "all" || m.processo === S.setor));
+    const porMaq = new Map();
+    doSetor.forEach(x=>{ if(!porMaq.has(x.maq)) porMaq.set(x.maq, []); porMaq.get(x.maq).push(x); });
+    const ordem = m => ORDEM_ETAPAS.indexOf(m.processo);
+    const com = maqs.filter(m=> porMaq.has(chaveMaq(m.id))).sort((a,b)=> ordem(a) - ordem(b) || a.nome.localeCompare(b.nome, "pt-BR", { numeric:true }));
+    const sem = maqs.filter(m=> !porMaq.has(chaveMaq(m.id)));
+    // local de máquina que não está na lista do painel (ex.: uma máquina nova): entra também
+    const extras = [...porMaq.keys()].filter(k=> !maqs.some(m=> chaveMaq(m.id) === k) && S.setor === "all");
+    const cartoes = [...com.map(m=> ({ id: chaveMaq(m.id), nome: m.nome, processo: m.processo })), ...extras.map(k=> ({ id:k, nome: nomeMaq(k), processo:"Outros locais" }))];
+    $("mp-grade").innerHTML = cartoes.map(c=>{
+      const l = porMaq.get(c.id) || [];
+      const contas = BANDEIRAS.map(b=>{ const n = l.filter(x=> x.b === b.k).length;
+        return n ? `<span class="mp-conta" style="--c:${b.cor}" title="${esc(b.nome)}">${bandeiraIc(b.cor)}${n}</span>` : ""; }).join("");
+      const grupos = BANDEIRAS.filter(b=> S.mostrar.has(b.k)).map(b=>{
+        const vs = l.filter(x=> x.b === b.k).sort((a,b2)=> b2.kg - a.kg);
+        return vs.length ? `<div class="vol-grupo"><div class="vol-grupo-nome" style="--c:${b.cor}">${esc(b.nome)}</div>${vs.map(v=> volHtml(v, b.cor, false)).join("")}</div>` : "";
+      }).join("");
+      const kg = l.reduce((a,x)=>a+x.kg, 0);
+      return `<article class="mp-card" aria-label="${esc(`${c.nome}: ${l.length} volumes de MP`)}">
+        <div class="mp-card-cab"><div><b>${esc(c.nome)}</b><small>${esc(c.processo)} · ${l.length} ${l.length === 1 ? "volume" : "volumes"} · ${esc(kgTxt(kg))}</small></div>
+          <div class="mp-contas">${contas}</div></div>
+        ${grupos || `<div class="empty-state" style="padding:8px 0">Nenhum volume com as bandeiras escolhidas.</div>`}
+        ${MAQUINAS.some(m=> chaveMaq(m.id) === c.id) ? `<div class="mp-card-pe"><button type="button" data-maq="${esc(c.id)}">Detalhado da ${esc(c.nome)} ›</button></div>` : ""}
+      </article>`;
+    }).join("") || `<div class="empty-state">Nenhuma máquina com MP no pé${S.setor === "all" ? "" : " nesse setor"} agora.</div>`;
+    $("mp-grade").querySelectorAll(".mp-card-pe button").forEach(bt=> bt.addEventListener("click", ()=>{
+      if(window.PE) window.PE.mostrar(bt.dataset.maq);
+      irPraTela("pe");
+    }));
+    $("mp-vazias").textContent = sem.length ? `Sem MP no pé da máquina: ${sem.map(m=> m.nome).join(", ")}.` : "";
+    if(view.classList.contains("active") && !S.animou){
+      S.animou = true;
+      $("mp-bandeiras").querySelectorAll(".kpi-num").forEach((el, i)=>{ const v = Number(el.textContent.replace(/\./g, "")); if(v) animateCount(el, v, 0, 80 + i*60); });
+    }
+  }
+  async function abrir(){
+    if(!S.pronto){ S.pronto = true; desenhar(); await carregar(); desenhar(); }
+  }
+  document.addEventListener("gualapack:tela", e=>{ if(e.detail === "mp") abrir(); });
+  if(view.classList.contains("active")) abrir();
+  setInterval(async ()=>{
+    if(!S.pronto || document.visibilityState !== "visible") return;
+    await carregar(); desenhar();
+  }, 5 * 60000);
+  window.PE_MP = { recarregar: async ()=>{ await carregar(); desenhar(); } };
 })();
 
 /* ---- Metas por máquina: só administrador grava (009) ---- */
@@ -8513,8 +8702,6 @@ function mostrarFalhaCarga(err){
   if(cabeca) cabeca.after(aviso); else document.querySelector(".content").prepend(aviso);
   document.getElementById("falha-tentar").addEventListener("click", ()=> location.reload());
   document.getElementById("falha-sair").addEventListener("click", ()=> document.getElementById("logout-btn").click());
-  const nota = document.getElementById("footer-note");
-  if(nota) nota.innerHTML = `Painel interno de Produção &middot; Gualapack Jaguariúna &middot; sem dados: a leitura do banco falhou.`;
 }
 
 async function boot(){
