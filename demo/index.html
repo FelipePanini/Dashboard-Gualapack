@@ -2558,8 +2558,12 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
       (prodRes && !prodRes.error ? prodRes.data || [] : []).map(r=>[r.cod_recurso, r])
     );
 
-    // as cortadeiras da lista inteira (a R12 fora do período não tira m² dos meses dela)
-    window.CORTE_IDS = new Set(maqRes.data.filter(r=>GRUPO_PROCESSO[r.grupo] === "Corte / Refile").map(r=>chaveMaq(r.id)));
+    // as cortadeiras da lista inteira (a R12 fora do período não tira m² dos meses dela).
+    // A revisora está no grupo CORTADEIRAS do cadastro, mas só revisa o material: não
+    // entra na produtividade do corte (15/10/2026).
+    window.CORTE_IDS = new Set(maqRes.data
+      .filter(r=>GRUPO_PROCESSO[r.grupo] === "Corte / Refile" && !/^REVISORA/i.test(String(r.id ?? "").trim()))
+      .map(r=>chaveMaq(r.id)));
     MAQUINAS = maqRes.data.filter(r=>!maqForaDoPainel(r.id, isoDate(periodoDe))).map(r=>{
       const processo = GRUPO_PROCESSO[r.grupo] || "Outro";
       const horasTot = Number(r.horas_totais) || 0;
