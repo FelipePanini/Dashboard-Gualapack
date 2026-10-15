@@ -33,6 +33,8 @@ body.auth-pending::after{
   text-align:center; font-size:13px; color:var(--text-secondary);
 }
 @keyframes gira{ to{ transform: rotate(360deg); } }
+/* volta de uma atualização automática: o aviso diz o que está acontecendo */
+body.auth-pending.retomando::after{ content:"Atualizando com os dados novos…"; }
 
 :root{
   color-scheme: light;
@@ -416,10 +418,11 @@ body.entrada .view.active .oee-card:nth-child(4){ animation-delay: .15s; }
 
 /* ---------- kpi row ---------- */
 .kpi-row{ display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:14px; margin-bottom:16px; }
-/* fileira com 5 cartões (Aparas): 5 lado a lado na tela larga, 3 + 2 na média */
+/* fileira com 5 cartões: 5 lado a lado na tela larga, 3 + 2 na média */
 @media (min-width: 1280px){ .kpi-row.cinco{ grid-template-columns: repeat(5, minmax(0,1fr)); } }
 @media (min-width: 1081px) and (max-width: 1279px){ .kpi-row.cinco{ grid-template-columns: repeat(3, minmax(0,1fr)); } }
 .kpi{
+  position:relative;
   background: var(--surface-1); border:1px solid var(--border); border-radius:16px;
   padding: 18px 20px 14px; box-shadow: var(--shadow-card);
   display:flex; flex-direction:column; min-width:0;
@@ -435,7 +438,30 @@ body.entrada .view.active .oee-card:nth-child(4){ animation-delay: .15s; }
 .kpi-nota{ font-size:12.5px; color: var(--text-muted); margin-top:4px; line-height:1.35; }
 .kpi-comp + .kpi-nota{ margin-top:3px; }
 .kpi > .kpi-nota:nth-child(3){ margin-top:10px; }
-.kpi-spark{ display:block; width:100%; height:30px; margin-top:auto; padding-top:10px; box-sizing:content-box; overflow:visible; }
+.kpi-spark{ display:block; width:100%; height:30px; overflow:visible; }
+/* cartão dividido (Refugo: confirmado em cima, apontado embaixo) */
+.kpi-partes{ display:flex; flex-direction:column; margin-top:6px; }
+.kpi-parte{ display:flex; align-items:baseline; justify-content:space-between; gap:10px; padding:7px 0; }
+.kpi-parte + .kpi-parte{ border-top:1px solid var(--border); }
+.kpi-parte-nome{ display:inline-flex; align-items:center; gap:7px; font-size:12.5px; font-weight:600; color: var(--text-secondary); }
+.kpi-parte-nome i{ width:8px; height:8px; border-radius:50%; flex:none; }
+.kpi-parte .kpi-value{ margin-top:0; font-size:28px; }
+/* a linha do cartão: ao passar o mouse (ou o dedo), o mês e o valor de cada ponto */
+.kpi-linha{ position:relative; margin-top:auto; padding-top:10px; touch-action: pan-y; }
+.spark-guia{ position:absolute; left:0; top:10px; width:1px; height:30px; background: var(--border-strong); opacity:0; pointer-events:none;
+  transition: opacity .15s var(--ease-out); }
+.spark-ponto{ position:absolute; left:0; top:0; width:8px; height:8px; margin:-4px 0 0 -4px; border-radius:50%; pointer-events:none;
+  background: var(--cor); box-shadow: 0 0 0 2px var(--surface-1); opacity:0; transform: scale(.3);
+  transition: opacity .15s var(--ease-out), transform .25s var(--ease-out); }
+.kpi-linha.ativa .spark-guia{ opacity:1; }
+.kpi-linha.ativa .spark-ponto.tem{ opacity:1; transform: scale(1); }
+.kpi-linha.ativa .kpi-spark path{ opacity:.55; transition: opacity .2s var(--ease-out); }
+.kpi-dica{ z-index:6; }
+.legend-item.fixo{ cursor:default; }
+.kpi-dica .dica-mes{ font-weight:650; }
+.kpi-dica .dica-linha{ display:flex; align-items:center; gap:6px; font-variant-numeric: tabular-nums; }
+.kpi-dica .dica-linha i{ width:7px; height:7px; border-radius:50%; flex:none; }
+@media (prefers-reduced-motion: reduce){ .spark-ponto, .spark-guia{ transition:none; } }
 
 /* ---------- panels/grid ---------- */
 .grid-2{ display:grid; grid-template-columns: minmax(0,1.55fr) minmax(0,1fr); gap:16px; margin-bottom:16px; align-items:stretch; }
@@ -457,6 +483,15 @@ body.no-scroll{ overflow:hidden; }
 .panel-head > div:first-child{ min-width:0; }
 .panel-title{ font-size:16px; font-weight:650; margin:0; letter-spacing:-0.01em; }
 .panel-sub{ color: var(--text-muted); font-size:12.5px; margin-top:3px; line-height:1.4; }
+/* total ao lado do título (perda por motivo e por máquina) */
+.panel-total{ display:flex; flex-direction:column; align-items:flex-end; text-align:right; line-height:1; margin-left:auto; }
+.panel-total[hidden]{ display:none; }
+.panel-total-valor{ font-size:24px; font-weight:700; letter-spacing:-0.02em; font-variant-numeric: tabular-nums; white-space:nowrap; }
+.panel-total-un{ font-size:.58em; font-weight:600; letter-spacing:0; color: var(--text-secondary); margin-left:3px; }
+.panel-total-rot{ font-size:11.5px; color: var(--text-muted); margin-top:5px; white-space:nowrap; }
+/* selo do topo depois de uma atualização automática: um brilho curto */
+@keyframes renovado{ 0%{ box-shadow: 0 0 0 0 color-mix(in srgb, var(--good) 45%, transparent); } 100%{ box-shadow: 0 0 0 9px transparent; } }
+.status-chip.renovado{ animation: renovado 1.1s var(--ease-out) 2; }
 .legend{ display:flex; gap:6px 14px; flex-wrap:wrap; }
 .legend-item{ display:flex; align-items:center; gap:6px; font-size:12px; color: var(--text-secondary); cursor:pointer; user-select:none; transition: opacity .2s var(--ease-out); }
 .legend-dot{ width:9px; height:9px; border-radius:3px; flex:none; }
@@ -967,6 +1002,8 @@ footer{ color: var(--text-muted); font-size:12px; padding: 18px 4px 0; line-heig
   .kpi-row{ gap:10px; }
   .kpi{ padding:14px 14px 12px; border-radius:14px; }
   .kpi-value{ font-size:26px; }
+  .kpi-parte .kpi-value{ font-size:23px; }
+  .panel-total-valor{ font-size:20px; }
   .panel{ padding:16px 14px 14px; border-radius:14px; }
   .proc-grid{ grid-template-columns: minmax(0,1fr); }
   .machine-grid{ grid-template-columns: repeat(auto-fill, minmax(156px, 1fr)); gap:10px; }
@@ -1443,6 +1480,7 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
 // tela chamando a API diretamente sem sessão.
 // ---------------------------------------------------------------------------
 (function(){
+  try{ if(sessionStorage.getItem("gualapack:retomar")) document.body.classList.add("retomando"); }catch(e){}
   const cfg = window.SUPABASE_CONFIG;
   const configured = cfg && !cfg.url.includes("SEU-PROJETO");
   // "__GUALAPACK_SESSION_READY__" existe pra cobrir uma corrida possível: se
@@ -1609,6 +1647,7 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
                 <h3 class="panel-title">Perda por motivo</h3>
                 <div class="panel-sub">kg apontados no período &middot; maiores ofensores</div>
               </div>
+              <div class="panel-total" id="motivo-total" hidden></div>
             </div>
             <div class="grafico" id="motivo-chart"></div>
           </div>
@@ -1645,7 +1684,7 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
 
       <!-- ============ QUALIDADE (aparas, perdas e laudos) ============ -->
       <div class="view" id="view-qualidade">
-        <section class="kpi-row cinco" id="aparas-kpis"></section>
+        <section class="kpi-row tres" id="aparas-kpis"></section>
 
         <section class="grid-2 uneven equal-cols">
           <div class="panel">
@@ -1654,6 +1693,7 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
                 <h3 class="panel-title">Perda por motivo (kg)</h3>
                 <div class="panel-sub">Estratificação por tipo de apontamento</div>
               </div>
+              <div class="panel-total" id="perda-tipo-total" hidden></div>
             </div>
             <div class="grafico" id="perda-tipo-chart"></div>
           </div>
@@ -1663,31 +1703,26 @@ html.vidro .oee-fator[aria-pressed="true"]{ border-color: var(--accent); box-sha
                 <h3 class="panel-title">Perda por máquina (kg)</h3>
                 <div class="panel-sub">Recursos ordenados por volume de refugo</div>
               </div>
+              <div class="panel-total" id="perda-maquina-total" hidden></div>
             </div>
             <div class="grafico" id="perda-maquina-chart"></div>
           </div>
         </section>
 
         <!-- "Refugo por máquina (Produção)" saiu: eram os mesmos kg do "Perda por máquina" acima -->
-        <section class="grid-2 uneven equal-cols">
-          <div class="panel">
-            <div class="panel-head">
-              <div>
-                <h3 class="panel-title">Apara por classificação de produto</h3>
-                <div class="panel-sub">% apontada sobre peso bruto, por família de estrutura &middot; a balança não separa por família</div>
-              </div>
+        <!-- "Apara por classificação de produto" saiu em 14/10/2026: a produção mensal ocupa a largura toda -->
+        <section class="panel">
+          <div class="panel-head">
+            <div>
+              <h3 class="panel-title">Produção mensal (t)</h3>
+              <div class="panel-sub" id="producao-kg-sub">Peso bruto das rebobinadeiras e refugo, por mês</div>
             </div>
-            <div class="grafico" id="classe-chart"></div>
-          </div>
-          <div class="panel">
-            <div class="panel-head">
-              <div>
-                <h3 class="panel-title">Produção mensal (t)</h3>
-                <div class="panel-sub">Peso bruto das rebobinadeiras e refugo, por mês</div>
-              </div>
+            <div class="legend" aria-hidden="true">
+              <span class="legend-item fixo"><span class="legend-dot" style="background:var(--series-3)"></span>Peso bruto</span>
+              <span class="legend-item fixo"><span class="legend-dot" style="background:var(--serious)"></span>Refugo</span>
             </div>
-            <div class="grafico" id="producao-kg-chart"></div>
           </div>
+          <div class="grafico" id="producao-kg-chart"></div>
         </section>
 
         <section class="panel">
@@ -2189,6 +2224,17 @@ const GRUPO_PROCESSO = {
   CORTADEIRAS:"Corte / Refile",
 };
 const GRUPO_ROTA = { FLEXOGRAFIA:"FLEXO", ROTOGRAVURA:"ROTO" };
+// Máquinas fora do painel (pedido de 14/10/2026): a REB 03 nunca existiu na fábrica (só
+// no cadastro do Supabase, sem nenhum apontamento no banco) e a R12 saiu, com o último
+// apontamento em 15/07/2026: entra só em período que começa até essa data.
+const MAQ_FORA_DO_PAINEL = new Set(["REB03"]);
+const MAQ_ULTIMO_APONTAMENTO = { R12: "2026-07-15" };
+function maqForaDoPainel(id, deIso){
+  const k = String(id ?? "").replace(/\s+/g, "").toUpperCase();
+  if(MAQ_FORA_DO_PAINEL.has(k)) return true;
+  const ultimo = MAQ_ULTIMO_APONTAMENTO[k];
+  return !!ultimo && !!deIso && deIso > ultimo;
+}
 const PROCESSOS = ["Coating", "Impressão", "Laminação", "Corte / Refile"];
 
 function prettyCodigo(raw){
@@ -2512,7 +2558,9 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
       (prodRes && !prodRes.error ? prodRes.data || [] : []).map(r=>[r.cod_recurso, r])
     );
 
-    MAQUINAS = maqRes.data.map(r=>{
+    // as cortadeiras da lista inteira (a R12 fora do período não tira m² dos meses dela)
+    window.CORTE_IDS = new Set(maqRes.data.filter(r=>GRUPO_PROCESSO[r.grupo] === "Corte / Refile").map(r=>chaveMaq(r.id)));
+    MAQUINAS = maqRes.data.filter(r=>!maqForaDoPainel(r.id, isoDate(periodoDe))).map(r=>{
       const processo = GRUPO_PROCESSO[r.grupo] || "Outro";
       const horasTot = Number(r.horas_totais) || 0;
       const horasProd = Number(r.horas_produzindo) || 0;
@@ -2704,6 +2752,9 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
     window.APARA_PERIODO = null;
     window.SERIE_MENSAL = null;
     window.APARAS_SERIE = null;
+    window.APARAS_MESES = null;
+    window.REFUGO_MENSAL = null;
+    window.PRODUCAO_SERIE = null;
     window.PERDA_MAQ_MOTIVO = null;
     if(HUB2){
       const n = v => Number(v)||0;
@@ -2740,7 +2791,11 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
         planKm: soma("planejado")/1000, realKm: soma("produzido")/1000,
         aderencia: soma("planejado")>0 ? soma("produzido")/soma("planejado")*100 : null,
       };
-      PRODUTIVIDADE = soma("horas_m2")>0 ? soma("m2")/soma("horas_m2") : null;
+      // Produtividade em m²/h só do setor Corte (pedido de 14/10/2026): m² ÷ horas
+      // produzindo das cortadeiras.
+      const doCorte = hubMaqRes.data.filter(r=>window.CORTE_IDS.has(chave(r.maquina)));
+      const somaCorte = c => doCorte.reduce((a,r)=>a+n(r[c]),0);
+      PRODUTIVIDADE = somaCorte("horas_m2")>0 ? somaCorte("m2")/somaCorte("horas_m2") : null;
       ADERENCIA_PROCESSO = calcAderenciaProcesso(MAQUINAS);
 
       if(!hubMotivoRes.error){
@@ -2768,8 +2823,20 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
         // a série inteira: o gráfico da visão geral mostra o ano, de janeiro até o último mês
         window.APARAS_SERIE = todos.map(r=>({ mes: String(r.mes).slice(0,7),
           apontado: r.apontado_pct!=null ? n(r.apontado_pct) : null, confirmado: r.confirmado_pct!=null ? n(r.confirmado_pct) : null }));
+        // produção do gráfico "Produção mensal": o ano do período, mês a mês
+        window.PRODUCAO_SERIE = (hubAparaRes.data||[]).map(r=>({ mes: String(r.mes).slice(0,7),
+          bruto: r.peso_bruto_rebs != null ? n(r.peso_bruto_rebs) : null, refugo: r.refugo != null ? n(r.refugo) : null }))
+          .filter(r=>(r.bruto||0) > 0 || (r.refugo||0) > 0)
+          .sort((a,b)=>a.mes.localeCompare(b.mes));
         const serie = todos.slice(-12);
         if(serie.length >= 2){
+          // o mês de cada ponto das linhas dos cartões ("set/26" na dica)
+          window.APARAS_MESES = serie.map(r=>String(r.mes).slice(0,7));
+          // refugo em t por mês: confirmado (scrap total da balança) e apontado
+          window.REFUGO_MENSAL = {
+            conf: serie.map(r=> r.scrap_total != null ? n(r.scrap_total)/1000 : null),
+            apont: serie.map(r=> r.refugo != null ? n(r.refugo)/1000 : null),
+          };
           MESES = serie.map(r=>fmtMes(String(r.mes).slice(0,10)));
           APARAS_MENSAL = {
             apontado: serie.map(r=> r.apontado_pct!=null ? n(r.apontado_pct) : null),
@@ -2788,6 +2855,8 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
         window.APARA_PERIODO = {
           apontado: r.apontado_pct != null ? n(r.apontado_pct) : null,
           confirmado: r.confirmado_pct != null ? n(r.confirmado_pct) : null,
+          // refugo confirmado do período (kg), na regra da confirmada: sem ela, sem ele
+          scrapKg: r.confirmado_pct != null && r.scrap_total != null ? n(r.scrap_total) : null,
         };
       }
       // Série mensal real (meses fechados) do
@@ -2800,7 +2869,8 @@ async function loadRealData(periodoDe, periodoAte, tentativa = 1){
           if(mes >= mesCorrente) return;          // mês aberto fica de fora da tendência
           const t = porMes.get(mes) || zero();
           t.tot += n(r.horas_totais); t.prod += n(r.horas_produzindo); t.metros += n(r.metros);
-          t.plan += n(r.planejado); t.prodz += n(r.produzido); t.m2 += n(r.m2); t.hm2 += n(r.horas_m2);
+          t.plan += n(r.planejado); t.prodz += n(r.produzido);
+          if(window.CORTE_IDS.has(chave(r.maquina))){ t.m2 += n(r.m2); t.hm2 += n(r.horas_m2); }   // produtividade: só o corte
           t.perda += n(r.perda_kg);
           porMes.set(mes, t);
           const id = chave(r.maquina);
@@ -2956,7 +3026,9 @@ const fmt   = n => Math.round(n).toLocaleString("pt-BR");
 const fmt1  = n => n.toLocaleString("pt-BR", { minimumFractionDigits:1, maximumFractionDigits:1 });
 const fmtNum = (n, casas) => n.toLocaleString("pt-BR", { minimumFractionDigits:casas, maximumFractionDigits:casas });
 const esc   = s => String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
-const reduzMovimento = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+// Na volta de uma atualização automática a tela reaparece como estava: sem entrada,
+// sem contagem e sem as linhas se desenhando (até o primeiro gesto).
+const reduzMovimento = () => !!window.ATUALIZACAO_SILENCIOSA || window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 /* ---- partes novas do banco (005_banco.sql): estado de cada uma ---- */
 const BANCO_MSG = {
@@ -2992,6 +3064,8 @@ const fmtHM   = d => d.toLocaleTimeString("pt-BR", { hour:"2-digit", minute:"2-d
 const fmtDMHM = d => `${fmtDM(d)} ${fmtHM(d)}`;
 const fmtDMA  = d => `${fmtDM(d)}/${String(d.getFullYear()).slice(-2)}`;
 const rotuloMes = iso => { const d = dataLocal(String(iso).slice(0,10)); return d ? MESES_CURTOS[d.getMonth()] : String(iso); };
+// "2026-09" → "set/26"
+const rotMesAno = ym => { const m = /^(\d{4})-(\d{2})/.exec(String(ym)); return m ? `${MESES_CURTOS[Number(m[2]) - 1]}/${m[1].slice(2)}` : String(ym); };
 const mesmoDiaQue = (a, b) => a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 const DIAS_SEMANA = ["dom","seg","ter","qua","qui","sex","sáb"];
 
@@ -3186,11 +3260,12 @@ const statusCor   = { good:"var(--good)", warning:"var(--warning)", critical:"va
 
 // Linha de tendência de uma série REAL. Mês sem dado quebra a linha; sem ao
 // menos dois pontos, não desenha nada ("" — nada de linha inventada).
-function sparkPath(data, w, h, pad=2){
+function sparkPath(data, w, h, pad=2, escala=null){
   if(!Array.isArray(data)) return "";
   const vals = data.filter(v=> v != null && Number.isFinite(v));
   if(vals.length < 2) return "";
-  const min = Math.min(...vals), max = Math.max(...vals);
+  // escala: a mesma de outras linhas do cartão (as duas do refugo se comparam)
+  const min = escala ? escala.min : Math.min(...vals), max = escala ? escala.max : Math.max(...vals);
   const range = (max-min)||1;
   const step = (w-pad*2)/(data.length-1);
   let comeca = true;
@@ -3242,6 +3317,20 @@ function attachTip(holder, html, evt){
 function clearTip(holder){
   const t = holder.querySelector(".chart-tooltip");
   if(t) t.remove();
+}
+
+/* Total ao lado do título de um gráfico ("12,3 t · no período"), com a mesma contagem
+   dos cartões. Sem valor, some (não vira 0). */
+function pintarTotal(id, valor, casas, unidade, rotulo = "no período"){
+  const el = document.getElementById(id);
+  if(!el) return;
+  if(valor == null || !Number.isFinite(valor)){ el.hidden = true; el.innerHTML = ""; return; }
+  el.hidden = false;
+  el.innerHTML = `<span class="panel-total-valor"><span class="kpi-num">${fmtNum(valor, casas)}</span><span class="panel-total-un">${esc(unidade)}</span></span>`
+               + ` <span class="panel-total-rot">${esc(rotulo)}</span>`;
+  const num = el.querySelector(".kpi-num");
+  if(el.closest(".view.active")) animateCount(num, valor, casas, 220);
+  else{ num.dataset.alvo = String(valor); num.dataset.casas = String(casas); }
 }
 
 /* Texto que não cabe ganha reticências (o nome inteiro fica no <title>). */
@@ -3510,38 +3599,138 @@ const SETA = {
   sobe:  `<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 10V2M2.5 5.5L6 2l3.5 3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   desce: `<svg viewBox="0 0 12 12" aria-hidden="true"><path d="M6 2v8M2.5 6.5L6 10l3.5-3.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
 };
+// As linhas do cartão: uma (k.spark) ou várias na mesma escala (k.sparks: o refugo
+// confirmado e o apontado).
+function linhasDoCartao(k){
+  if(Array.isArray(k.sparks)) return k.sparks.filter(s=>s && Array.isArray(s.data));
+  return Array.isArray(k.spark) ? [{ data:k.spark, cor:"var(--series-3)", nome:null }] : [];
+}
+// O mês de cada ponto ("set/26"). Sem rótulo dado pelo cartão, as linhas do hub são os
+// meses fechados de SERIE_MENSAL.
+function rotulosDoCartao(k, n){
+  if(Array.isArray(k.sparkRotulos) && k.sparkRotulos.length === n) return k.sparkRotulos;
+  const m = window.SERIE_MENSAL && window.SERIE_MENSAL.meses;
+  return m && m.length === n ? m.map(rotMesAno) : null;
+}
+/* Dica da linha do cartão (pedido de 14/10/2026): passando o mouse, ou o dedo, uma guia
+   vertical e um ponto em cada linha marcam o mês mais perto, e a dica mostra o mês e os
+   valores. O svg estica (preserveAspectRatio none), então guia, pontos e dica são HTML
+   por cima dele, posicionados em pixels. */
+function ligarDicaDaLinha(card, area, k, linhas, escala){
+  const svg = area.querySelector(".kpi-spark");
+  const guia = area.querySelector(".spark-guia");
+  const pontos = [...area.querySelectorAll(".spark-ponto")];
+  const n = Math.max(...linhas.map(s=>s.data.length));
+  const rotulos = rotulosDoCartao(k, n);
+  const W = 120, Hs = 30, PAD = 2, step = n > 1 ? (W - PAD*2) / (n - 1) : 0;
+  const range = (escala.max - escala.min) || 1;
+  const fmtV = k.sparkFmt || (v => fmtNum(v, k.decimals ?? 0) + (k.suffix || ""));
+  const ok = v => v != null && Number.isFinite(v);
+  const temPonto = i => linhas.some(s=>ok(s.data[i]));
+  let atual = -1;
+  function esconder(){
+    atual = -1;
+    area.classList.remove("ativa");
+    const t = card.querySelector(".kpi-dica");
+    if(t) t.remove();
+  }
+  function mostrar(evt){
+    const r = svg.getBoundingClientRect();
+    if(!r.width) return;
+    let i = Math.round(((evt.clientX - r.left) / r.width * W - PAD) / (step || 1));
+    i = Math.max(0, Math.min(n - 1, i));
+    // mês sem dado: o mais perto que tem
+    if(!temPonto(i)){
+      let achou = -1;
+      for(let d = 1; d < n && achou < 0; d++){
+        if(i - d >= 0 && temPonto(i - d)) achou = i - d;
+        else if(i + d < n && temPonto(i + d)) achou = i + d;
+      }
+      if(achou < 0) return;
+      i = achou;
+    }
+    area.classList.add("ativa");
+    if(i === atual) return;
+    atual = i;
+    const x = (PAD + i*step) / W * r.width;
+    const topoSvg = r.top - area.getBoundingClientRect().top;   // svg não tem offsetTop
+    const yDe = v => topoSvg + (PAD + (Hs - PAD*2) * (1 - (v - escala.min) / range)) / Hs * r.height;
+    guia.style.left = x + "px";
+    let topo = Infinity;
+    pontos.forEach((p, j)=>{
+      const v = linhas[j].data[i];
+      p.classList.toggle("tem", ok(v));
+      if(!ok(v)) return;
+      const y = yDe(v);
+      topo = Math.min(topo, y);
+      p.style.left = x + "px"; p.style.top = y + "px";
+    });
+    let tip = card.querySelector(".kpi-dica");
+    if(!tip){ tip = document.createElement("div"); tip.className = "chart-tooltip kpi-dica"; card.appendChild(tip); }
+    const mes = rotulos ? rotulos[i] : null;
+    tip.innerHTML = (mes ? `<div class="dica-mes">${esc(mes)}</div>` : "") + linhas.map(s=>{
+      const v = s.data[i];
+      return `<div class="dica-linha">${linhas.length > 1 ? `<i style="background:${s.cor}"></i>${esc(s.nome || "")} ` : ""}<b>${ok(v) ? esc(fmtV(v)) : "—"}</b></div>`;
+    }).join("");
+    // em cima do ponto, sem sair do cartão
+    const xCard = area.offsetLeft + x;
+    const esq = Math.max(6, Math.min(card.clientWidth - tip.offsetWidth - 6, xCard - tip.offsetWidth / 2));
+    tip.style.left = esq + "px";
+    tip.style.top = (area.offsetTop + topo - tip.offsetHeight - 10) + "px";
+  }
+  area.addEventListener("pointermove", mostrar);
+  area.addEventListener("pointerdown", mostrar);
+  area.addEventListener("pointerleave", esconder);
+  area.addEventListener("pointercancel", esconder);
+}
 function renderKpis(container, kpis){
   container.innerHTML = "";
   kpis.forEach((k,ki)=>{
     const div = document.createElement("div");
-    div.className = "kpi";
-    const semValor = k.value == null || !Number.isFinite(k.value);
-    const path = sparkPath(k.spark, 120, 30);
+    div.className = "kpi" + (k.split ? " kpi-dividido" : "");
+    const semValor = !k.split && (k.value == null || !Number.isFinite(k.value));
+    const linhas = linhasDoCartao(k);
+    const vals = linhas.flatMap(s=>s.data).filter(v=> v != null && Number.isFinite(v));
+    const escala = vals.length ? { min: Math.min(...vals), max: Math.max(...vals) } : null;
+    const comLinha = linhas.map(s=>({ ...s, d: sparkPath(s.data, 120, 30, 2, escala) })).filter(s=>s.d);
     const clipId = "sk-" + container.id + "-" + ki;
     const comp = !semValor && k.comp ? k.comp : null;
+    const valor = (v, casas, suf) => v == null || !Number.isFinite(v) ? `<span class="kpi-num">—</span>`
+      : `<span class="kpi-num">${fmtNum(v, casas)}</span><span class="kpi-unit">${esc((suf||"").trim())}</span>`;
     div.innerHTML = `
       <div class="kpi-label">${esc(k.label)}</div>
-      <div class="kpi-value"><span class="kpi-num">${semValor ? "—" : fmtNum(k.value, k.decimals ?? 0)}</span>${semValor ? "" : `<span class="kpi-unit">${esc((k.suffix||"").trim())}</span>`}</div>
+      ${k.split ? `<div class="kpi-partes">${k.split.map(p=>`
+        <div class="kpi-parte"><span class="kpi-parte-nome">${p.cor ? `<i style="background:${p.cor}"></i>` : ""}${esc(p.nome)}</span>
+          <span class="kpi-value">${valor(p.value, p.decimals ?? 0, p.suffix)}</span></div>`).join("")}</div>`
+        : `<div class="kpi-value">${valor(k.value, k.decimals ?? 0, k.suffix)}</div>`}
       ${comp ? `<div class="kpi-comp ${comp.tom}">${comp.seta ? SETA[comp.seta] : ""}<span>${esc(comp.texto)}</span></div>` : ""}
       ${k.nota ? `<div class="kpi-nota">${esc(k.nota)}</div>` : ""}
-      ${path ? `<svg class="kpi-spark" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">
-        <defs><clipPath id="${clipId}"><rect class="revela" style="animation-delay:${(0.2+ki*0.06).toFixed(2)}s" x="-2" y="-4" width="124" height="38"/></clipPath></defs>
-        <path clip-path="url(#${clipId})" d="${path}" fill="none" stroke="var(--series-3)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>
-      </svg>` : ""}`;
+      ${comLinha.length ? `<div class="kpi-linha">
+        <svg class="kpi-spark" viewBox="0 0 120 30" preserveAspectRatio="none" aria-hidden="true">
+          <defs><clipPath id="${clipId}"><rect class="revela" style="animation-delay:${(0.2+ki*0.06).toFixed(2)}s" x="-2" y="-4" width="124" height="38"/></clipPath></defs>
+          ${comLinha.map(s=>`<path clip-path="url(#${clipId})" d="${s.d}" fill="none" stroke="${s.cor}" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" vector-effect="non-scaling-stroke"/>`).join("")}
+        </svg>
+        <span class="spark-guia" aria-hidden="true"></span>
+        ${comLinha.map(s=>`<span class="spark-ponto" style="--cor:${s.cor}" aria-hidden="true"></span>`).join("")}
+      </div>` : ""}`;
     container.appendChild(div);
     const spark = div.querySelector(".kpi-spark");
     if(spark && container.closest(".view.active") && !reduzMovimento()) spark.classList.add("anima");
-    if(!semValor){
-      const el = div.querySelector(".kpi-num");
-      // conta na tela visível; nas outras o número já fica pronto e a
-      // contagem roda na primeira vez que a tela aparecer
-      if(container.closest(".view.active")) animateCount(el, k.value, k.decimals ?? 0, 120 + ki*60);
+    if(spark) ligarDicaDaLinha(div, div.querySelector(".kpi-linha"), k, comLinha, escala);
+    // conta na tela visível; nas outras o número já fica pronto e a contagem roda na
+    // primeira vez que a tela aparecer
+    const nums = div.querySelectorAll(".kpi-num");
+    const alvos = k.split ? k.split.map((p,j)=>[nums[j], p.value, p.decimals ?? 0])
+                          : [[nums[0], k.value, k.decimals ?? 0]];
+    alvos.forEach(([el, v, casas], j)=>{
+      if(!el || v == null || !Number.isFinite(v)) return;
+      if(container.closest(".view.active")) animateCount(el, v, casas, 120 + ki*60 + j*90);
       else{
-        el.textContent = fmtNum(k.value, k.decimals ?? 0);
-        el.dataset.alvo = String(k.value);
-        el.dataset.casas = String(k.decimals ?? 0);
+        el.textContent = fmtNum(v, casas);
+        el.dataset.alvo = String(v);
+        el.dataset.casas = String(casas);
       }
-    }
+    });
   });
 }
 
@@ -3610,6 +3799,8 @@ function renderDashboard(){
 // Último valor COM dado, não o último da série: as duas séries terminam em
 // meses diferentes, e ler a última posição pegava um mês vazio.
 const ultimoValido = arr => { for(let i=arr.length-1;i>=0;i--) if(arr[i]!=null) return arr[i]; return null; };
+// o mês de cada ponto das linhas de apara (série do hub; sem ela, os rótulos de MESES)
+const rotulosAparas = () => window.APARAS_MESES ? window.APARAS_MESES.map(rotMesAno) : MESES.slice();
 // Com o hub (003), apara do PERÍODO escolhido, como os cartões do BI; sem ele,
 // o último mês da série, como antes.
 const aparasMedia   = window.APARA_PERIODO ? window.APARA_PERIODO.apontado : ultimoValido(APARAS_MENSAL.apontado);
@@ -3646,13 +3837,13 @@ const kpisGerais = [
   // A confirmada é mensal: período sem dia 1º (um dia, uma semana) fica sem ela, como no BI.
   { label:"Apara confirmada", value:confirmMedia, suffix:"%", decimals:1, comp: comparaMeta(confirmMedia),
     nota: confirmMedia == null ? `só por mês · apontada ${fmtPct(aparasMedia)}` : `apontada ${fmtPct(aparasMedia)}`,
-    spark: APARAS_MENSAL.confirmado.slice() },
+    spark: APARAS_MENSAL.confirmado.slice(), sparkRotulos: rotulosAparas() },
   ...(comOeeFabrica ? [] : [{ label:"TMR médio", value:tmrMedio, suffix:"%", decimals:1,
         comp: comparaMesAnterior(tmrMedio, "tmr"), nota:"tempo de máquina rodando", spark: serieMensal("tmr") }]),
 ];
 if(produtividade != null){
-  kpisGerais.push({ label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:0,
-    comp: comparaMesAnterior(produtividade, "prodt", { unidade:"m²/h", casas:0 }), nota:"m² ÷ horas de máquina produzindo", spark: serieMensal("prodt") });
+  kpisGerais.push({ label:"Produtividade · corte", value:produtividade, suffix:" m²/h", decimals:0,
+    comp: comparaMesAnterior(produtividade, "prodt", { unidade:"m²/h", casas:0 }), nota:"m² ÷ horas produzindo das cortadeiras", spark: serieMensal("prodt") });
 }
 kpisGerais.push({ label:"Aderência ao plano", value:aderMedia, suffix:"%", decimals:1,
     comp: comparaMesAnterior(aderMedia, "ader"), nota:"km realizados ÷ planejados", spark: serieMensal("ader") });
@@ -3786,6 +3977,7 @@ function renderMotivoChart(){
     color:"var(--series-3)",
     tip:`<b>${t.cod ? t.cod+" — " : ""}${esc(t.nome)}</b><br>${fmt(t.kg)} kg · ${fmt1(t.kg/perdaTotalKg*100)}% do refugo`
   })), { labelW:150, valueW:58, aria:"Perda por motivo em toneladas" });
+  pintarTotal("motivo-total", TIPOS_PERDA.length ? perdaTotalKg/1000 : null, 1, "t", "total no período");
 }
 renderMotivoChart();
 
@@ -3946,7 +4138,11 @@ const ORDEM_ETAPAS = ["Impressão", "Laminação", "Corte / Refile", "Coating"];
    ele começa), a OP aberta nela, velocidade real x programada e o término
    programado. O hub lê o banco a cada 10 min; esta tela busca de novo a cada
    5 min, e o "há quanto tempo" anda sozinho a cada minuto. */
-const AGORA_GRUPOS = { produzindo:["PRODUZINDO"], setup:["SETUP", "INICIALIZACAO"], fora:["FIM TURNO", "INATIVIDADE"] };
+const AGORA_GRUPOS = { produzindo:["PRODUZINDO"], fora:["FIM TURNO", "INATIVIDADE"] };
+// "Em setup" conta só os códigos 01 e 02 (pedido de 14/10/2026): a inicialização entra
+// nas paradas.
+const CODIGOS_SETUP = new Set(["01", "02"]);
+const emSetupAgora = r => !!r && !r.terminou_em && CODIGOS_SETUP.has(String(r.cod_apont ?? "").trim().padStart(2, "0"));
 function estadoAgora(r){
   if(!r) return { chave:"SEM", nome:"Sem apontamento recente", cor:"var(--border-strong)" };
   if(r.terminou_em) return { chave:"ENCERRADO", nome:"Sem atividade aberta", cor:"var(--border-strong)" };
@@ -3966,8 +4162,11 @@ function estadoAgora(r){
   function itens(){
     const linhas = bancoLinhas("agora");
     const porMaq = new Map(linhas.map(r=>[chaveMaq(r.maquina), r]));
-    const lista = MAQUINAS.map(m=>({ id:m.id, nome:m.nome, processo:m.processo, rota:m.rota, m, r: porMaq.get(chaveMaq(m.id)) || null }));
+    const hoje = isoDate(new Date());
+    const lista = MAQUINAS.filter(m=>!maqForaDoPainel(m.id, hoje))
+      .map(m=>({ id:m.id, nome:m.nome, processo:m.processo, rota:m.rota, m, r: porMaq.get(chaveMaq(m.id)) || null }));
     linhas.forEach(r=>{
+      if(maqForaDoPainel(r.maquina, hoje)) return;
       if(!porId.has(chaveMaq(r.maquina))) lista.push({ id:limpaTexto(r.maquina), nome:limpaTexto(r.maquina), processo:"Outros recursos", rota:"—", m:null, r });
     });
     return lista;
@@ -4034,7 +4233,8 @@ function estadoAgora(r){
 
   function contagem(lista){
     const comDado = lista.filter(x=>x.r);
-    const conta = g => comDado.filter(x=>!x.r.terminou_em && AGORA_GRUPOS[g].includes(estadoAgora(x.r).chave)).length;
+    const conta = g => comDado.filter(x=> g === "setup" ? emSetupAgora(x.r)
+      : !x.r.terminou_em && AGORA_GRUPOS[g].includes(estadoAgora(x.r).chave)).length;
     const produzindo = conta("produzindo"), setup = conta("setup"), fora = conta("fora");
     return { total: comDado.length, produzindo, setup, fora, paradas: comDado.length - produzindo - setup - fora };
   }
@@ -4080,7 +4280,7 @@ function estadoAgora(r){
     if(!bancoLinhas("agora").length){
       renderKpis(kpis, [
         { label:"Produzindo", value:null, nota:"máquinas rodando agora" },
-        { label:"Em setup", value:null, nota:"setup e inicialização" },
+        { label:"Em setup", value:null, nota:"01 setup · 02 acerto de cores" },
         { label:"Paradas", value:null, nota:"com ou sem motivo apontado" },
         { label:"TMR hoje", value:null, suffix:"%", nota:"dia de produção atual" },
       ]);
@@ -4098,7 +4298,7 @@ function estadoAgora(r){
     const hp = doDia.reduce((a,x)=>a+(Number(x.r.horas_prod_dia)||0),0), ht = doDia.reduce((a,x)=>a+(Number(x.r.horas_tot_dia)||0),0);
     const valores = [
       { label:"Produzindo", value:c.produzindo, suffix:` de ${c.total}`, decimals:0, nota:"máquinas rodando agora" },
-      { label:"Em setup", value:c.setup, decimals:0, nota:"setup e inicialização" },
+      { label:"Em setup", value:c.setup, decimals:0, nota:"01 setup · 02 acerto de cores" },
       { label:"Paradas", value:c.paradas, decimals:0, nota: c.fora ? `e mais ${c.fora} fora de turno ou inativas` : "com ou sem motivo apontado" },
       { label:"TMR hoje", value: ht > 0 ? hp / ht * 100 : null, suffix:"%", decimals:1,
         nota: ht > 0 ? `${fmt1(hp)} de ${fmt1(ht)} h · dia ${fmtDM(dataLocal(dia))}` : "sem horas apontadas hoje" },
@@ -4136,34 +4336,31 @@ function estadoAgora(r){
 })();
 
 /* ============ VIEW: APARAS & REFUGO ============ */
-// Diferença do MESMO mês: o último com apontado e confirmado. O apontado do
-// mês aberto contra o confirmado do mês anterior comparava meses diferentes.
-function diferencaMesmoMes(){
-  if(window.APARA_PERIODO){   // com o hub: o próprio período escolhido
-    const { apontado: a, confirmado: c } = window.APARA_PERIODO;
-    return a != null && c != null ? c - a : null;
-  }
-  const { apontado, confirmado } = APARAS_MENSAL;
-  for(let i = apontado.length - 1; i >= 0; i--){
-    if(apontado[i] != null && confirmado[i] != null) return confirmado[i] - apontado[i];
-  }
-  return confirmMedia - aparasMedia;
-}
+// Três cartões (pedido de 14/10/2026). O refugo do período em t, dividido: em cima o
+// confirmado (scrap total da balança, na regra da apara confirmada) e embaixo o apontado
+// pelo operador (a soma dos motivos, a dos gráficos abaixo). A apara confirmada é a do
+// período escolhido, com o acumulado do ano na nota.
+const refugoConfT = window.APARA_PERIODO && window.APARA_PERIODO.scrapKg != null ? window.APARA_PERIODO.scrapKg/1000 : null;
+const refugoApontT = TIPOS_PERDA.length ? perdaTotalKg/1000 : null;
 renderKpis(document.getElementById("aparas-kpis"), [
-  { label:"Refugo total", value: perdaTotalKg/1000, suffix:" t", decimals:1,
-    nota:"acumulado do período", spark: serieMensal("perdaT") },
+  { label:"Refugo no período", split:[
+      { nome:"Confirmado", value: refugoConfT, suffix:" t", decimals:1, cor:"var(--series-2)" },
+      { nome:"Apontado", value: refugoApontT, suffix:" t", decimals:1, cor:"var(--series-4)" },
+    ],
+    nota: refugoConfT == null && refugoApontT != null ? "a balança fecha só por mês" : "balança e apontamento do operador",
+    sparks: window.REFUGO_MENSAL ? [
+      { nome:"Confirmado", cor:"var(--series-2)", data: window.REFUGO_MENSAL.conf },
+      { nome:"Apontado", cor:"var(--series-4)", data: window.REFUGO_MENSAL.apont },
+    ] : null,
+    sparkRotulos: rotulosAparas(), sparkFmt: v => fmt1(v) + " t" },
   { label:"Apara confirmada", value: confirmMedia, suffix:"%", decimals:1, comp: comparaMeta(confirmMedia),
-    nota: confirmMedia == null ? "% JGR da Conta Refugo, só por mês" : "% JGR da Conta Refugo (balança)", spark: APARAS_MENSAL.confirmado.slice() },
-  { label:`Apara confirmada ${APARA_ANO.ano}`, value: APARA_ANO.valor, suffix:"%", decimals:2, comp: comparaMeta(APARA_ANO.valor),
-    nota: APARA_ANO.valor == null ? "acumulado do ano (YTD) · sem dados ainda"
-      : `acumulado jan–${APARA_ANO.ateMes} (YTD)` + (APARA_ANO.anterior != null ? ` · ${APARA_ANO.ano - 1}: ${fmtNum(APARA_ANO.anterior, 2)}%` : ""),
-    spark: APARA_ANO.serie },
+    nota: (confirmMedia == null ? "% JGR da balança, só por mês" : "% JGR da Conta Refugo (balança)")
+      + (APARA_ANO.valor != null ? ` · ${APARA_ANO.ano} até ${APARA_ANO.ateMes}: ${fmtNum(APARA_ANO.valor, 2)}%` : ""),
+    spark: APARAS_MENSAL.confirmado.slice(), sparkRotulos: rotulosAparas() },
   { label:"Apara apontada", value: aparasMedia, suffix:"%", decimals:1,
-    nota:"apontada pelo operador · sem meta", spark: APARAS_MENSAL.apontado.slice() },
-  { label:"Diferença conf. x apont.", value: diferencaMesmoMes(), suffix:" p.p.", decimals:1,
-    nota:"quanto o apontamento subestima",
-    spark: APARAS_MENSAL.confirmado.map((c,i)=> c != null && APARAS_MENSAL.apontado[i] != null ? c - APARAS_MENSAL.apontado[i] : null) },
+    nota:"apontada pelo operador · sem meta", spark: APARAS_MENSAL.apontado.slice(), sparkRotulos: rotulosAparas() },
 ]);
+pintarTotal("perda-tipo-total", refugoApontT, 1, "t", "total no período");
 
 hBarChart(document.getElementById("perda-tipo-chart"), TIPOS_PERDA.map(t=>({
   label: t.cod ? `${t.cod} · ${t.nome}` : t.nome,
@@ -4180,32 +4377,39 @@ hBarChart(document.getElementById("perda-tipo-chart"), TIPOS_PERDA.map(t=>({
     nome:m.nome, kg: Math.round(kgReal.get(String(m.id).trim().toUpperCase()) || 0),
   })).sort((a,b)=>b.kg-a.kg);
   const totalMaq = porMaq.reduce((a,m)=>a+m.kg,0);
+  pintarTotal("perda-maquina-total", kgReal ? totalMaq/1000 : null, 1, "t", "total no período");
   hBarChart(document.getElementById("perda-maquina-chart"), porMaq.map(m=>({
     label:m.nome, value:m.kg, display: fmt(m.kg)+" kg",
     tip:`<b>${esc(m.nome)}</b><br>${fmt(m.kg)} kg` + (totalMaq>0 ? ` · ${fmt1(m.kg/totalMaq*100)}% do refugo das máquinas` : "")
   })), { labelW:100, valueW:78, rowH:28, aria:"Perda por máquina" });
 })();
 
-// É a apara APONTADA: a balança (confirmada) não separa por família. Por isso
-// sem a linha da meta e sem verde/vermelho: a meta de 12% é da confirmada.
-hBarChart(document.getElementById("classe-chart"), CLASSIFICACOES.map(c=>({
-  label:c.nome, value:c.aparas, display: fmt1(c.aparas)+"%", color:"var(--series-3)",
-  tip:`<b>${esc(c.nome)}</b><br>${fmt1(c.aparas)}% de apara apontada · ${fmt(c.kg)} kg produzidos`
-})), { labelW:200, valueW:58, rowH:30, aria:"Apara apontada por classificação de produto" });
-
+// Produção mensal: o ano do período escolhido, de janeiro ao último mês com produção
+// (pedido de 14/10/2026), como as aparas da visão geral, e as duas linhas cheias. Sem a
+// série do hub (ou com menos de dois meses no ano), os últimos 12 meses.
 (function(){
   const holder = document.getElementById("producao-kg-chart");
-  if(PRODUCAO_KG_MENSAL.length === 0){
+  const sub = document.getElementById("producao-kg-sub");
+  const ultimo = new Date(periodoDaUrl().ate); ultimo.setDate(ultimo.getDate() - 1);
+  const ano = String(ultimo.getFullYear());
+  const doAno = (window.PRODUCAO_SERIE || []).filter(r=>r.mes.startsWith(ano));
+  const linhas = doAno.length >= 2
+    ? doAno.map(r=>({ mes: MESES_CURTOS[Number(r.mes.slice(5,7)) - 1], bruto: r.bruto, refugo: r.refugo }))
+    : PRODUCAO_KG_MENSAL.map(p=>({ mes: p.mes, bruto: p.peso_bruto_kg, refugo: p.refugo_kg }));
+  if(linhas.length === 0){
     holder.innerHTML = `<div class="empty-state">Sem dados de produção no período.</div>`;
     return;
   }
+  const quando = doAno.length >= 2 ? `${linhas[0].mes}–${linhas.at(-1).mes} de ${ano}` : "últimos 12 meses";
+  if(sub) sub.textContent = `Peso bruto das rebobinadeiras e refugo · ${quando}`;
+  const t = v => v != null && Number.isFinite(v) ? v/1000 : null;
   multiLineChart(holder,
-    PRODUCAO_KG_MENSAL.map(p=>p.mes),
+    linhas.map(r=>r.mes),
     [
-      { name:"Peso bruto", short:"Bruto", color:"var(--series-3)", data: PRODUCAO_KG_MENSAL.map(p=>p.peso_bruto_kg/1000) },
-      { name:"Refugo",     short:"Refugo", color:"var(--serious)", dashed:true, data: PRODUCAO_KG_MENSAL.map(p=>p.refugo_kg/1000) },
+      { name:"Peso bruto", short:"Bruto", color:"var(--series-3)", data: linhas.map(r=>t(r.bruto)) },
+      { name:"Refugo",     short:"Refugo", color:"var(--serious)", data: linhas.map(r=>t(r.refugo)) },
     ],
-    { idPrefix:"pk", fmtY: v=> fmt(v)+" t", fmtTip: v=> fmt1(v)+" t", aria:"Produção e refugo mensal em toneladas" }
+    { idPrefix:"pk", height:250, fmtY: v=> fmt(v)+" t", fmtTip: v=> fmt1(v)+" t", aria:`Produção e refugo por mês em toneladas, ${quando}` }
   );
 })();
 
@@ -4288,9 +4492,9 @@ const STATUS_LAUDO = [
       nota: horasTot>0 ? `de ${fmt(horasTot)} h totais` : "sem horas apontadas no período", spark: serieMensal("horasProd") },
   ]);
   renderKpis(document.getElementById("perf-kpis"), [
-    { label:"Produtividade", value:produtividade, suffix:" m²/h", decimals:0,
+    { label:"Produtividade · corte", value:produtividade, suffix:" m²/h", decimals:0,
       comp: produtividade != null ? comparaMesAnterior(produtividade, "prodt", { unidade:"m²/h", casas:0 }) : null,
-      nota: produtividade != null ? "m² ÷ horas de máquina produzindo" : "sem m² apontado no período", spark: serieMensal("prodt") },
+      nota: produtividade != null ? "m² ÷ horas produzindo das cortadeiras" : "sem m² do corte no período", spark: serieMensal("prodt") },
     { label:"Velocidade média", value: velDisponivel ? velMedia : null, suffix:" m/min", decimals:0,
       comp: velDisponivel ? comparaMesAnterior(velMedia, "vel", { unidade:"m/min", casas:0 }) : null,
       nota: velDisponivel ? "metros ÷ horas produzindo, todas as máquinas" : "sem velocidade medida no período", spark: serieMensal("vel") },
@@ -5207,6 +5411,8 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
   });
   const ativa = document.querySelector(".view.active");
   if(ativa) ativa.dataset.vista = "1";
+  // volta de uma atualização automática: a tela em que a pessoa estava, sem transição
+  window.irParaTela = alvo => { const b = botaoDa(alvo); if(b && !b.classList.contains("active")) aplicar(b); };
   moverIndicador();
   window.addEventListener("resize", moverIndicador);
   if(document.fonts && document.fonts.ready) document.fonts.ready.then(moverIndicador);
@@ -5616,7 +5822,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     const ate = linhas.map(r=>dataLocal(r.dados_ate)).filter(Boolean).sort((a,b)=>b - a)[0] || null;
     const ref = ate && (Date.now() - ate) < 30 * 60000 ? new Date() : (ate || new Date());
     const com = linhas.map(r=>({ r, e: estadoAgora(r) }));
-    const em = (x, g) => !x.r.terminou_em && AGORA_GRUPOS[g].includes(x.e.chave);
+    const em = (x, g) => g === "setup" ? emSetupAgora(x.r) : !x.r.terminou_em && AGORA_GRUPOS[g].includes(x.e.chave);
     const prod = com.filter(x=>em(x, "produzindo")).length, setup = com.filter(x=>em(x, "setup")).length, fora = com.filter(x=>em(x, "fora")).length;
     const paradas = com.filter(x=>!em(x, "produzindo") && !em(x, "setup") && !em(x, "fora"));
     const lista = paradas.map(x=>({ x, desde: dataLocal(x.r.terminou_em || x.r.desde) }))
@@ -5734,7 +5940,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     let s = "";
     if(produtividade != null){
       const comp = comparaMesAnterior(produtividade, "prodt", { unidade:"m²/h", casas:0 });
-      s += `Produtividade ${per}: ${b(fmt(produtividade) + " m²/h")}${comparado(comp)}, m² ÷ horas de máquina produzindo.`;
+      s += `Produtividade do corte ${per}: ${b(fmt(produtividade) + " m²/h")}${comparado(comp)}, m² ÷ horas produzindo das cortadeiras.`;
     }
     if(tot && ok(tot.vel)) s += ` Velocidade média: ${b(fmt(tot.vel) + " m/min")}.`;
     return s + " Mais na tela TMR.";
@@ -5745,7 +5951,7 @@ window.renderGanttForTheme = USANDO_DADOS_REAIS ? null : renderGantt;
     const add = (nome, atual, chave, op, texto) => { if(!ok(atual)) return; const c = comparaMesAnterior(atual, chave, op); if(c) itens.push(`${nome} ${texto}${comparado(c)}`); };
     if(ok(tmrMedio)) add("TMR", tmrMedio, "tmr", undefined, pct1(tmrMedio));
     if(ok(aderMedia)) add("aderência", aderMedia, "ader", undefined, pct1(aderMedia));
-    if(produtividade != null) add("produtividade", produtividade, "prodt", { unidade:"m²/h", casas:0 }, fmt(produtividade) + " m²/h");
+    if(produtividade != null) add("produtividade do corte", produtividade, "prodt", { unidade:"m²/h", casas:0 }, fmt(produtividade) + " m²/h");
     add("refugo", perdaTotalKg / 1000, "perdaT", { unidade:"t", maiorMelhor:false }, fmt1(perdaTotalKg / 1000) + " t");
     const ant = aparaMesAnterior();
     if(ok(confirmMedia) && ant){
@@ -6490,6 +6696,80 @@ if(footerNote){
   window.refreshLiveStatus = refreshStatus; // chamado pelo boot() depois de loadRealData()
 })();
 
+/* ============ atualização automática ============
+   O hub publica a cada 10 min, só quando o dado muda (pedido de 14/10/2026: "atualizar
+   automaticamente sem sair da tela"). A cada minuto o painel olha a hora da última
+   publicação (v_hub_execucao); quando ela muda, recarrega e volta à mesma tela e à
+   mesma altura. Com alguém no meio de alguma coisa (gaveta, busca, menu ou assistente
+   abertos, digitando, mexendo há menos de 30 s, maquete numa área ou no ajuste da
+   planta), espera e olha de novo. Com a aba escondida, recarrega na hora. */
+const CHAVE_RETOMAR = "gualapack:retomar";
+(function(){
+  const QUIETO_MS = 30000;
+  let ultimoGesto = Date.now(), pendente = false, olhando = false;
+  ["pointerdown", "keydown", "wheel", "touchstart", "input"].forEach(t=>
+    window.addEventListener(t, ()=>{ ultimoGesto = Date.now(); }, { capture:true, passive:true }));
+  const publicada = e => e ? String(e.publicada_em || e.terminada_em || "") : "";
+  function ocupado(){
+    if(document.visibilityState !== "visible") return false;
+    if(Date.now() - ultimoGesto < QUIETO_MS) return true;
+    if(document.body.classList.contains("no-scroll")) return true;
+    const a = document.activeElement;
+    if(a && (/^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName) || a.isContentEditable)) return true;
+    if(document.querySelector(".open, .aberta, [aria-haspopup][aria-expanded='true'], [role='combobox'][aria-expanded='true']")) return true;
+    return !!(window.MAQUETE && window.MAQUETE.ocupada && window.MAQUETE.ocupada());
+  }
+  function recarregar(){
+    const ativa = document.querySelector(".view.active");
+    try{
+      sessionStorage.setItem(CHAVE_RETOMAR, JSON.stringify({ tela: ativa ? ativa.id.replace(/^view-/, "") : null, y: window.scrollY, em: Date.now() }));
+    }catch(e){ /* sem sessionStorage: recarrega na tela inicial */ }
+    location.reload();
+  }
+  async function olhar(){
+    if(olhando || !window.gualapackAuth || !window.HUB_EXECUCAO) return;
+    olhando = true;
+    try{
+      if(!pendente){
+        const { data, error } = await window.gualapackAuth.from("v_hub_execucao").select("publicada_em,terminada_em");
+        if(error || !Array.isArray(data) || !data.length) return;
+        const nova = publicada(data[0]);
+        if(nova && nova !== publicada(window.HUB_EXECUCAO)) pendente = true;
+      }
+      if(pendente && !ocupado()) recarregar();
+    }catch(e){ /* sem rede: olha de novo no próximo minuto */ }
+    finally{ olhando = false; }
+  }
+  setInterval(olhar, 60000);
+  document.addEventListener("visibilitychange", olhar);
+  window.olharAtualizacao = olhar;
+})();
+// Volta de uma atualização automática: a tela e a altura em que a pessoa estava (vale
+// por 2 min; depois disso é uma abertura nova).
+function lerRetomada(){
+  try{
+    const s = sessionStorage.getItem(CHAVE_RETOMAR);
+    sessionStorage.removeItem(CHAVE_RETOMAR);
+    const r = s ? JSON.parse(s) : null;
+    return r && Date.now() - r.em < 120000 ? r : null;
+  }catch(e){ return null; }
+}
+function retomarTela(r){
+  if(r.tela && window.irParaTela) window.irParaTela(r.tela);
+  const rolar = ()=> window.scrollTo({ top: r.y || 0 });
+  rolar(); requestAnimationFrame(rolar); setTimeout(rolar, 350);
+  // o silêncio vale até o primeiro gesto (a maquete pode demorar a montar)
+  const GESTOS = ["pointerdown", "keydown", "wheel", "touchstart"];
+  const acordar = ()=>{ window.ATUALIZACAO_SILENCIOSA = false; GESTOS.forEach(t=>window.removeEventListener(t, acordar, true)); };
+  GESTOS.forEach(t=>window.addEventListener(t, acordar, true));
+  setTimeout(acordar, 20000);
+  const selo = document.getElementById("data-source-tag");
+  if(selo && !window.matchMedia("(prefers-reduced-motion: reduce)").matches){
+    selo.classList.add("renovado");
+    setTimeout(()=> selo.classList.remove("renovado"), 2400);
+  }
+}
+
 /* ============ sessão, conta e logout ============
    O avatar (barra lateral no computador, topo no celular) abre o cartão da
    conta: nome, e-mail, perfil, área, desde quando tem acesso e o último
@@ -6816,6 +7096,8 @@ function mostrarFalhaCarga(err){
 
 async function boot(){
   const { de, ate } = periodoDaUrl();
+  const retomada = lerRetomada();
+  if(retomada) window.ATUALIZACAO_SILENCIOSA = true;
   try{
     let falha = await loadRealData(de, ate, 1);
     if(falha){
@@ -6825,21 +7107,25 @@ async function boot(){
     }
     if(falha) mostrarFalhaCarga(falha);
     else{
-      // entrada escalonada (título, cartões, painéis) só na primeira carga
-      document.body.classList.add("entrada");
-      setTimeout(()=> document.body.classList.remove("entrada"), 1500);
+      // entrada escalonada (título, cartões, painéis) só na primeira carga; na volta de
+      // uma atualização automática, a tela reaparece parada onde estava
+      if(!retomada){
+        document.body.classList.add("entrada");
+        setTimeout(()=> document.body.classList.remove("entrada"), 1500);
+      }
       renderDashboard();
     }
     if(window.refreshLiveStatus) window.refreshLiveStatus();
     const labelEl = document.getElementById("period-label");
     if(labelEl && window.rotuloPeriodo) labelEl.textContent = window.rotuloPeriodo(de, ate);
+    if(retomada) retomarTela(retomada);
   }catch(err){
     // Erro aqui não pode deixar a página presa atrás do "auth-pending" pra
     // sempre — melhor mostrar o painel (mesmo que incompleto) do que uma
     // tela em branco.
     console.error("Falha ao iniciar o painel:", err);
   }finally{
-    document.body.classList.remove("auth-pending");
+    document.body.classList.remove("auth-pending", "retomando");
   }
 }
 whenSessionReady(boot);

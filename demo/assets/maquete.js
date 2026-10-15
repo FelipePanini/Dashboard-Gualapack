@@ -73,7 +73,8 @@ const VAO = 0.07;          // fresta entre as faixas da coluna
 
 /* ---------------- utilidades */
 const $ = (id) => document.getElementById(id);
-const reduz = () => matchMedia("(prefers-reduced-motion: reduce)").matches;
+// na volta de uma atualização automática do painel, sem a entrada animada
+const reduz = () => !!window.ATUALIZACAO_SILENCIOSA || matchMedia("(prefers-reduced-motion: reduce)").matches;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const nrm = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -1187,5 +1188,7 @@ export async function iniciar({ client, lerTudo, papel }) {
     mostrar() { redimensionar(); pedirQuadro(); },
     buscar,
     irPara,
+    // uma área aberta ou o ajuste da planta: a atualização automática espera
+    ocupada: () => !!E.foco || E.editando,
   };
 }
