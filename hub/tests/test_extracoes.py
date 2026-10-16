@@ -1,3 +1,4 @@
+import pathlib
 from datetime import date, datetime
 from decimal import Decimal
 
@@ -116,3 +117,24 @@ def test_extracoes_nao_pedem_coluna_pessoal():
         sel = ex.sql.split("FROM")[0] if ex.nome != "entregas" else ex.sql.split("FROM (")[0]
         for p in pessoais:
             assert p not in sel, f"{ex.nome} pede {p}"
+
+
+def test_leitura_sem_fonte_vira_aviso(tmp_path):
+    # 16/10: a mp_maquina gravava o parquet, mas sem a fonte em fontes.local.yaml o arquivo nunca
+    # entrava no hub. Agora vira aviso; a leitura que só guarda histórico não precisa de fonte.
+    cfg = {"banco": {"ativo": True, "pasta": str(tmp_path)}, "fontes": [{"id": "banco.com_fonte"}]}
+    ex = [Extracao("com_fonte", "teste", "SELECT a FROM t"), Extracao("sem_fonte", "teste", "SELECT a FROM t"),
+          Extracao("so_guarda", "teste", "SELECT a FROM t", historico_diario=True, so_historico=True)]
+    con = ConexaoFalsa(lambda sql, p: (["a"], [(1,)]))
+    mudaram, avisos = extracoes.extrair(cfg, hoje=date(2026, 10, 16), extracoes=ex, conectar=lambda: con)
+    assert len(mudaram) == 3
+    assert avisos == ["sem_fonte: lida do banco, mas sem a fonte banco.sem_fonte em fontes.local.yaml; o arquivo não entra no hub"]
+    _, avisos = extracoes.extrair(cfg, hoje=date(2026, 10, 16), extracoes=ex, conectar=lambda: con)
+    assert len(avisos) == 1                                            # nada vencido: o aviso continua
+
+
+def test_toda_leitura_do_hub_tem_fonte_no_exemplo():
+    # o exemplo de configuração cita cada leitura que precisa de fonte
+    texto = (pathlib.Path(__file__).parents[1] / "config" / "fontes.exemplo.yaml").read_text(encoding="utf-8")
+    faltam = [e.nome for e in extracoes.EXTRACOES if not e.so_historico and e.nome not in texto]
+    assert faltam == []

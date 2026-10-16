@@ -43,6 +43,7 @@ class Extracao:
     intervalo_min: int = 0          # minutos mínimos entre duas leituras (view lenta, dado que muda pouco)
     historico_diario: bool = False  # foto: guarda a primeira de cada dia em historico/
     primeiro_por: tuple[str, ...] = ()  # foto: mantém só a primeira linha de cada chave (como o Table.Distinct do Excel)
+    so_historico: bool = False      # só guarda as fotos (historico/): ainda não é fonte do hub
 
 
 # Classificação de entrega do PCP: a mesma consulta da planilha Aderência
@@ -90,7 +91,7 @@ EXTRACOES: list[Extracao] = [
     Extracao("programacao_pcp", "Programação do PCP (View_usr_programacao_teruel), uma foto por dia: base da aderência pelo banco.",
              """SELECT NumOrdem, CodRecurso, CodAtiv, Produto, QtdPlanejada, QtdProduzida, DtIniPlan, DtFimPlan,
                        Unidade, TipoProduto, DtEntrega
-                FROM dbo.View_usr_programacao_teruel""", intervalo_min=60, historico_diario=True),
+                FROM dbo.View_usr_programacao_teruel""", intervalo_min=60, historico_diario=True, so_historico=True),
     Extracao("wip", "Pallets em processo disponíveis (view_usr_pallet_wip_disponiveis), sem operador nem código de barras.",
              """SELECT OP, ID, OP_HoraInicio, CodAtiv, LocalEstoque, OP_Cliente, OP_QtdPlanejado, OP_QtdProduzido_Ativ,
                        QtdMetroLinear, QtdKg, StatusWIP, StatusOP
@@ -220,17 +221,24 @@ def extrair(cfg: dict, hoje: date | None = None, extracoes: list[Extracao] | Non
     pasta = Path(b["pasta"])
     pasta.mkdir(parents=True, exist_ok=True)
     hoje = hoje or date.today()
+    # Cada leitura precisa da fonte banco.<nome> em fontes.local.yaml: sem ela o arquivo é
+    # gravado, mas nunca entra no hub (16/10: o pé de máquina passou um dia vazio assim).
+    sem_fonte = []
+    if "fontes" in cfg:
+        ids = {f.get("id") for f in cfg["fontes"]}
+        sem_fonte = [f"{e.nome}: lida do banco, mas sem a fonte banco.{e.nome} em fontes.local.yaml; o arquivo não entra no hub"
+                     for e in (extracoes or EXTRACOES) if not e.so_historico and f"banco.{e.nome}" not in ids]
     estado = _estado(pasta)
     agora = time.time()
     pendentes = [ex for ex in (extracoes or EXTRACOES) if _vencida(ex, estado, agora)]
     if not pendentes:
-        return [], []
+        return [], sem_fonte
     from hub import sqlserver
     try:
         con = (conectar or sqlserver.conectar)()
     except Exception as e:  # noqa: BLE001 — sem conexão: fica o que já foi extraído
-        return [], [f"leitura do banco não rodou ({sqlserver.erro_legivel(e)}); os dados já extraídos continuam valendo"]
-    mudaram, avisos = [], []
+        return [], [f"leitura do banco não rodou ({sqlserver.erro_legivel(e)}); os dados já extraídos continuam valendo"] + sem_fonte
+    mudaram, avisos = [], list(sem_fonte)
     try:
         for ex in pendentes:
             t = time.time()

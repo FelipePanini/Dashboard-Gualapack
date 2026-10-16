@@ -125,6 +125,8 @@ fontes:
 
 # As outras leituras do banco seguem o modelo de banco.carteira, uma entrada
 # por arquivo de hub/extracoes.py: banco.estrutura_largura, maquina_agora,
-# programacao, programacao_pcp, wip, gramatura_produto (fotos) e
+# programacao, wip, mp_maquina, gramatura_produto (fotos) e
 # banco.faturamento, entregas, setup, laudos (um arquivo por mês, com
-# "varios: true" e o curinga <nome>_*.parquet).
+# "varios: true" e o curinga <nome>_*.parquet). A programacao_pcp só guarda a
+# foto de cada dia (historico/) e não precisa de entrada. Leitura sem a entrada
+# vira aviso: o arquivo é gravado, mas não entra no hub.
