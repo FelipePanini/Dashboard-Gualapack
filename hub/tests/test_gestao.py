@@ -68,6 +68,17 @@ def test_mp_maquina_traz_as_bandeiras_e_a_maquina_do_painel():
     assert linhas["94307"][1:3] == ("L04", 3)
 
 
+def test_mp_maquina_volume_numerico_sem_ponto_zero():
+    """16/10: o IdVolume chega como número no parquet e aparecia "vol. 94424.0" no painel."""
+    con = duckdb.connect()
+    con.execute("create schema if not exists raw; create schema if not exists clean")
+    con.execute("""create table raw.banco__mp_maquina as select * from (values
+        ('PL24.100', 'PAPEL', 'MATRIZ - HMC01', 3.0, 94424.0, 628.0, timestamp '2026-10-16 06:00')
+        ) t(cod_item, descricao, local_estoque, transfer_status, id_volume, quantidade, data_entrada)""")
+    con.execute((SQL / "clean" / "240_mp_maquina.sql").read_text(encoding="utf-8"))
+    assert con.execute("select id_volume, bandeira from clean.mp_maquina").fetchall() == [("94424", 3)]
+
+
 def test_mp_maquina_vai_no_pacote():
     tabela, consulta = publicacao.FOTOS["mp_maquina"]
     assert tabela == "clean.mp_maquina" and "bandeira" in consulta

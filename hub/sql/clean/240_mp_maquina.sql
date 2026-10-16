@@ -17,7 +17,8 @@ with v as (
          trim(cast(cod_item as varchar))                                as cod_item,
          trim(cast(descricao as varchar))                               as descricao,
          cast(transfer_status as integer)                               as bandeira,
-         trim(cast(id_volume as varchar))                               as id_volume,
+         -- o banco manda o IdVolume como número: no parquet vira 94424.0; fica o código sem o ".0"
+         regexp_replace(trim(cast(id_volume as varchar)), '\.0+$', '')   as id_volume,
          cast(quantidade as double)                                     as quantidade,
          cast(data_entrada as timestamp)                                as data_entrada
   from raw.banco__mp_maquina
