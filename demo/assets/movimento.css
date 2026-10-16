@@ -1,0 +1,101 @@
+/* Visual novo do painel (prévia de 16/10/2026, pedido do dono). Só vale com html.novo,
+   que o index.html liga com "?novo=1". Carregado depois do CSS principal.
+   - Barra lateral como a do Mac (sidebars.md): linhas com ícone e o nome da tela, grupos
+     com título curto e divisórias, e a conta embaixo. Recolhe até ficar só com os ícones
+     ("Let people hide the sidebar"), e recolhe sozinha em janela com menos de 1280 px.
+   - Topo fixo: com a rolagem suave (ScrollSmoother) o conteúdo corre por baixo dele. */
+html.novo{ --barra-w: 232px; --off: calc(var(--barra-w) + 24px); --topo-h: 68px; }
+html.novo.barra-fechada{ --barra-w: 72px; }
+/* com o GSAP, quem move a seleção é ele (a transição do CSS brigaria com a mola) */
+html.novo.anima .rail-indicator{ transition: none !important; }
+
+@media (min-width: 769px){
+  html.novo .shell{ display:block; }
+  html.novo .main{ margin-left: var(--off); }
+
+  /* ---------- barra lateral ---------- */
+  html.novo .rail, html.novo.vidro .rail{
+    position:fixed; left:12px; top:12px; bottom:12px; height:auto; width: var(--barra-w); margin:0;
+    display:flex; flex-direction:column; align-items:stretch; gap:6px; padding:10px 8px 10px;
+    border-radius:22px; overflow:hidden; z-index:25;
+  }
+  html.novo .rail-mark{ display:none; }
+  html.novo .rail-recolher{
+    display:flex; align-items:center; justify-content:center; flex:none; width:36px; height:32px; margin:0 0 2px 10px; padding:0;
+    border:0; border-radius:9px; background:transparent; color: var(--text-secondary); cursor:pointer;
+    transition: background .2s var(--ease-out), color .2s var(--ease-out), transform .25s var(--spring);
+  }
+  html.novo .rail-recolher svg{ width:19px; height:19px; }
+  html.novo .rail-recolher:hover{ color: var(--text-primary); background: color-mix(in srgb, var(--text-primary) 7%, transparent); }
+  html.novo .rail-recolher:active{ transform: scale(.92); transition-duration:.1s; }
+  html.novo .rail-recolher:focus-visible, html.novo .rail-btn:focus-visible, html.novo .rail-conta:focus-within{ outline:2px solid var(--accent); outline-offset:-2px; }
+
+  html.novo .rail-nav{ align-items:stretch; gap:1px; padding:2px 0 6px; }
+  /* a seleção ocupa a linha inteira: o GSAP move só a altura e o "y" */
+  html.novo .rail-indicator{ left:0; right:0; width:auto !important; border-radius:10px; }
+  html.novo .rail-btn, html.novo.vidro .rail-btn{
+    width:auto; height:34px; min-height:34px; flex:none; flex-direction:row; justify-content:flex-start; align-items:center;
+    gap:12px; padding:0 10px 0 18px; border-radius:10px; overflow:hidden; white-space:nowrap;
+    font-size:13.5px; font-weight:500; line-height:1; letter-spacing:-.005em;
+  }
+  html.novo .rail-btn svg{ width:19px; height:19px; flex:none; }
+  html.novo .rail-btn.active{ font-weight:600; }
+  html.novo .rail-btn:not(.active):hover{ background: color-mix(in srgb, var(--text-primary) 6%, transparent); }
+  html.novo .rail-btn:active{ transform: scale(.975); }
+  /* nomes inteiros na barra larga ("Visão geral", "Detalhado das máquinas") */
+  html.novo .rail-label, html.novo .rail-label-longo{
+    max-width:none; overflow:hidden; text-overflow:clip; white-space:nowrap;
+    transition: opacity .24s var(--ease-out) .12s;
+  }
+  html.novo .rail-label-longo{ display:block; }
+  html.novo .rail-btn:has(.rail-label-longo) .rail-label{ display:none; }
+
+  html.novo .rail-grupo{ display:flex; flex-direction:column; align-items:stretch; gap:1px; margin:0; padding:0; border:0; }
+  html.novo .rail-grupo-nome{
+    display:block; margin:0; padding:6px 0 5px 18px; font-size:11px; font-weight:650; letter-spacing:.01em; line-height:1.2;
+    text-transform:none; color: var(--text-muted); opacity:1; white-space:nowrap;
+    transition: opacity .24s var(--ease-out) .12s;
+  }
+  html.novo .rail-sep{ width:auto; height:1px; margin:7px 12px; background: color-mix(in srgb, var(--text-primary) 10%, transparent); }
+
+  /* a conta embaixo: avatar, nome e perfil; a linha inteira abre o cartão da conta */
+  html.novo .rail-conta{
+    display:flex; align-items:center; gap:10px; flex:none; min-width:0; margin:0; padding:9px 6px 2px 12px;
+    border-top:1px solid color-mix(in srgb, var(--text-primary) 9%, transparent); cursor:pointer; white-space:nowrap; border-radius:0 0 14px 14px;
+  }
+  html.novo .rail-conta:has(.rail-foot[hidden]){ display:none; }
+  html.novo .rail-foot{ width:32px; height:32px; font-size:12.2px; flex:none; }
+  html.novo .rail-conta-txt{ display:flex; flex-direction:column; gap:3px; min-width:0; overflow:hidden; line-height:1.15; transition: opacity .24s var(--ease-out) .12s; }
+  html.novo .rail-conta-nome{ font-size:13px; font-weight:600; color: var(--text-primary); overflow:hidden; text-overflow:ellipsis; }
+  html.novo .rail-conta-papel{ font-size:11.5px; color: var(--text-muted); overflow:hidden; text-overflow:ellipsis; }
+  html.novo .rail-conta-papel:empty{ display:none; }
+  html.novo .rail-conta:hover .rail-conta-nome{ color: var(--accent); }
+
+  /* recolhida: só os ícones, no mesmo lugar (as linhas não pulam) */
+  html.novo.barra-fechada .rail-label, html.novo.barra-fechada .rail-label-longo,
+  html.novo.barra-fechada .rail-grupo-nome, html.novo.barra-fechada .rail-conta-txt{
+    opacity:0; pointer-events:none; transition-delay:0s; transition-duration:.12s;
+  }
+
+  /* ---------- topo fixo e conteúdo ---------- */
+  html.novo .topbar{ position:fixed; top:0; left: var(--off); right:0; z-index:20; }
+  html.novo .topbar::before{ left: calc(-1 * var(--off)); }
+  html.novo .content{ padding-top: calc(var(--topo-h) + 12px); }
+  html.novo .view .panel, html.novo .view .evolucao{ scroll-margin-top: calc(var(--topo-h) + 14px); }
+  html.novo .conta-pop{ left: calc(var(--barra-w) + 24px); bottom:12px; }
+  /* "Sair" fica no cartão da conta, que a linha da conta na barra abre: no topo seria repetido.
+     Sem a conta carregada, o botão do topo continua. */
+  html.novo .shell:has(#rail-foot:not([hidden])) #logout-btn{ display:none !important; }
+  /* o cartão da maior perda: o complemento ("paradas") sai para o nome caber inteiro ao lado do selo */
+  html.novo .oee-fator-topo:has(.oee-fator-chip) .oee-fator-nome small{ display:none; }
+  /* rolagem suave: o ScrollSmoother fixa o #smooth-wrapper na janela; ele começa depois da barra */
+  html.novo.suave #smooth-wrapper{ left: var(--off) !important; right:0 !important; width:auto !important; }
+}
+
+/* notebook de tela baixa: linhas mais justas antes de precisar rolar a barra */
+@media (min-width: 769px) and (max-height: 760px){
+  html.novo .rail-btn, html.novo.vidro .rail-btn{ height:31px; min-height:31px; }
+  html.novo .rail-grupo-nome{ padding:4px 0 3px 18px; }
+  html.novo .rail-sep{ margin:5px 12px; }
+  html.novo .rail-recolher{ height:30px; }
+}

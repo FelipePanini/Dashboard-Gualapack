@@ -74,7 +74,8 @@ const VAO = 0.07;          // fresta entre as faixas da coluna
 /* ---------------- utilidades */
 const $ = (id) => document.getElementById(id);
 // na volta de uma atualização automática do painel, sem a entrada animada
-const reduz = () => !!window.ATUALIZACAO_SILENCIOSA || matchMedia("(prefers-reduced-motion: reduce)").matches;
+// no visual novo do painel (html.novo) a entrada anima mesmo com "reduzir movimento" (decisão do dono, 16/10)
+const reduz = () => !!window.ATUALIZACAO_SILENCIOSA || (!document.documentElement.classList.contains("novo") && matchMedia("(prefers-reduced-motion: reduce)").matches);
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const nrm = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();

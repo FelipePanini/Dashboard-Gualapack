@@ -335,6 +335,24 @@ vale daqui pra frente em `demo/index.html`:
     - A Groq não guarda as perguntas por padrão.
     - Sem cota ou sem rede, vale a resposta local, com um aviso.
     - Toda resposta da IA diz que é IA e pede para conferir na tela.
+- **Visual novo em prévia** (16/10, pedido do dono; `?novo=1` liga e
+  `?novo=0` desliga, salvo no navegador). Vale só para quem liga, até o dono
+  aprovar. Está em `demo/assets/movimento.css` e `movimento.js`, com o GSAP
+  3.15.0.
+  - Barra lateral como a do Mac (`sidebars.md`): ícone e nome inteiro da
+    tela, grupos Fábrica e OEE com divisórias e a conta embaixo. Ela recolhe
+    até ficar só com os ícones, e a escolha fica salva. Sem escolha, recolhe
+    sozinha em janela com menos de 1280 px. O "Sair" do topo sai: fica no
+    cartão da conta.
+  - Animações com GSAP:
+    - a seleção da barra estica até a aba nova e assenta com mola;
+    - a tela entra em cascata, e o que está abaixo aparece ao rolar;
+    - os cartões inclinam um pouco com o ponteiro.
+  - Rolagem suave (ScrollSmoother) no computador, com mouse ou trackpad.
+    No toque fica a rolagem do sistema.
+  - Ligado o visual novo, as animações rodam mesmo com "Reduzir movimento"
+    no sistema, inclusive a abertura do login (decisão do dono).
+  - Sem o GSAP (sem rede), fica a barra nova com as animações de antes.
 
 ---
 

@@ -16,7 +16,8 @@
   if(window.__uiPainel) return;
   window.__uiPainel = true;
 
-  const reduzMovimento = () => window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  // no visual novo do painel (html.novo) as animações ficam, por decisão do dono (16/10)
+  const reduzMovimento = () => !document.documentElement.classList.contains("novo") && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const ponteiroFino = () => window.matchMedia("(pointer: fine)").matches;
 
   /* ---------------------------------------------------------------- estilo */
@@ -70,8 +71,8 @@
 }
 @keyframes gp-dica-in{ from{ opacity:0; transform: translateY(var(--gp-dy, 3px)); } }
 @media (prefers-reduced-motion: reduce){
-  .gp-menu, .gp-menu.acima, .gp-dica{ animation: gp-so-opacidade .12s linear; }
-  .gp-menu.saindo{ animation: none; opacity:0; }
+  html:not(.novo) .gp-menu, html:not(.novo) .gp-menu.acima, html:not(.novo) .gp-dica{ animation: gp-so-opacidade .12s linear; }
+  html:not(.novo) .gp-menu.saindo{ animation: none; opacity:0; }
   @keyframes gp-so-opacidade{ from{ opacity:0; } }
 }
 @media (prefers-reduced-transparency: reduce){
