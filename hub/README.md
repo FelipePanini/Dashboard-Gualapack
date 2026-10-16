@@ -355,9 +355,15 @@ Uma vez só, nesta ordem:
     com a foto `mp_maquina`). Tem de mostrar `pe_de_maquina_ok = true`. A
     próxima rodada do hub publica os volumes. Sem o 010, a tela Pé de máquina
     diz que ainda não foi ativada.
+14. No **SQL Editor** → rodar `sql/supabase/011_perfil_seguro.sql`
+    (segurança, 16/10/2026). A regra de `profiles` deixava cada usuário mudar
+    qualquer coluna da própria linha, inclusive o perfil, então qualquer
+    conta logada podia virar administradora pela API. Com o 011, o usuário
+    muda só o próprio nome, e o perfil muda pelo SQL Editor. Tem de mostrar
+    `perfil_ok = true`. O painel não muda: nenhuma tela edita o perfil.
 
 Feitos: 1 a 3 em 25/09, 4 a 6 em 30/09, o 8 (que já faz o 7) em 07/10, o 9
-em 08/10.
+em 08/10 e do 10 ao 13 depois (o 13 em 16/10). Falta o 14.
 
 ### Conferência com o motor do BI (30/09)
 
