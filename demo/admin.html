@@ -267,7 +267,7 @@ tbody tr:hover{ background: var(--glass-bg-strong); }
 
     btn.addEventListener("click", ()=>{
       const next = effectiveTheme() === "dark" ? "light" : "dark";
-      if(window.matchMedia("(prefers-reduced-motion: reduce)").matches || !document.startViewTransition){
+      if(!document.startViewTransition){
         applyTheme(next);
         return;
       }

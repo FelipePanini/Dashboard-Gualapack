@@ -157,8 +157,3 @@
 @media (prefers-reduced-transparency: reduce), (prefers-contrast: more){
   .maquete-dica, .maquete-recentrar, .maquete-edicao{ -webkit-backdrop-filter:none; backdrop-filter:none; background: var(--surface-1); }
 }
-@media (prefers-reduced-motion: reduce){
-  html:not(.novo) .mq-rotulo, html:not(.novo) .mi-missao, html:not(.novo) .maquete-recentrar{ transition:none; }
-  html:not(.novo) .mi-barra .t span{ animation:none; }
-  html:not(.novo) .maquete-anel{ animation-duration: 3s; }
-}

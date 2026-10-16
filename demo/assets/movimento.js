@@ -1,8 +1,9 @@
-/* Visual novo do painel (prévia de 16/10/2026, pedido do dono). Só roda com html.novo,
-   que o index.html liga com "?novo=1". As animações não seguem o "reduzir movimento" do
-   sistema: decisão do dono.
+/* Visual do painel (padrão desde 16/10/2026, aprovado pelo dono). Roda com html.novo, que o
+   index.html liga sempre (menos com "?novo=0"). As animações não seguem o "reduzir
+   movimento" do sistema: decisão do dono.
    - Barra lateral com os nomes das telas, que recolhe até ficar só com os ícones. A escolha
-     fica salva; sem escolha, recolhe em janela com menos de 1280 px.
+     fica salva; sem escolha, recolhe em janela com menos de 1280 px. Arrastar a borda muda
+     a largura, que também fica salva.
    - GSAP: a seleção da barra estica até a aba nova e assenta com mola; a tela que abre
      entra em cascata e o que está mais abaixo aparece ao rolar; a primeira abertura entra
      por partes; os cartões inclinam um pouco com o ponteiro.
@@ -39,12 +40,13 @@
     const antes = rail.getBoundingClientRect().width;
     raiz.classList.toggle("barra-fechada", fechar);
     rotularBotao();
+    marcarAlca();
     if(window.moverIndicadorBarra) window.moverIndicadorBarra();
     if(!animar || !gsap || !noComputador()) return;
     const depois = rail.getBoundingClientRect().width, dx = antes - depois;
     const vai = { duration: .5, ease: "power3.inOut" };
     gsap.fromTo(rail, { width: antes }, { width: depois, ...vai, clearProps: "width" });
-    gsap.fromTo([".topbar", "main.content"], { x: dx }, { x: 0, ...vai, clearProps: "transform" });
+    gsap.fromTo([".topbar", "main.content", "#rail-alca"], { x: dx }, { x: 0, ...vai, clearProps: "transform" });
   }
   function montarBarra(){
     rotularBotao();
@@ -72,6 +74,93 @@
     });
   }
 
+  /* ------------------------------------------------ largura da barra (arrastar a borda) */
+  // Como o divisor da barra lateral do Mac: arrastar a borda muda a largura (180 a 360 px, até
+  // um terço da janela) e a página acompanha; abaixo de 140 px a barra recolhe até os ícones.
+  // A largura fica salva. Dois cliques voltam ao tamanho padrão. Pelo teclado, com a borda em
+  // foco: as setas mudam 16 px (com Shift, 48), Enter recolhe ou abre, Home e End vão ao
+  // menor e ao maior tamanho.
+  const CHAVE_W = "gualapack-barra-largura", PADRAO = 232, MIN = 180, MAX = 360, RECOLHE = 140, FECHADA = 72;
+  const maxJanela = () => Math.max(MIN, Math.min(MAX, Math.round(innerWidth * .32)));
+  const larguraAberta = () => parseFloat(raiz.style.getPropertyValue("--barra-w-aberta")) || PADRAO;
+  const porLargura = w => raiz.style.setProperty("--barra-w-aberta", Math.round(w) + "px");
+  function guardarLargura(w){ try{ w === PADRAO ? localStorage.removeItem(CHAVE_W) : localStorage.setItem(CHAVE_W, String(w)); }catch(e){} }
+  function marcarAlca(){
+    const a = document.getElementById("rail-alca");
+    if(a) a.setAttribute("aria-valuenow", String(fechada() ? FECHADA : Math.round(larguraAberta())));
+  }
+  // vai até a largura w com uma animação curta; enquanto a página muda de largura, os gráficos
+  // redesenham com folga (classe arrastando-barra)
+  function irPara(w){
+    w = Math.max(MIN, Math.min(maxJanela(), Math.round(w)));
+    guardarLargura(w);
+    if(!window.gsap || !noComputador()){ porLargura(w); marcarAlca(); return; }
+    porLargura(larguraAberta());   // o GSAP precisa do valor de partida escrito
+    raiz.classList.add("arrastando-barra");
+    window.gsap.to(raiz, { "--barra-w-aberta": w + "px", duration: .3, ease: "power3.out", overwrite: true,
+      onComplete: ()=>{ raiz.classList.remove("arrastando-barra"); marcarAlca(); } });
+  }
+  function abrirOuFechar(fechar){
+    guardar(fechar ? "fechada" : "aberta");
+    alternarBarra(fechar, true);
+  }
+  function montarAlca(){
+    const alca = document.getElementById("rail-alca"), rail = document.querySelector(".rail");
+    if(!alca || !rail) return;
+    marcarAlca();
+    alca.addEventListener("pointerdown", e=>{
+      if(e.button !== 0 || !noComputador()) return;
+      e.preventDefault();
+      alca.setPointerCapture(e.pointerId);
+      const x0 = e.clientX, w0 = rail.getBoundingClientRect().width, abertaAntes = larguraAberta();
+      let w = w0, mexeu = false, ativo = true;
+      if(window.gsap) window.gsap.killTweensOf(raiz);
+      raiz.classList.add("arrastando-barra");
+      const mover = ev=>{
+        if(Math.abs(ev.clientX - x0) > 2) mexeu = true;
+        if(!mexeu) return;
+        w = Math.max(FECHADA, Math.min(maxJanela(), w0 + ev.clientX - x0));
+        const fechar = w < RECOLHE;
+        if(fechada() !== fechar){ raiz.classList.toggle("barra-fechada", fechar); rotularBotao(); }
+        if(!fechar) porLargura(w);
+      };
+      const soltar = ()=>{
+        if(!ativo) return;
+        ativo = false;
+        alca.removeEventListener("pointermove", mover);
+        raiz.classList.remove("arrastando-barra");
+        if(!mexeu) return;   // só um clique (o primeiro dos dois cliques, por exemplo)
+        if(fechada()){ porLargura(abertaAntes); guardar("fechada"); marcarAlca(); }
+        else{ guardar("aberta"); irPara(w); }
+        if(window.moverIndicadorBarra) window.moverIndicadorBarra();
+      };
+      alca.addEventListener("pointermove", mover);
+      alca.addEventListener("pointerup", soltar, { once:true });
+      alca.addEventListener("pointercancel", soltar, { once:true });
+      alca.addEventListener("lostpointercapture", soltar, { once:true });
+    });
+    alca.addEventListener("dblclick", ()=>{
+      if(fechada()){ porLargura(PADRAO); guardarLargura(PADRAO); abrirOuFechar(false); return; }
+      irPara(PADRAO);
+    });
+    alca.addEventListener("keydown", e=>{
+      const passo = e.shiftKey ? 48 : 16;
+      if(e.key === "ArrowRight" || e.key === "ArrowLeft"){
+        e.preventDefault();
+        if(fechada()){ if(e.key === "ArrowRight") abrirOuFechar(false); return; }
+        const alvo = larguraAberta() + (e.key === "ArrowRight" ? passo : -passo);
+        if(alvo < MIN) abrirOuFechar(true); else irPara(alvo);
+      }else if(e.key === "Enter" || e.key === " "){
+        e.preventDefault();
+        abrirOuFechar(!fechada());
+      }else if(e.key === "Home" || e.key === "End"){
+        e.preventDefault();
+        if(fechada()) abrirOuFechar(false);
+        irPara(e.key === "Home" ? MIN : MAX);
+      }
+    });
+  }
+
   /* ------------------------------------------------ altura do topo fixo */
   const topo = () => document.querySelector(".topbar");
   const alturaTopo = () => (noComputador() && topo()) ? topo().getBoundingClientRect().height : 0;
@@ -83,7 +172,7 @@
     por();
   }
 
-  quandoPronto(()=>{ montarBarra(); medirTopo(); });
+  quandoPronto(()=>{ montarBarra(); montarAlca(); medirTopo(); });
   if(!gsap) return;
   gsap.registerPlugin(...[ScrollTrigger, ScrollSmoother].filter(Boolean));
   raiz.classList.add("anima");
@@ -247,16 +336,30 @@
       suave = ScrollSmoother.create({ wrapper: "#smooth-wrapper", content: "#smooth-content", smooth: .9,
         smoothTouch: false, effects: false, normalizeScroll: false, ignoreMobileResize: true });
       raiz.classList.add("suave");
-      return ()=>{ if(suave) suave.kill(); suave = null; raiz.classList.remove("suave"); };
+      // Quem rola o #smooth-wrapper por conta própria (a busca do navegador, um scrollIntoView,
+      // a ferramenta de teste) leva o conteúdo a um lugar que o ScrollSmoother não conhece, e o
+      // próximo recálculo de altura o zerava: o conteúdo pulava. O deslocamento vira rolagem da
+      // página na hora, com o conteúdo parado onde o navegador o deixou.
+      const wrap = document.getElementById("smooth-wrapper");
+      const passar = ()=>{
+        const d = wrap.scrollTop;
+        if(!d || !suave) return;
+        wrap.scrollTop = 0;
+        suave.scrollTop(suave.scrollTop() + d);
+      };
+      wrap.addEventListener("scroll", passar, { passive:true });
+      return ()=>{ wrap.removeEventListener("scroll", passar); if(suave) suave.kill(); suave = null; raiz.classList.remove("suave"); };
     });
     // o conteúdo muda de altura (dados que chegam, troca de tela): recalcula onde cada bloco aparece
     let t = 0;
     new ResizeObserver(()=>{ clearTimeout(t); t = setTimeout(()=> ScrollTrigger.refresh(), 200); }).observe(conteudo);
   }
-  function rolar(alvo, animado){
+  // posição: onde o elemento para na janela ("center center", por exemplo); sem ela, o topo do
+  // elemento logo abaixo do topo fixo
+  function rolar(alvo, animado, posicao){
     if(!suave) return false;
     if(typeof alvo === "number") suave.scrollTo(alvo, !!animado);
-    else suave.scrollTo(alvo, animado !== false, "top " + Math.round(alturaTopo() + 14) + "px");
+    else suave.scrollTo(alvo, animado !== false, posicao || "top " + Math.round(alturaTopo() + 14) + "px");
     return true;
   }
 

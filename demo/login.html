@@ -16,14 +16,11 @@
 // uma cortina em curva (assets/login-intro.js).
 // - Na primeira visita a abertura começa do topo; nas seguintes a página abre já no login
 //   (rolar para cima revê). "?intro=1" força a abertura do começo.
-// - Com "reduzir movimento", ou "?intro=0", fica o login simples, sem GSAP. Com o visual novo
-//   do painel ligado neste navegador (?novo=1 no painel), a abertura roda mesmo assim.
+// - "?intro=0" deixa o login simples, sem GSAP. A abertura roda mesmo com "reduzir movimento"
+//   no sistema (decisão do dono, 16/10, igual ao painel).
 (function(){
   const pedido = new URLSearchParams(location.search).get("intro");
-  let novo = false;
-  try{ novo = localStorage.getItem("gualapack-visual-novo") === "1"; }catch(e){}
-  if(novo) document.documentElement.classList.add("novo");
-  if(pedido === "0" || (!novo && window.matchMedia("(prefers-reduced-motion: reduce)").matches)) return;
+  if(pedido === "0") return;
   let vista = false;
   try{ vista = localStorage.getItem("gualapack-abertura-vista") === "1"; }catch(e){}
   window.ABERTURA = { doComeco: pedido === "1" || !vista };
@@ -146,7 +143,6 @@ body{
 .blob-b{ width:480px; height:480px; right:-140px; bottom:-160px; background: radial-gradient(circle at 60% 40%, var(--blob-1), var(--blob-2) 65%, transparent 78%); animation: drift-b 32s var(--ease) infinite; }
 @keyframes drift-a{ 0%,100%{ transform:translate(0,0) scale(1);} 50%{ transform:translate(60px,50px) scale(1.08);} }
 @keyframes drift-b{ 0%,100%{ transform:translate(0,0) scale(1);} 50%{ transform:translate(-50px,-40px) scale(1.05);} }
-@media (prefers-reduced-motion: reduce){ html:not(.novo) .blob{ animation:none !important; } }
 
 .card{
   position:relative; z-index:1;
@@ -315,7 +311,7 @@ button.submit.loading .spinner{ display:inline-block; }
 
   btn.addEventListener("click", ()=>{
     const next = effectiveTheme() === "dark" ? "light" : "dark";
-    if((!document.documentElement.classList.contains("novo") && window.matchMedia("(prefers-reduced-motion: reduce)").matches) || !document.startViewTransition){
+    if(!document.startViewTransition){
       applyTheme(next);
       return;
     }

@@ -1,10 +1,11 @@
-/* Visual novo do painel (prévia de 16/10/2026, pedido do dono). Só vale com html.novo,
-   que o index.html liga com "?novo=1". Carregado depois do CSS principal.
+/* Visual do painel (padrão desde 16/10/2026, aprovado pelo dono). Vale com html.novo, que o
+   index.html liga sempre (menos com "?novo=0"). Carregado depois do CSS principal.
    - Barra lateral como a do Mac (sidebars.md): linhas com ícone e o nome da tela, grupos
      com título curto e divisórias, e a conta embaixo. Recolhe até ficar só com os ícones
-     ("Let people hide the sidebar"), e recolhe sozinha em janela com menos de 1280 px.
+     ("Let people hide the sidebar"), e recolhe sozinha em janela com menos de 1280 px. A borda
+     se arrasta para mudar a largura (180 a 360 px), como o divisor da barra do Mac.
    - Topo fixo: com a rolagem suave (ScrollSmoother) o conteúdo corre por baixo dele. */
-html.novo{ --barra-w: 232px; --off: calc(var(--barra-w) + 24px); --topo-h: 68px; }
+html.novo{ --barra-w: var(--barra-w-aberta, 232px); --off: calc(var(--barra-w) + 24px); --topo-h: 68px; }
 html.novo.barra-fechada{ --barra-w: 72px; }
 /* com o GSAP, quem move a seleção é ele (a transição do CSS brigaria com a mola) */
 html.novo.anima .rail-indicator{ transition: none !important; }
@@ -44,7 +45,7 @@ html.novo.anima .rail-indicator{ transition: none !important; }
   html.novo .rail-btn:active{ transform: scale(.975); }
   /* nomes inteiros na barra larga ("Visão geral", "Detalhado das máquinas") */
   html.novo .rail-label, html.novo .rail-label-longo{
-    max-width:none; overflow:hidden; text-overflow:clip; white-space:nowrap;
+    max-width:none; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
     transition: opacity .24s var(--ease-out) .12s;
   }
   html.novo .rail-label-longo{ display:block; }
@@ -76,6 +77,19 @@ html.novo.anima .rail-indicator{ transition: none !important; }
   html.novo.barra-fechada .rail-grupo-nome, html.novo.barra-fechada .rail-conta-txt{
     opacity:0; pointer-events:none; transition-delay:0s; transition-duration:.12s;
   }
+
+  /* borda de arrastar: o traço azul aparece com o ponteiro em cima, no foco e arrastando */
+  html.novo .rail-alca{
+    display:block; position:fixed; top:28px; bottom:28px; left: calc(12px + var(--barra-w) - 5px); width:10px; z-index:26;
+    cursor: col-resize; touch-action:none; outline:none;
+  }
+  html.novo .rail-alca::after{
+    content:""; position:absolute; top:0; bottom:0; left:4px; width:2px; border-radius:2px; background: var(--accent);
+    opacity:0; transition: opacity .2s var(--ease-out) .12s;
+  }
+  html.novo .rail-alca:hover::after, html.novo.arrastando-barra .rail-alca::after{ opacity:.6; transition-delay:0s; }
+  html.novo .rail-alca:focus-visible::after{ opacity:1; transition-delay:0s; }
+  html.novo.arrastando-barra, html.novo.arrastando-barra *{ cursor: col-resize !important; user-select:none !important; }
 
   /* ---------- topo fixo e conteúdo ---------- */
   html.novo .topbar{ position:fixed; top:0; left: var(--off); right:0; z-index:20; }

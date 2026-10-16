@@ -73,9 +73,9 @@ const VAO = 0.07;          // fresta entre as faixas da coluna
 
 /* ---------------- utilidades */
 const $ = (id) => document.getElementById(id);
-// na volta de uma atualização automática do painel, sem a entrada animada
-// no visual novo do painel (html.novo) a entrada anima mesmo com "reduzir movimento" (decisão do dono, 16/10)
-const reduz = () => !!window.ATUALIZACAO_SILENCIOSA || (!document.documentElement.classList.contains("novo") && matchMedia("(prefers-reduced-motion: reduce)").matches);
+// na volta de uma atualização automática do painel, sem a entrada animada (o "reduzir movimento"
+// do sistema não vale aqui: decisão do dono, 16/10)
+const reduz = () => !!window.ATUALIZACAO_SILENCIOSA;
 const clamp = (v, a, b) => Math.min(b, Math.max(a, v));
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const nrm = (s) => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
@@ -1178,7 +1178,9 @@ export async function iniciar({ client, lerTudo, papel }) {
       if (!r) { definirDestaque(null); $("maquete-inspetor").insertAdjacentHTML("afterbegin", `<p class="mi-nota" style="margin:0 0 10px">Nenhuma etiqueta ou OP começa com ${esc(alvo.busca)} no WIP.</p>`); return; }
       alvo = r;
     }
-    palco.scrollIntoView({ behavior: reduz() ? "auto" : "smooth", block: "center" });
+    // com a rolagem suave do painel, rola por ela (o scrollIntoView rolaria o contêiner fixo dela)
+    const mv = window.MOVIMENTO;
+    if (!(mv && mv.rolar && mv.rolar(palco, !reduz(), "center center"))) palco.scrollIntoView({ behavior: reduz() ? "auto" : "smooth", block: "center" });
     if (alvo.tipo === "pallet") selecionar(alvo.chave);
     else if (alvo.tipo === "op") destacarOP(alvo.chave);
     else if (alvo.tipo === "cliente") destacarCliente(alvo.chave);

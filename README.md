@@ -289,15 +289,18 @@ vale daqui pra frente em `demo/index.html`:
 - **Máquina sem apontamento no período** fica neutra ("—", "sem
   apontamento no período"), não "Crítico 0%". As faixas do TMR (75% e 62%)
   continuam as mesmas até a meta ser definida.
-- **Movimento**: curto (até ~0,6 s), com curva de mola, nunca bloqueia o uso
-  e some com "Reduzir movimento". Cada tela anima só na primeira vez que
-  aparece; trocar de aba de novo não repete.
+- **Movimento**: curto (até ~0,6 s), com curva de mola, nunca bloqueia o uso.
+  Desde 16/10 não segue o "Reduzir movimento" do sistema (decisão do dono;
+  veja "Visual do painel com GSAP" abaixo). A tela entra em cascata a cada
+  troca de aba. Já os números contando e os gráficos se desenhando aparecem só
+  na primeira vez que a tela abre.
 - **Celular** (até 768 px): abas embaixo, detalhe da máquina como folha que
   sobe de baixo (arrasta pra fechar), nenhuma rolagem lateral.
 - **Avatar abre o cartão da conta** (barra lateral no computador, topo no
   celular): nome, e-mail, perfil, área, desde quando tem acesso e último
-  login, só com o que `profiles` e o login guardam. No celular o "Sair" fica
-  dentro desse cartão.
+  login, só com o que `profiles` e o login guardam. O "Sair" fica dentro
+  desse cartão (no computador, desde 16/10, a linha da conta na barra
+  lateral abre o cartão).
 - **Agora no chão de fábrica** busca o dado de novo a cada 5 minutos, e o
   "há quanto tempo" anda a cada minuto. Com o dado parado há mais de 30 min,
   a legenda fica âmbar e os tempos param no último apontamento lido.
@@ -335,23 +338,34 @@ vale daqui pra frente em `demo/index.html`:
     - A Groq não guarda as perguntas por padrão.
     - Sem cota ou sem rede, vale a resposta local, com um aviso.
     - Toda resposta da IA diz que é IA e pede para conferir na tela.
-- **Visual novo em prévia** (16/10, pedido do dono; `?novo=1` liga e
-  `?novo=0` desliga, salvo no navegador). Vale só para quem liga, até o dono
-  aprovar. Está em `demo/assets/movimento.css` e `movimento.js`, com o GSAP
+- **Visual do painel com GSAP** (16/10). Foi prévia e o dono aprovou no
+  mesmo dia; é o padrão. `?novo=0` mostra o visual de antes, só naquela
+  visita. Está em `demo/assets/movimento.css` e `movimento.js`, com o GSAP
   3.15.0.
   - Barra lateral como a do Mac (`sidebars.md`): ícone e nome inteiro da
-    tela, grupos Fábrica e OEE com divisórias e a conta embaixo. Ela recolhe
-    até ficar só com os ícones, e a escolha fica salva. Sem escolha, recolhe
-    sozinha em janela com menos de 1280 px. O "Sair" do topo sai: fica no
-    cartão da conta.
+    tela, grupos Fábrica e OEE com divisórias e a conta embaixo.
+    - Ela recolhe até ficar só com os ícones, e a escolha fica salva. Sem
+      escolha, recolhe sozinha em janela com menos de 1280 px.
+    - A borda se arrasta para mudar a largura, de 180 a 360 px, até um terço
+      da janela. Abaixo de 140 px ela recolhe. A largura fica salva, e dois
+      cliques na borda voltam ao padrão de 232 px.
+    - Pelo teclado, com a borda em foco: as setas mudam 16 px (48 px com
+      Shift), Enter recolhe ou abre, e Home e End vão ao menor e ao maior
+      tamanho.
+    - Enquanto se arrasta, os gráficos redesenham no máximo a cada 140 ms.
+    - O "Sair" do topo sai: fica no cartão da conta.
   - Animações com GSAP:
     - a seleção da barra estica até a aba nova e assenta com mola;
     - a tela entra em cascata, e o que está abaixo aparece ao rolar;
     - os cartões inclinam um pouco com o ponteiro.
   - Rolagem suave (ScrollSmoother) no computador, com mouse ou trackpad.
     No toque fica a rolagem do sistema.
-  - Ligado o visual novo, as animações rodam mesmo com "Reduzir movimento"
-    no sistema, inclusive a abertura do login (decisão do dono).
+  - O painel não segue o "Reduzir movimento" do sistema em nenhum visual,
+    nem no login, nos acessos ou na maquete (decisão do dono, 16/10). Só a
+    volta de uma atualização automática chega parada, sem entrada.
+  - Se o conteúdo for rolado por fora do ScrollSmoother (busca do navegador,
+    `scrollIntoView`), o deslocamento vira rolagem da página na hora, sem o
+    conteúdo pular no recálculo seguinte.
   - Sem o GSAP (sem rede), fica a barra nova com as animações de antes.
 
 ---

@@ -13,7 +13,8 @@
 
    Na primeira visita a abertura começa do topo; nas seguintes a página abre já no login
    (rolar para cima revê a abertura). "?intro=1" força o começo.
-   Com "reduzir movimento" ligado, ou "?intro=0", nada disso roda: fica o login simples.
+   Com "?intro=0" nada disso roda: fica o login simples. Com "reduzir movimento" no sistema a
+   abertura roda mesmo assim (decisão do dono, 16/10).
    GSAP 3.15 (ScrollTrigger, ScrollToPlugin e MorphSVGPlugin) vem do CDN. */
 (function(){
   "use strict";

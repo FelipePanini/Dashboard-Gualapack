@@ -240,7 +240,7 @@ h1,h2{ font-family:"Archivo","Public Sans",sans-serif; letter-spacing:-0.01em; m
     updateIcon(effectiveTheme());
     btn.addEventListener("click", ()=>{
       const next = effectiveTheme() === "dark" ? "light" : "dark";
-      if(window.matchMedia("(prefers-reduced-motion: reduce)").matches || !document.startViewTransition){
+      if(!document.startViewTransition){
         applyTheme(next);
         return;
       }

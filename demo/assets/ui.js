@@ -16,8 +16,6 @@
   if(window.__uiPainel) return;
   window.__uiPainel = true;
 
-  // no visual novo do painel (html.novo) as animações ficam, por decisão do dono (16/10)
-  const reduzMovimento = () => !document.documentElement.classList.contains("novo") && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   const ponteiroFino = () => window.matchMedia("(pointer: fine)").matches;
 
   /* ---------------------------------------------------------------- estilo */
@@ -70,11 +68,6 @@
   animation: gp-dica-in .16s var(--ease-out, ease-out);
 }
 @keyframes gp-dica-in{ from{ opacity:0; transform: translateY(var(--gp-dy, 3px)); } }
-@media (prefers-reduced-motion: reduce){
-  html:not(.novo) .gp-menu, html:not(.novo) .gp-menu.acima, html:not(.novo) .gp-dica{ animation: gp-so-opacidade .12s linear; }
-  html:not(.novo) .gp-menu.saindo{ animation: none; opacity:0; }
-  @keyframes gp-so-opacidade{ from{ opacity:0; } }
-}
 @media (prefers-reduced-transparency: reduce){
   .gp-menu, .gp-dica{ backdrop-filter:none; -webkit-backdrop-filter:none; background: var(--surface-1, #fff); }
 }
@@ -312,7 +305,6 @@
     sel.setAttribute("aria-expanded", "false");
     sel.removeAttribute("aria-controls");
     if(devolverFoco) sel.focus({ preventScroll: true });
-    if(reduzMovimento()){ menu.remove(); return; }
     menu.classList.add("saindo");
     menu.addEventListener("animationend", () => menu.remove(), { once:true });
     setTimeout(() => menu.remove(), 250);
@@ -395,8 +387,10 @@
     document.body.appendChild(dica);
     const r = el.getBoundingClientRect(), w = dica.offsetWidth, h = dica.offsetHeight, m = 8;
     let x, y;
-    if(el.closest(".rail")){            // barra lateral: à direita do botão
-      x = r.right + 10; y = r.top + r.height/2 - h/2;
+    if(el.closest(".rail") || el.dataset.dicaLado === "direita"){   // barra lateral (e a borda dela): à direita
+      // elemento alto (a borda da barra lateral): a dica fica na altura do ponteiro
+      const meio = el.dataset.dicaLado === "direita" && ponteiroY != null ? ponteiroY : r.top + r.height/2;
+      x = r.right + 10; y = meio - h/2;
       dica.style.setProperty("--gp-dy", "0px");
     }else{
       x = r.left + r.width/2 - w/2; y = r.bottom + 8;
@@ -425,8 +419,10 @@
     dicaPendente = el;
     dicaTempo = setTimeout(() => { dicaPendente = null; dicaTempo = 0; mostrarDica(el); }, quente ? 0 : ATRASO);
   }
+  let ponteiroY = null;
   document.addEventListener("pointerover", e => {
     if(e.pointerType !== "mouse") return;
+    ponteiroY = e.clientY;
     const el = alvoDe(e.target);
     if(el && el === clicado) return;
     if(el && (el === dicaAlvo || el === dicaPendente)) return;
